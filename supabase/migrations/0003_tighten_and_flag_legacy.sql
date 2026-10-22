@@ -1,4 +1,22 @@
--- Pending: needs the owner's approval to run (was cancelled while unattended on 22 Oct 2026).
+-- 0003: table permissions for signed-in users, tighter function access, and flags on imported bills.
+
+-- Table permissions for signed-in users. Row-level security still decides which rows each person can see or change.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on
+  public.app_settings, public.locations, public.profile_locations, public.units, public.categories,
+  public.items, public.item_locations, public.vendors, public.vendor_items,
+  public.indents, public.indent_lines, public.purchase_orders, public.po_lines,
+  public.goods_receipts, public.grn_lines, public.issues, public.issue_lines,
+  public.stock_counts, public.stock_count_lines
+  to authenticated;
+grant select, update on public.profiles to authenticated;
+grant select, insert, update on public.vendor_bills to authenticated;
+grant select, insert on public.bill_payments to authenticated;
+grant select on public.stock_ledger, public.audit_log, public.stock_on_hand, public.vendor_bill_balances to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+grant execute on function public.department_items(smallint), public.issue_items_to_confirm(uuid),
+  public.post_opening_stock(smallint, int, numeric, text) to authenticated;
+
 revoke execute on function public.business_date(timestamptz) from public, anon;
 revoke execute on function public.has_role(public.app_role[]) from public, anon;
 revoke execute on function public.my_location_ids() from public, anon;
