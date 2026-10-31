@@ -11,9 +11,11 @@ import { Bills } from './pages/Bills';
 import { People } from './pages/People';
 import { OpeningStock } from './pages/OpeningStock';
 import { StaffHome } from './pages/StaffHome';
+import { IndentPage } from './pages/Indent';
+import { Indents } from './pages/Indents';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/items': <Items />, '/stock': <OpeningStock />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
+  '/': <Dashboard />, '/indents': <Indents />, '/items': <Items />, '/stock': <OpeningStock />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
 };
 
 function Gate() {
@@ -30,7 +32,15 @@ function Gate() {
       </div></div>
     );
   }
-  if (profile.role === 'department' || profile.role === 'closing') return <StaffHome />;
+  if (profile.role === 'department' || profile.role === 'closing') {
+    return (
+      <Routes>
+        <Route path="/" element={<StaffHome />} />
+        <Route path="/indent" element={<IndentPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
   const allowed = NAV.filter((n) => n.roles.includes(profile.role));
   return (
     <Layout>

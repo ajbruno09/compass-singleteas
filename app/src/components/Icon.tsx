@@ -17,7 +17,10 @@ const P: Record<string, string> = {
   trash: 'M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 11v6M14 11v6',
   globe: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14M21 21l-4.3-4.3',
-  layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5'
+  layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',
+  back: 'M15 18l-6-6 6-6',
+  bell: 'M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7M10 20a2 2 0 0 0 4 0',
+  phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2'
 };
 export function Icon({ name, size = 20, stroke = 1.9 }: { name: keyof typeof P | string; size?: number; stroke?: number }) {
   return (

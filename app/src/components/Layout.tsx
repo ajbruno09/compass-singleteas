@@ -3,10 +3,12 @@ import type { ReactNode } from 'react';
 import { useSession } from '../lib/session';
 import { ROLE_LABEL, type Role } from '../lib/types';
 import { Icon } from './Icon';
+import { SosWatcher } from './SosWatcher';
 
 interface NavItem { to: string; label: string; icon: string; roles: Role[] }
 export const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: 'home', roles: ['owner', 'manager', 'store', 'accounts'] },
+  { to: '/indents', label: 'Indents', icon: 'clip', roles: ['owner', 'manager', 'store'] },
   { to: '/items', label: 'Items', icon: 'tag', roles: ['owner', 'manager', 'store'] },
   { to: '/stock', label: 'Opening stock', icon: 'layers', roles: ['owner', 'store'] },
   { to: '/vendors', label: 'Vendors', icon: 'truck', roles: ['owner', 'manager', 'store', 'accounts'] },
@@ -41,7 +43,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </select>
         <button className="btn quiet" onClick={signOut} aria-label="Sign out"><Icon name="out" /></button>
       </header>
-      <main className="main">{children}</main>
+      <main className="main"><SosWatcher />{children}</main>
     </div>
   );
 }

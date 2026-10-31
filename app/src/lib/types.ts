@@ -24,3 +24,18 @@ export const LANGUAGES: Record<string, string> = {
   hi: 'हिंदी (Hindi)', as: 'অসমীয়া (Assamese)', bn: 'বাংলা (Bengali)', kn: 'ಕನ್ನಡ (Kannada)', ta: 'தமிழ் (Tamil)',
   ml: 'മലയാളം (Malayalam)', te: 'తెలుగు (Telugu)', ne: 'नेपाली (Nepali)', or: 'ଓଡ଼ିଆ (Odia)'
 };
+
+export interface Group { id: number; code: string; name: string; icon: string | null; sort: number; }
+export interface DeptItem {
+  id: number; name: string; local_names: Record<string, string> | null; group_id: number | null; unit: string;
+  pack_note: string | null; quick_amounts: number[] | null; photo_path: string | null;
+}
+export interface IndentRec { id: string; location_id: number; for_date: string; status: 'draft' | 'submitted' | 'locked' | 'cancelled'; submitted_at: string | null; nothing_needed: boolean; }
+export interface Usual { item_id: number; usual: number; last_qty: number; runs: number; }
+export interface SosAlert {
+  id: string; location_id: number; raised_by: string; item_id: number | null; note: string; created_at: string;
+  acked_by: string | null; acked_at: string | null; eta_minutes: number | null; resolved_at: string | null;
+}
+export interface Contact { full_name: string; phone: string; role: Role; }
+export const REASONS = ['Guests or event', 'Running low', 'Spoiled or wasted', 'New dish', 'Other'];
+export const SOS_AFTER_SECONDS = 120;
