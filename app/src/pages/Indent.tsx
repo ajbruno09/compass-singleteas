@@ -21,6 +21,8 @@ const addLabel = (n: number, unit: string) => {
   return `+${n}`;
 };
 
+const CAT_PHOTO: Record<number, string> = { 1: 'veg', 2: 'dairy', 3: 'chicken', 4: 'atta', 5: 'spices', 6: 'sauces', 7: 'frozen', 8: 'kitchen', 9: 'bread', 10: 'drinks', 11: 'icecream', 12: 'packaging', 13: 'cleaning', 14: 'gas', 15: 'stationery', 16: 'dryfruits' };
+
 export function IndentPage() {
   const { profile, myLocations } = useSession();
   const toast = useToast();
@@ -178,9 +180,9 @@ export function IndentPage() {
                 {groupInfo.map(({ g, count, picked }) => (
                   <button key={g.id} className="grouptile" onClick={() => setView({ kind: 'group', id: g.id })}>
                     {picked > 0 && <span className="badge">{picked}</span>}
-                    <span className="emoji">{g.icon || '🧾'}</span>
-                    <span className="gname">{g.name}</span>
-                    <span className="small muted">{count} {count === 1 ? "item" : "items"}</span>
+                    <span className="gphoto">{CAT_PHOTO[g.id] ? <img src={`/cats/${CAT_PHOTO[g.id]}.jpg`} alt="" loading="lazy" /> : <span className="emoji">{g.icon || '🧾'}</span>}</span>
+                    <span className="gtext"><span className="gname">{g.name}</span>
+                    <span className="small muted">{count} {count === 1 ? "item" : "items"}</span></span>
                   </button>
                 ))}
               </div>
