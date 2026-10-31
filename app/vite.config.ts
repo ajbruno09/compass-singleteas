@@ -7,6 +7,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false,
+      workbox: { skipWaiting: true, clientsClaim: true, cleanupOutdatedCaches: true },
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Compass · Single Teas',
