@@ -159,12 +159,12 @@ export function IndentPage() {
         {lang && <button className="btn secondary" style={{ minHeight: 40, borderRadius: 999 }} onClick={() => { const n = !local; setLocal(n); try { localStorage.setItem('compass-lang', n ? 'local' : 'en'); } catch { /* ignore */ } }}><Icon name="globe" size={16} />{local ? 'English' : 'Local'}</button>}
       </div>
 
+      <div className={`notice ${win === 'open' ? 'ok' : win === 'early' ? 'info' : 'warn'}`}>{winChip}</div>
       {myLocations.length > 1 && (
-        <div className="seg" role="group" aria-label="Counter">
+        <div className="cpills" role="group" aria-label="Counter">
           {myLocations.map((l) => <button key={l.id} aria-pressed={l.id === locId} onClick={() => setSp({ loc: String(l.id) })}>{l.name}</button>)}
         </div>
       )}
-      <div className="row">{winChip}</div>
 
       {loading ? <p className="muted">Loading…</p> : !indent ? null : !editable ? (
         <Sent indent={indent} lines={lines} itemById={itemById} label={label} onReopen={reopen} busy={busy} />

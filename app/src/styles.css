@@ -188,6 +188,15 @@ tr.click { cursor: pointer; }
 .searchbox:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
 .usualbar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--r-lg); border: 1px solid var(--warn-line); background: var(--warn-bg); color: var(--ink); font: inherit; text-align: left; cursor: pointer; min-height: 60px; }
 .usualbar:disabled { opacity: 0.6; cursor: default; border-color: var(--line); background: var(--surface); }
+.notice { display: flex; align-items: center; padding: 10px 12px; border-radius: 12px; font-weight: 550; font-size: 14px; }
+.notice .chip { height: auto; padding: 0; background: transparent; font-size: 14px; font-weight: 550; white-space: normal; }
+.notice .chip::before { width: 8px; height: 8px; }
+.notice.info { background: var(--info-bg); color: var(--info); }
+.notice.ok { background: var(--ok-bg); color: var(--ok); }
+.notice.warn { background: var(--warn-bg); color: var(--warn); }
+.cpills { display: flex; flex-wrap: wrap; gap: 6px; }
+.cpills button { min-height: 34px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink-2); font: 550 13.5px/1 var(--font); cursor: pointer; }
+.cpills button[aria-pressed=true] { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 650; }
 .groupgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 10px; }
 .backcat { min-height: 44px; padding: 0 14px 0 8px; font-weight: 600; font-size: 15px; }
 .grouptile { position: relative; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--ink); font: inherit; display: flex; flex-direction: column; text-align: left; cursor: pointer; }
