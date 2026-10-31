@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { supabase, staffEmail } from '../lib/supabase';
 import { errText } from '../lib/format';
+import { Icon } from '../components/Icon';
 
 type Mode = 'staff' | 'owner' | 'owner-new';
 
@@ -40,58 +41,70 @@ export function Login() {
   }
 
   return (
-    <div className="login">
-      <form className="card" onSubmit={submit}>
-        <div className="row" style={{ gap: 10 }}>
-          <img src="/icon.svg" alt="" width={40} height={40} />
+    <div className="split">
+      <div className="split-form">
+        <div className="logo"><img src="/icon.svg" alt="" /><b>Compass</b><span className="small muted">Single Teas</span></div>
+        <form onSubmit={submit}>
           <div>
-            <h1 style={{ fontSize: 26, lineHeight: '30px' }}>Compass</h1>
-            <p className="small muted">Single Teas operations</p>
+            <h1 style={{ fontSize: 24, lineHeight: '32px' }}>{mode === 'owner-new' ? 'Set up your owner account' : 'Welcome back'}</h1>
+            <p className="muted" style={{ marginTop: 4 }}>{mode === 'staff' ? 'Sign in with your mobile number and PIN.' : 'Sign in with your email.'}</p>
+          </div>
+
+          {mode === 'staff' ? (
+            <>
+              <label className="field">
+                <span>Mobile number</span>
+                <input id="phone" inputMode="numeric" autoComplete="tel-national" maxLength={10} value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))} placeholder="10 digits" className="num" style={{ minHeight: 40 }} />
+              </label>
+              <label className="field">
+                <span>PIN</span>
+                <input id="pin" className="pin" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6}
+                  value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} placeholder="••••••" style={{ minHeight: 40 }} />
+              </label>
+            </>
+          ) : (
+            <>
+              <label className="field">
+                <span>Email</span>
+                <input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ minHeight: 40 }} />
+              </label>
+              <label className="field">
+                <span>{mode === 'owner-new' ? 'Choose a password' : 'Password'}</span>
+                <input id="password" type="password" autoComplete={mode === 'owner-new' ? 'new-password' : 'current-password'}
+                  value={password} onChange={(e) => setPassword(e.target.value)} style={{ minHeight: 40 }} />
+              </label>
+            </>
+          )}
+
+          {error && <p className="banner bad" role="alert">{error}</p>}
+          {note && <p className="banner ok" role="status">{note}</p>}
+
+          <button className="btn primary floor" disabled={busy}>
+            {busy ? 'Please wait…' : mode === 'owner-new' ? 'Create owner account' : 'Sign in'}
+          </button>
+
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            {mode === 'staff'
+              ? <button type="button" className="btn quiet" onClick={() => setMode('owner')}>Owner sign in with email</button>
+              : <button type="button" className="btn quiet" onClick={() => setMode('staff')}>Staff sign in with mobile</button>}
+            {mode === 'owner' && <button type="button" className="btn quiet" onClick={() => setMode('owner-new')}>First time? Set up</button>}
+          </div>
+          <p className="small muted">Trouble signing in? Ask Devid or J to reset your PIN.</p>
+        </form>
+        <p className="small muted">Internal use only · Single Teas Operations</p>
+      </div>
+      <div className="split-art">
+        <div className="inner">
+          <p className="label" style={{ color: 'inherit' }}>One place for the whole kitchen</p>
+          <p className="big">Indents, store and purchases, without the WhatsApp chaos.</p>
+          <div style={{ display: 'grid', gap: 14 }}>
+            {['Counters send tomorrow\'s indent in under a minute', 'The store sees every request live, with SOS alarms', 'One sign in, then pick the app you need'].map((t) => (
+              <div key={t} className="pt"><Icon name="check" /><span>{t}</span></div>
+            ))}
           </div>
         </div>
-
-        {mode === 'staff' ? (
-          <>
-            <label className="field">
-              <span>Mobile number</span>
-              <input id="phone" inputMode="numeric" autoComplete="tel-national" maxLength={10} value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))} placeholder="10 digits" className="num" />
-            </label>
-            <label className="field">
-              <span>PIN</span>
-              <input id="pin" className="pin" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6}
-                value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} placeholder="••••••" />
-            </label>
-          </>
-        ) : (
-          <>
-            <label className="field">
-              <span>Email</span>
-              <input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>{mode === 'owner-new' ? 'Choose a password' : 'Password'}</span>
-              <input id="password" type="password" autoComplete={mode === 'owner-new' ? 'new-password' : 'current-password'}
-                value={password} onChange={(e) => setPassword(e.target.value)} />
-            </label>
-          </>
-        )}
-
-        {error && <p className="banner bad" role="alert">{error}</p>}
-        {note && <p className="banner ok" role="status">{note}</p>}
-
-        <button className="btn primary floor" disabled={busy}>
-          {busy ? 'Please wait…' : mode === 'owner-new' ? 'Create owner account' : 'Sign in'}
-        </button>
-
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          {mode === 'staff'
-            ? <button type="button" className="btn quiet" onClick={() => setMode('owner')}>Owner sign in with email</button>
-            : <button type="button" className="btn quiet" onClick={() => setMode('staff')}>Staff sign in with mobile</button>}
-          {mode === 'owner' && <button type="button" className="btn quiet" onClick={() => setMode('owner-new')}>First time? Set up</button>}
-        </div>
-        <img src="/single-teas-logo.png" alt="Single Teas" width={44} height={44} style={{ justifySelf: 'center', opacity: 0.9 }} />
-      </form>
+      </div>
     </div>
   );
 }

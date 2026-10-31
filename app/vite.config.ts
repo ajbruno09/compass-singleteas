@@ -12,8 +12,8 @@ export default defineConfig({
         name: 'Compass · Single Teas',
         short_name: 'Compass',
         description: 'Single Teas operations: indents, stock, purchases and closing.',
-        theme_color: '#2B44A6',
-        background_color: '#F2F3EF',
+        theme_color: '#1B6A4D',
+        background_color: '#F6F7F6',
         display: 'standalone',
         start_url: '/',
         icons: [

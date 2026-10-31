@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { SessionProvider, useSession } from './lib/session';
 import { configured } from './lib/supabase';
 import { ToastProvider } from './components/Toast';
@@ -13,10 +13,19 @@ import { OpeningStock } from './pages/OpeningStock';
 import { StaffHome } from './pages/StaffHome';
 import { IndentPage } from './pages/Indent';
 import { Indents } from './pages/Indents';
+import { Apps } from './pages/Apps';
+import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
   '/': <Dashboard />, '/indents': <Indents />, '/items': <Items />, '/stock': <OpeningStock />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
 };
+
+// After signing in, people with more than one app choose which to open. Once per visit.
+function Home({ several }: { several: boolean }) {
+  let picked = true;
+  try { picked = sessionStorage.getItem('compass-picked') === '1'; } catch { /* ignore */ }
+  return several && !picked ? <Navigate to="/apps" replace /> : <Dashboard />;
+}
 
 function Gate() {
   const { session, profile, loading, signOut } = useSession();
@@ -42,13 +51,16 @@ function Gate() {
     );
   }
   const allowed = NAV.filter((n) => n.roles.includes(profile.role));
+  const several = appsFor(profile.role).length > 1;
   return (
-    <Layout>
-      <Routes>
-        {allowed.map((n) => <Route key={n.to} path={n.to} element={PAGES[n.to]} />)}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Layout>
+    <Routes>
+      <Route path="/apps" element={several ? <Apps /> : <Navigate to="/" replace />} />
+      <Route element={<Layout><Outlet /></Layout>}>
+        <Route path="/" element={<Home several={several} />} />
+        {allowed.filter((n) => n.to !== '/').map((n) => <Route key={n.to} path={n.to} element={PAGES[n.to]} />)}
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 

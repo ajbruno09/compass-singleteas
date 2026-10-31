@@ -4,6 +4,7 @@ import { useSession } from '../lib/session';
 import { dayLabel, timeOf, windowState, type Reminders } from '../lib/ist';
 import { qty as fmtQty } from '../lib/format';
 import type { Group } from '../lib/types';
+import { DatePicker } from '../components/DatePicker';
 
 interface LineRow { item_id: number; qty: number; reason: string | null }
 interface IndentRow { id: string; location_id: number; status: string; submitted_at: string | null; nothing_needed: boolean; indent_lines: LineRow[] }
@@ -65,9 +66,9 @@ export function Indents() {
   return (
     <>
       <div className="pagehead">
-        <div><h1>Indents</h1><p className="muted">For {date ? dayLabel(date) : '…'} · {doneCount} of {counters.length} counters have sent</p></div>
+        <div><p className="label">Store view</p><h1>Indents for {date ? dayLabel(date) : '…'}</h1><p className="muted small" style={{ marginTop: 2 }}>{doneCount} of {counters.length} counters have sent. Counters can still change theirs until the store starts.</p></div>
         <div className="row">
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: 170 }} aria-label="Indent date" />
+          <DatePicker value={date} onChange={setDate} tomorrow={target} label="Indent date" />
           <div className="seg"><button aria-pressed={tab === 'counter'} onClick={() => setTab('counter')}>By counter</button><button aria-pressed={tab === 'item'} onClick={() => setTab('item')}>All counters together</button></div>
         </div>
       </div>

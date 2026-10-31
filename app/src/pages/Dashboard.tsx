@@ -3,11 +3,14 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { money } from '../lib/format';
+import { dayLabel } from '../lib/ist';
 
 interface VendorDue { name: string; balance: number; bills: number }
 
 export function Dashboard() {
-  const { profile } = useSession();
+  const { profile, locations } = useSession();
+  const [indents, setIndents] = useState<Record<number, string>>({});
+  const [indentDate, setIndentDate] = useState('');
   const [counts, setCounts] = useState({ items: 0, vendors: 0, people: 0, noPhone: 0, noPhoto: 0 });
   const [dues, setDues] = useState<VendorDue[]>([]);
   const [unpaid, setUnpaid] = useState(0);
@@ -18,6 +21,12 @@ export function Dashboard() {
 
   useEffect(() => {
     (async () => {
+      const d = await supabase.rpc('indent_for_date');
+      if (d.data) {
+        setIndentDate(String(d.data));
+        const r = await supabase.from('indents').select('location_id, status').eq('for_date', String(d.data));
+        setIndents(Object.fromEntries(((r.data as { location_id: number; status: string }[]) ?? []).map((x) => [x.location_id, x.status])));
+      }
       const [items, vendors, people] = await Promise.all([
         supabase.from('items').select('id, photo_path', { count: 'exact' }).eq('active', true),
         supabase.from('vendors').select('id, phone, whatsapp', { count: 'exact' }).eq('active', true),
@@ -43,29 +52,57 @@ export function Dashboard() {
     })();
   }, [seesMoney]);
 
+  const maxDue = dues[0]?.balance || 1;
+  const counters = locations.filter((l) => l.kind === 'department' && l.active);
+  const state = (id: number) => indents[id];
+  const sentN = counters.filter((c) => ['submitted', 'locked'].includes(state(c.id) ?? '')).length;
+  const tile = { textDecoration: 'none', color: 'inherit' } as const;
+
   return (
     <>
       <div className="pagehead">
         <div><p className="label">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-          <h1>{greet}{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}</h1></div>
+          <h1 style={{ fontSize: 26, lineHeight: '34px' }}>{greet}{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}</h1></div>
       </div>
-      <p className="banner">Compass is being set up. Indents, store issues and closing stock switch on in the next update, once items and staff are loaded.</p>
       <div className="grid-tiles">
-        <Link to="/items" className="card tile" style={{ textDecoration: 'none', color: 'inherit' }}><span className="label">Items</span><span className="big">{counts.items}</span><span className="small muted">{counts.noPhoto ? `${counts.noPhoto} without a photo` : 'All have photos'}</span></Link>
-        <Link to="/vendors" className="card tile" style={{ textDecoration: 'none', color: 'inherit' }}><span className="label">Vendors</span><span className="big">{counts.vendors}</span><span className="small" style={{ color: counts.noPhone ? 'var(--watch)' : undefined, fontWeight: counts.noPhone ? 700 : 400 }}>{counts.noPhone ? `${counts.noPhone} without WhatsApp` : 'All reachable'}</span></Link>
-        {profile?.role === 'owner' && <Link to="/people" className="card tile" style={{ textDecoration: 'none', color: 'inherit' }}><span className="label">People with access</span><span className="big">{counts.people}</span></Link>}
-        {seesMoney && <Link to="/bills" className="card tile" style={{ textDecoration: 'none', color: 'inherit', background: 'var(--turmeric-tint)', borderColor: 'var(--turmeric)' }}><span className="label" style={{ color: 'var(--ink)' }}>Unpaid to vendors</span><span className="big">{money(unpaid)}</span>{flagged > 0 && <span className="small" style={{ fontWeight: 700 }}>{flagged} bills need a check</span>}</Link>}
+        <Link to="/items" className="card tile" style={tile}><span className="label">Items</span><span className="big">{counts.items}</span><span className="small muted">{counts.noPhoto ? `${counts.noPhoto} without a photo` : 'All have photos'}</span></Link>
+        <Link to="/vendors" className="card tile" style={tile}><span className="label">Vendors</span><span className="big">{counts.vendors}</span><span className="small" style={{ color: counts.noPhone ? 'var(--warn)' : undefined, fontWeight: counts.noPhone ? 550 : 400 }}>{counts.noPhone ? `${counts.noPhone} without WhatsApp` : 'All reachable'}</span></Link>
+        {profile?.role === 'owner' && <Link to="/people" className="card tile" style={tile}><span className="label">People with access</span><span className="big">{counts.people}</span><span className="small muted">Owner, store and counters</span></Link>}
+        {seesMoney && <Link to="/bills" className="card tile attn" style={tile}><span className="label" style={{ color: 'var(--warn)' }}>Unpaid to vendors</span><span className="big">{money(unpaid)}</span><span className="small" style={{ color: 'var(--warn)', fontWeight: 550 }}>{flagged > 0 ? `${flagged} bills need a check` : 'Nothing flagged'}</span></Link>}
       </div>
-      {seesMoney && dues.length > 0 && (
-        <section className="card" style={{ display: 'grid', gap: 10 }}>
-          <h2>Largest unpaid vendors</h2>
-          {dues.map((d) => (
-            <div key={d.name} className="row" style={{ justifyContent: 'space-between' }}>
-              <span>{d.name} <span className="small muted">· {d.bills} bills</span></span><span className="num">{money(d.balance)}</span>
-            </div>
-          ))}
-        </section>
-      )}
+
+      <div className="row" style={{ alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        {seesMoney && dues.length > 0 && (
+          <section className="tablewrap" style={{ flex: '3 1 520px', minWidth: 0 }}>
+            <div className="row" style={{ justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--line)' }}><h2>Largest unpaid vendors</h2><Link to="/bills" className="btn quiet" style={{ minHeight: 28 }}>View all</Link></div>
+            <table>
+              <thead><tr><th>Vendor</th><th style={{ width: 80 }}>Bills</th><th style={{ width: 200 }}>Share of largest</th><th className="r" style={{ width: 120 }}>Amount</th></tr></thead>
+              <tbody>{dues.map((d) => (
+                <tr key={d.name}><td style={{ fontWeight: 500 }}>{d.name}</td><td className="num">{d.bills}</td>
+                  <td><div style={{ height: 6, borderRadius: 999, background: 'var(--sunken)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.round((d.balance / maxDue) * 100)}%`, background: 'var(--brand)', borderRadius: 999 }} /></div></td>
+                  <td className="r num" style={{ fontWeight: 550 }}>{money(d.balance)}</td></tr>))}</tbody>
+            </table>
+          </section>
+        )}
+        <div className="stack" style={{ flex: '2 1 320px', minWidth: 0 }}>
+          <section className="card" style={{ display: 'grid', gap: 10 }}>
+            <h2>Needs a look</h2>
+            {seesMoney && <Link to="/bills" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Bills waiting for a check</span><span className={'chip ' + (flagged ? 'late' : 'done')}>{flagged}</span></Link>}
+            <Link to="/vendors" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Vendors with no WhatsApp group yet</span><span className={'chip ' + (counts.noPhone ? 'late' : 'done')}>{counts.noPhone}</span></Link>
+          </section>
+          {counters.length > 0 && (
+            <section className="card" style={{ display: 'grid', gap: 10 }}>
+              <div className="row" style={{ justifyContent: 'space-between' }}><h2>Indents {indentDate ? `for ${dayLabel(indentDate)}` : ''}</h2><span className="small muted">{sentN} of {counters.length} sent</span></div>
+              {counters.map((c) => {
+                const st = state(c.id);
+                const sent = st === 'submitted' || st === 'locked';
+                return <div key={c.id} className="row" style={{ justifyContent: 'space-between' }}><span>{c.name}</span>
+                  <span className={'chip ' + (sent ? 'done' : st ? 'late' : 'off')}>{sent ? 'Sent' : st ? 'Open' : 'Not started'}</span></div>;
+              })}
+            </section>
+          )}
+        </div>
+      </div>
     </>
   );
 }

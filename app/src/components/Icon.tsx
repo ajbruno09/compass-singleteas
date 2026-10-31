@@ -20,9 +20,16 @@ const P: Record<string, string> = {
   layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',
   back: 'M15 18l-6-6 6-6',
   bell: 'M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7M10 20a2 2 0 0 0 4 0',
+  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  moon: 'M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z',
+  cal: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
+  chev: 'M6 9l6 6 6-6',
+  eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
+  alert: 'M12 3l10 18H2L12 3zM12 10v5M12 18h.01',
   phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2'
 };
-export function Icon({ name, size = 20, stroke = 1.9 }: { name: keyof typeof P | string; size?: number; stroke?: number }) {
+export function Icon({ name, size = 16, stroke = 1.7 }: { name: keyof typeof P | string; size?: number; stroke?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={P[name] ?? ''} />

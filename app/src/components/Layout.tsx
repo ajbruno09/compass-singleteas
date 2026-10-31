@@ -1,8 +1,11 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useSession } from '../lib/session';
 import { ROLE_LABEL, type Role } from '../lib/types';
 import { Icon } from './Icon';
+import { appsFor } from '../lib/apps';
+
+const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
 import { SosWatcher } from './SosWatcher';
 
 interface NavItem { to: string; label: string; icon: string; roles: Role[] }
@@ -31,15 +34,19 @@ export function Layout({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
         <div className="who">
-          <span style={{ fontWeight: 700 }}>{profile?.full_name || profile?.email}</span>
-          <span className="small muted">{profile ? ROLE_LABEL[profile.role] : ''}</span>
-          <button className="btn secondary" onClick={signOut}><Icon name="out" />Sign out</button>
+          {profile && appsFor(profile.role).length > 1 && <Link to="/apps" className="navlink"><span className="row" style={{ gap: 10 }}><Icon name="grid" />All apps</span></Link>}
+          <div className="row" style={{ gap: 10, flexWrap: 'nowrap', padding: '0 6px' }}>
+            <span className="avatar">{initials(profile?.full_name || profile?.email || 'C')}</span>
+            <div style={{ minWidth: 0, flex: 1 }}><div style={{ fontWeight: 550, lineHeight: '16px' }}>{profile?.full_name || profile?.email}</div><div className="small muted">{profile ? ROLE_LABEL[profile.role] : ''}</div></div>
+            <button className="btn quiet" onClick={signOut} aria-label="Sign out"><Icon name="out" /></button>
+          </div>
         </div>
       </aside>
       <header className="topbar">
         <div className="brand" style={{ padding: 0 }}><img src="/icon.svg" alt="" /><span>Compass</span></div>
         <select aria-label="Go to" value={nav.find((n) => n.to === loc.pathname)?.to ?? '/'} onChange={(e) => navigate(e.target.value)}>
           {nav.map((n) => <option key={n.to} value={n.to}>{n.label}</option>)}
+          {profile && appsFor(profile.role).length > 1 && <option value="/apps">All apps</option>}
         </select>
         <button className="btn quiet" onClick={signOut} aria-label="Sign out"><Icon name="out" /></button>
       </header>
