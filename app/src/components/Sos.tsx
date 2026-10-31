@@ -6,12 +6,14 @@ import { SOS_AFTER_SECONDS, type Contact, type DeptItem, type Location, type Sos
 import { useToast } from './Toast';
 import { Sheet } from './Sheet';
 import { Icon } from './Icon';
+import { useLang } from '../lib/i18n';
 
 const QUICK_NOTES = ['Finished', 'Almost over', 'Need it now', 'Wrong item came'];
 
 // The red SOS button on a counter's phone: "I need something right now".
 export function SosButton({ locations, defaultId }: { locations: Location[]; defaultId?: number }) {
   const toast = useToast();
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [alert, setAlert] = useState<SosAlert | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -39,13 +41,13 @@ export function SosButton({ locations, defaultId }: { locations: Location[]; def
   return (
     <>
       <button className={'sosfab' + (alert ? ' live' : '')} onClick={() => setOpen(true)} aria-label="SOS, I need something right now">
-        <Icon name="bell" size={22} /> SOS
+        <Icon name="bell" size={22} /> {t('SOS')}
       </button>
       {open && (
-        <Sheet title={alert ? 'Your SOS' : 'Need something right now?'} onClose={() => setOpen(false)}>
+        <Sheet title={alert ? t('Your SOS') : t('Need something right now?')} onClose={() => setOpen(false)}>
           {alert
             ? <Status alert={alert} contacts={contacts} now={now} onDone={() => { setAlert(null); setOpen(false); }} />
-            : <Form locations={locations} defaultId={defaultId ?? ids[0]} onSent={(a) => { setAlert(a); toast('SOS sent to the store'); }} />}
+            : <Form locations={locations} defaultId={defaultId ?? ids[0]} onSent={(a) => { setAlert(a); toast(t('SOS sent to the store')); }} />}
         </Sheet>
       )}
     </>
@@ -54,6 +56,8 @@ export function SosButton({ locations, defaultId }: { locations: Location[]; def
 
 function Form({ locations, defaultId, onSent }: { locations: Location[]; defaultId: number; onSent: (a: SosAlert) => void }) {
   const toast = useToast();
+  const { t, local } = useLang();
+  const nm = (i: DeptItem) => (local && i.local_names?.hi) || i.name;
   const [locationId, setLocationId] = useState(defaultId);
   const [items, setItems] = useState<DeptItem[]>([]);
   useEffect(() => { setItem(null); supabase.rpc('department_items', { p_location_id: locationId }).then(({ data }) => setItems((data as DeptItem[]) ?? [])); }, [locationId]);
@@ -61,7 +65,7 @@ function Form({ locations, defaultId, onSent }: { locations: Location[]; default
   const [item, setItem] = useState<DeptItem | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const found = useMemo(() => { const t = q.trim().toLowerCase(); return t ? items.filter((i) => i.name.toLowerCase().includes(t)).slice(0, 6) : []; }, [q, items]);
+  const found = useMemo(() => { const t = q.trim().toLowerCase(); return t ? items.filter((i) => i.name.toLowerCase().includes(t) || (i.local_names?.hi ?? '').includes(t)).slice(0, 6) : []; }, [q, items]);
   async function send() {
     setBusy(true);
     const { data, error } = await supabase.rpc('raise_sos', { p_location_id: locationId, p_item_id: item?.id ?? null, p_note: note });
@@ -71,29 +75,30 @@ function Form({ locations, defaultId, onSent }: { locations: Location[]; default
   }
   return (
     <>
-      <p className="muted">This makes a loud alarm on the store phone. Use it only when you really cannot wait.</p>
+      <p className="muted">{t('This makes a loud alarm on the store phone. Use it only when you really cannot wait.')}</p>
       {locations.length > 1 && (
         <div className="seg" role="group" aria-label="Which counter">{locations.map((l) => <button key={l.id} aria-pressed={l.id === locationId} onClick={() => setLocationId(l.id)}>{l.name}</button>)}</div>
       )}
       {item ? (
-        <div className="card row" style={{ justifyContent: 'space-between' }}><b>{item.name}</b><button className="btn quiet" onClick={() => setItem(null)}>Change</button></div>
+        <div className="card row" style={{ justifyContent: 'space-between' }}><b>{nm(item)}</b><button className="btn quiet" onClick={() => setItem(null)}>{t('Change')}</button></div>
       ) : (
         <div className="stack">
-          <label className="field"><span>Which item? (you can skip this)</span>
-            <div className="searchbox"><Icon name="search" size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type a few letters" /></div>
+          <label className="field"><span>{t('Which item? (you can skip this)')}</span>
+            <div className="searchbox"><Icon name="search" size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Type a few letters')} /></div>
           </label>
-          {found.map((i) => <button key={i.id} className="btn secondary" style={{ justifyContent: 'flex-start' }} onClick={() => { setItem(i); setQ(''); }}>{i.name}</button>)}
+          {found.map((i) => <button key={i.id} className="btn secondary" style={{ justifyContent: 'flex-start' }} onClick={() => { setItem(i); setQ(''); }}>{nm(i)}</button>)}
         </div>
       )}
-      <div className="seg">{QUICK_NOTES.map((n) => <button key={n} aria-pressed={note === n} onClick={() => setNote(note === n ? '' : n)}>{n}</button>)}</div>
-      <label className="field"><span>Anything else to tell the store?</span><input value={QUICK_NOTES.includes(note) ? '' : note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" /></label>
-      <button className="btn floor sosgo" disabled={busy} onClick={() => void send()}>{busy ? 'Sending…' : 'Send SOS to the store'}</button>
+      <div className="seg">{QUICK_NOTES.map((n) => <button key={n} aria-pressed={note === n} onClick={() => setNote(note === n ? '' : n)}>{t(n)}</button>)}</div>
+      <label className="field"><span>{t('Anything else to tell the store?')}</span><input value={QUICK_NOTES.includes(note) ? '' : note} onChange={(e) => setNote(e.target.value)} placeholder={t('Optional')} /></label>
+      <button className="btn floor sosgo" disabled={busy} onClick={() => void send()}>{busy ? t('Sending…') : t('Send SOS to the store')}</button>
     </>
   );
 }
 
 function Status({ alert, contacts, now, onDone }: { alert: SosAlert; contacts: Contact[]; now: number; onDone: () => void }) {
   const toast = useToast();
+  const { t, local } = useLang();
   const [items, setItems] = useState<DeptItem[]>([]);
   useEffect(() => { supabase.rpc('department_items', { p_location_id: alert.location_id }).then(({ data }) => setItems((data as DeptItem[]) ?? [])); }, [alert.location_id]);
   const waited = Math.floor((now - new Date(alert.created_at).getTime()) / 1000);
@@ -107,20 +112,20 @@ function Status({ alert, contacts, now, onDone }: { alert: SosAlert; contacts: C
   return (
     <>
       <div className="card stack">
-        <p><b>{item?.name ?? 'Request'}</b>{alert.note ? <span className="muted"> · {alert.note}</span> : null}</p>
-        <p className="small muted">Sent at {timeOf(alert.created_at)}</p>
+        <p><b>{item ? ((local && item.local_names?.hi) || item.name) : t('Request')}</b>{alert.note ? <span className="muted"> · {alert.note}</span> : null}</p>
+        <p className="small muted">{t('Sent at {time}', { time: timeOf(alert.created_at) })}</p>
       </div>
       {alert.acked_at
-        ? <p className="banner ok">The store is on it{alert.eta_minutes ? `. About ${alert.eta_minutes} minutes.` : '.'}</p>
+        ? <p className="banner ok">{alert.eta_minutes ? t('The store is on it. About {n} minutes.', { n: alert.eta_minutes }) : t('The store is on it.')}</p>
         : escalated
-          ? <p className="banner bad">No answer from the store yet. The owner is being alerted too. You can also call.</p>
-          : <p className="banner warn">Waiting for the store to answer…</p>}
+          ? <p className="banner bad">{t('No answer from the store yet. The owner is being alerted too. You can also call.')}</p>
+          : <p className="banner warn">{t('Waiting for the store to answer…')}</p>}
       {!alert.acked_at && escalated && (
         <div className="stack">
-          {contacts.map((c) => <a key={c.phone} className="btn secondary floor" href={`tel:+91${c.phone}`}><Icon name="phone" /> Call {c.full_name}</a>)}
+          {contacts.map((c) => <a key={c.phone} className="btn secondary floor" href={`tel:+91${c.phone}`}><Icon name="phone" /> {t('Call {name}', { name: c.full_name })}</a>)}
         </div>
       )}
-      <button className="btn secondary floor" onClick={() => void done()}>{alert.acked_at ? 'I got it, close this' : 'Cancel, no longer needed'}</button>
+      <button className="btn secondary floor" onClick={() => void done()}>{alert.acked_at ? t('I got it, close this') : t('Cancel, no longer needed')}</button>
     </>
   );
 }

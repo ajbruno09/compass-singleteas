@@ -108,7 +108,7 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
         <label className="field"><span>Name</span><input id="person-name" value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="field"><span>Mobile number</span><input id="person-phone" className="num" inputMode="numeric" maxLength={10} disabled={!!person} value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))} /></label>
         <label className="field"><span>Role</span><select id="person-role" value={role} onChange={(e) => setRole(e.target.value as Role)}>{STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select></label>
-        <label className="field"><span>Extra language</span><select id="person-lang" value={lang} onChange={(e) => setLang(e.target.value)}><option value="">English only</option>{Object.entries(LANGUAGES).map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select></label>
+        <label className="field"><span>Screen language</span><select id="person-lang" value={lang} onChange={(e) => setLang(e.target.value)}><option value="">English</option><option value="hi">हिंदी (Hindi)</option></select><span className="small muted">The store always sees English, whatever language they use.</span></label>
       </div>
       <fieldset className="card" style={{ display: 'grid', gap: 10 }}>
         <legend className="label">Works at</legend>

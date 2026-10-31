@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { clock12, dayLabel, timeOf, windowState, type Reminders } from '../lib/ist';
-import { LANGUAGES, type IndentRec } from '../lib/types';
+import { type IndentRec } from '../lib/types';
+import { useLang } from '../lib/i18n';
 import { Icon } from '../components/Icon';
 import { SosButton } from '../components/Sos';
 
@@ -13,8 +14,7 @@ export function StaffHome() {
   const [status, setStatus] = useState<Record<number, IndentRec>>({});
   const [date, setDate] = useState('');
   const [rem, setRem] = useState<Reminders>({});
-  const [local, setLocal] = useState(() => { try { return localStorage.getItem('compass-lang') === 'local'; } catch { return false; } });
-  const lang = profile?.extra_language ?? null;
+  const { t, local, toggle, canSwitch } = useLang();
 
   useEffect(() => {
     (async () => {
@@ -26,26 +26,26 @@ export function StaffHome() {
   }, []);
 
   const win = windowState(rem);
-  const sentText = (r?: IndentRec) => !r || r.status === 'draft' ? null : r.nothing_needed ? 'Nothing needed' : `Sent ${timeOf(r.submitted_at)}`;
+  const sentText = (r?: IndentRec) => !r || r.status === 'draft' ? null : r.nothing_needed ? t('Nothing needed') : t('Sent {time}', { time: timeOf(r.submitted_at) });
 
   return (
     <div className="phone">
       <div className="phone-head">
         <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
           <img src="/icon.svg" alt="" width={32} height={32} />
-          <div><p style={{ font: '800 18px/20px var(--font-display)' }}>Hello, {profile?.full_name?.split(' ')[0]}</p>
-            <p className="small muted">{date ? `Indent for ${dayLabel(date)}` : ''}</p></div>
+          <div><p style={{ font: '800 18px/20px var(--font-display)' }}>{t('Hello, {name}', { name: profile?.full_name?.split(' ')[0] ?? '' })}</p>
+            <p className="small muted">{date ? t('Indent for {day}', { day: dayLabel(date) }) : ''}</p></div>
         </div>
         <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-          {lang && <button className="btn secondary" style={{ minHeight: 40, borderRadius: 999 }} onClick={() => { const n = !local; setLocal(n); try { localStorage.setItem('compass-lang', n ? 'local' : 'en'); } catch { /* ignore */ } }}><Icon name="globe" size={16} />{local ? 'English' : (LANGUAGES[lang] ?? lang).split(' ')[0]}</button>}
-          <button className="btn quiet" onClick={signOut} aria-label="Sign out"><Icon name="out" /></button>
+          {canSwitch && <div className="langsw" role="group" aria-label="Language"><button aria-pressed={local} onClick={() => { if (!local) toggle(); }}>हिंदी</button><button aria-pressed={!local} onClick={() => { if (local) toggle(); }}>English</button></div>}
+          <button className="btn quiet" onClick={signOut} aria-label={t('Sign out')}><Icon name="out" /></button>
         </div>
       </div>
 
       <p className={'banner' + (win === 'late' ? ' warn' : '')}>
-        {win === 'open' ? `Indent time is on. Please send by ${clock12(rem.indent_due ?? '17:00')}.`
-          : win === 'early' ? `Indent time starts at ${clock12(rem.indent_open ?? '15:30')}. You can start earlier.`
-          : `Indent time was until ${clock12(rem.indent_due ?? '17:00')}. Please send now if you have not.`}
+        {win === 'open' ? t('Indent time is on. Please send by {time}.', { time: clock12(rem.indent_due ?? '17:00') })
+          : win === 'early' ? t('Indent time starts at {time}. You can start earlier.', { time: clock12(rem.indent_open ?? '15:30') })
+          : t('Indent time was until {time}. Please send now if you have not.', { time: clock12(rem.indent_due ?? '17:00') })}
       </p>
 
       <div className="stack">
@@ -57,14 +57,14 @@ export function StaffHome() {
               <Icon name="clip" size={34} stroke={1.6} />
               <span style={{ flex: 1, textAlign: 'left' }}>
                 <span className="name" style={{ display: 'block' }}>{l.name}</span>
-                <span className="small muted" style={{ fontWeight: 700 }}>{s ?? (r ? 'Started, not sent' : 'Make the indent')}</span>
+                <span className="small muted" style={{ fontWeight: 700 }}>{s ?? (r ? t('Started, not sent') : t('Make the indent'))}</span>
               </span>
-              <span className={'chip ' + (s ? 'done' : win === 'late' ? 'late' : 'due')}>{s ? 'Sent' : 'Open'}</span>
+              <span className={'chip ' + (s ? 'done' : win === 'late' ? 'late' : 'due')}>{s ? t('Sent') : t('Open')}</span>
             </button>
           );
         })}
       </div>
-      <p className="small muted">Receiving, counting and waste come next.</p>
+      <p className="small muted">{t('Receiving, counting and waste come next.')}</p>
       {myLocations.length > 0 && <SosButton locations={myLocations} />}
     </div>
   );
