@@ -45,6 +45,10 @@ export function IndentPage() {
   const [local, setLocal] = useState(() => { try { return localStorage.getItem('compass-lang') === 'local'; } catch { return false; } });
   const lang = profile?.extra_language ?? null;
   const timers = useRef<Record<number, number>>({});
+  // Opening a category adds a history step, so the phone's own back button returns to the category grid first.
+  const openView = (v: View) => { try { window.history.pushState({ ...(window.history.state || {}), cv: 1 }, ''); } catch { /* ignore */ } setView(v); };
+  const toGroups = () => { setQ(''); let pushed = false; try { pushed = !!window.history.state?.cv; } catch { /* ignore */ } if (pushed) window.history.back(); else setView({ kind: 'groups' }); };
+  useEffect(() => { const pop = () => { setView({ kind: 'groups' }); setQ(''); }; window.addEventListener('popstate', pop); return () => window.removeEventListener('popstate', pop); }, []);
 
   const label = useCallback((i: DeptItem) => (local && lang && i.local_names?.[lang]) || i.name, [local, lang]);
 
@@ -144,9 +148,11 @@ export function IndentPage() {
     <div className="phone">
       <div className="phone-head">
         <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
-          <button className="btn quiet" onClick={() => (view.kind === 'groups' ? nav('/') : (setView({ kind: 'groups' }), setQ('')))} aria-label="Back"><Icon name="back" /></button>
+          {view.kind === 'groups'
+            ? <button className="btn quiet" onClick={() => nav('/')} aria-label="Back"><Icon name="back" /></button>
+            : <button className="btn backcat" onClick={toGroups} aria-label="Back to categories"><Icon name="back" />Categories</button>}
           <div>
-            <p style={{ font: '800 20px/22px var(--font-display)' }}>{where} indent</p>
+            <p style={{ font: '800 20px/22px var(--font-display)' }}>{view.kind === 'group' ? (groups.find((g) => g.id === view.id)?.name ?? where) : view.kind === 'usual' ? 'My usual' : view.kind === 'search' ? 'Search' : `${where} indent`}</p>
             <p className="small muted">For {indent ? dayLabel(indent.for_date) : 'tomorrow'}</p>
           </div>
         </div>
@@ -172,13 +178,13 @@ export function IndentPage() {
 
           {view.kind === 'groups' && (
             <>
-              <button className="usualbar" onClick={() => setView({ kind: 'usual' })} disabled={Object.keys(usual).length === 0}>
+              <button className="usualbar" onClick={() => openView({ kind: 'usual' })} disabled={Object.keys(usual).length === 0}>
                 <span style={{ fontSize: 26 }}>⭐</span>
                 <span><b>My usual</b><br /><span className="small muted">{Object.keys(usual).length ? `${Object.keys(usual).length} items you ask for often` : 'Fills in after your first few indents'}</span></span>
               </button>
               <div className="groupgrid">
                 {groupInfo.map(({ g, count, picked }) => (
-                  <button key={g.id} className="grouptile" onClick={() => setView({ kind: 'group', id: g.id })}>
+                  <button key={g.id} className="grouptile" onClick={() => openView({ kind: 'group', id: g.id })}>
                     {picked > 0 && <span className="badge">{picked}</span>}
                     <span className="gphoto">{CAT_PHOTO[g.id] ? <img src={`/cats/${CAT_PHOTO[g.id]}.jpg`} alt="" loading="lazy" /> : <span className="emoji">{g.icon || '🧾'}</span>}</span>
                     <span className="gtext"><span className="gname">{g.name}</span>
@@ -191,7 +197,6 @@ export function IndentPage() {
 
           {view.kind !== 'groups' && (
             <>
-              <h2>{view.kind === 'group' ? groups.find((g) => g.id === view.id)?.name : view.kind === 'usual' ? 'My usual' : 'Search'}</h2>
               {visible.length === 0 ? <p className="empty card">{view.kind === 'search' ? 'No item with that name on your counter.' : 'Nothing here yet.'}</p> : (
                 <div className="stack">
                   {visible.map((i) => (
