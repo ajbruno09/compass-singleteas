@@ -180,7 +180,7 @@ export function IndentPage() {
                     {picked > 0 && <span className="badge">{picked}</span>}
                     <span className="emoji">{g.icon || '🧾'}</span>
                     <span className="gname">{g.name}</span>
-                    <span className="small muted">{count} items</span>
+                    <span className="small muted">{count} {count === 1 ? "item" : "items"}</span>
                   </button>
                 ))}
               </div>

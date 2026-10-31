@@ -180,3 +180,4 @@ tr.click:hover td { background: var(--surface-100); }
 .sosbig { font: 800 40px/1 var(--font-display); color: var(--critical); text-align: center; animation: pulse 0.8s ease-in-out infinite; }
 .sosbtn { min-height: 56px; padding: 0 18px; font-size: 17px; background: var(--critical) !important; color: #fff !important; border-color: var(--critical) !important; }
 @media (prefers-reduced-motion: reduce) { .sosfab.live, .sosbig { animation: none; } }
+.sheet > .stack { align-content: start; }
