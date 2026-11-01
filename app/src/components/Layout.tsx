@@ -12,6 +12,7 @@ interface NavItem { to: string; label: string; icon: string; roles: Role[] }
 export const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: 'home', roles: ['owner', 'manager', 'store', 'accounts'] },
   { to: '/indents', label: 'Indents', icon: 'clip', roles: ['owner', 'manager', 'store'] },
+  { to: '/buying', label: 'Buying', icon: 'cart', roles: ['owner', 'store'] },
   { to: '/items', label: 'Items', icon: 'tag', roles: ['owner', 'manager', 'store'] },
   { to: '/stock', label: 'Opening stock', icon: 'layers', roles: ['owner', 'store'] },
   { to: '/vendors', label: 'Vendors', icon: 'truck', roles: ['owner', 'manager', 'store', 'accounts'] },

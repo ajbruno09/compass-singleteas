@@ -13,11 +13,12 @@ import { OpeningStock } from './pages/OpeningStock';
 import { StaffHome } from './pages/StaffHome';
 import { IndentPage } from './pages/Indent';
 import { Indents } from './pages/Indents';
+import { Buying } from './pages/Buying';
 import { Apps } from './pages/Apps';
 import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/indents': <Indents />, '/items': <Items />, '/stock': <OpeningStock />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
+  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/stock': <OpeningStock />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
 };
 
 // After signing in, people with more than one app choose which to open. Once per visit.

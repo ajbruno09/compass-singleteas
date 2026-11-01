@@ -7,7 +7,7 @@ const parse = (s: string) => { const [y, m, d] = s.split('-').map(Number); retur
 const MONTH = new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' });
 const LABEL = new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
-export function DatePicker({ value, onChange, tomorrow, label = 'Date' }: { value: string; onChange: (v: string) => void; tomorrow?: string; label?: string }) {
+export function DatePicker({ value, onChange, tomorrow, label = 'Date', min, tomorrowLabel = "Tomorrow's indent" }: { value: string; onChange: (v: string) => void; tomorrow?: string; label?: string; min?: string; tomorrowLabel?: string }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState(() => { const d = value ? parse(value) : new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const ref = useRef<HTMLDivElement>(null);
@@ -43,12 +43,12 @@ export function DatePicker({ value, onChange, tomorrow, label = 'Date' }: { valu
             {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((h, i) => <div key={i} className="h">{h}</div>)}
             {cells.map((c) => (
               <button key={c.key} type="button" className={[c.out ? 'o' : '', c.key === today ? 't' : '', c.key === value ? 's' : ''].join(' ').trim()}
-                aria-label={LABEL.format(c.d)} aria-pressed={c.key === value} onClick={() => pick(c.key)}>{c.d.getDate()}</button>
+                aria-label={LABEL.format(c.d)} aria-pressed={c.key === value} disabled={!!min && c.key < min} style={min && c.key < min ? { opacity: 0.35, cursor: 'not-allowed' } : undefined} onClick={() => pick(c.key)}>{c.d.getDate()}</button>
             ))}
           </div>
           <div className="dp-foot">
-            <button type="button" className="btn" onClick={() => pick(today)}>Today</button>
-            {tomorrow && <button type="button" className="btn primary" onClick={() => pick(tomorrow)}>Tomorrow's indent</button>}
+            <button type="button" className="btn" disabled={!!min && today < min} onClick={() => pick(today)}>Today</button>
+            {tomorrow && <button type="button" className="btn primary" onClick={() => pick(tomorrow)}>{tomorrowLabel}</button>}
           </div>
         </div>
       )}
