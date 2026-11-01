@@ -81,7 +81,7 @@ export function SosWatcher() {
           <Icon name="bell" /> Tap here to turn on the SOS alarm sound on this phone
         </button>
       ) : (
-        <div className="row small muted"><Icon name="bell" size={16} /> SOS alarm is on, keep Compass open on this phone. <button className="btn quiet" style={{ minHeight: 28 }} onClick={testBeep}>Test sound</button></div>
+        <div className="row small muted"><Icon name="bell" size={16} /> SOS siren is on. Keep Compass open for the loud siren. Alerts still reach this phone when it is closed. <button className="btn quiet" style={{ minHeight: 28 }} onClick={testBeep}>Test sound</button></div>
       )}
 
       {alerts.filter((a) => a.acked_at).map((a) => (

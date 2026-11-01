@@ -7,6 +7,7 @@ import { appsFor } from '../lib/apps';
 
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
 import { SosWatcher } from './SosWatcher';
+import { PushSetup } from './PushSetup';
 
 interface NavItem { to: string; label: string; icon: string; roles: Role[] }
 export const NAV: NavItem[] = [
@@ -51,7 +52,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </select>
         <button className="btn quiet" onClick={signOut} aria-label="Sign out"><Icon name="out" /></button>
       </header>
-      <main className="main"><SosWatcher />{children}</main>
+      <main className="main"><PushSetup /><SosWatcher />{children}</main>
     </div>
   );
 }

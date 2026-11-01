@@ -8,3 +8,5 @@
   Cache-Control: no-cache
 /manifest.webmanifest
   Cache-Control: no-cache
+/push-sw.js
+  Cache-Control: no-cache

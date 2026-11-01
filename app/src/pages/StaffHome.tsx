@@ -7,6 +7,7 @@ import { type IndentRec } from '../lib/types';
 import { useLang } from '../lib/i18n';
 import { Icon } from '../components/Icon';
 import { SosButton } from '../components/Sos';
+import { PushSetup } from '../components/PushSetup';
 
 export function StaffHome() {
   const { profile, myLocations, signOut } = useSession();
@@ -48,6 +49,7 @@ export function StaffHome() {
           : t('Indent time was until {time}. Please send now if you have not.', { time: clock12(rem.indent_due ?? '17:00') })}
       </p>
 
+      <PushSetup />
       <div className="stack">
         {myLocations.map((l) => {
           const r = status[l.id];

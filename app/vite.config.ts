@@ -8,7 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: false,
-      workbox: { skipWaiting: true, clientsClaim: true, cleanupOutdatedCaches: true },
+      workbox: { importScripts: ['push-sw.js'], skipWaiting: true, clientsClaim: true, cleanupOutdatedCaches: true },
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Compass · Single Teas',
