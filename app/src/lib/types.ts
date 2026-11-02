@@ -1,5 +1,5 @@
 export type Role = 'owner' | 'manager' | 'store' | 'department' | 'closing' | 'accounts';
-export interface Profile { id: string; full_name: string; phone: string | null; email: string | null; role: Role; extra_language: string | null; active: boolean; }
+export interface Profile { id: string; full_name: string; phone: string | null; email: string | null; role: Role; extra_language: string | null; active: boolean; photo?: string | null; }
 export interface Location { id: number; code: string; name: string; kind: 'store' | 'department'; sort: number; active: boolean; }
 export interface Category { id: number; code: string; name: string; sort: number; }
 export interface Unit { code: string; name: string; kind: 'weight' | 'volume' | 'count'; decimals: number; }
@@ -39,3 +39,17 @@ export interface SosAlert {
 export interface Contact { full_name: string; phone: string; role: Role; }
 export const REASONS = ['Guests or event', 'Running low', 'Spoiled or wasted', 'New dish', 'Other'];
 export const SOS_AFTER_SECONDS = 120;
+
+export interface MenuItem {
+  id: number; name: string; pos_name: string | null; price: number | null; menu_page: string | null; menu_group: string | null;
+  location_id: number | null; status: 'active' | 'inactive'; needs_check: boolean; note: string;
+}
+export interface MenuCombo { id: number; name: string; price: number | null; grp: string | null; parts: string; status: 'active' | 'inactive'; note: string; }
+export interface Rule {
+  key: string; label: string; description: string; group_name: string; kind: 'number' | 'percent' | 'time' | 'text' | 'money';
+  unit: string; value: unknown; wired: boolean; money: boolean; sort: number; why: string; updated_at: string;
+}
+export interface RuleHist { id: number; key: string; value: unknown; effective_from: string; set_at: string; note: string; }
+export interface Notice { id: string; title: string; body: string; location_ids: number[] | null; pinned: boolean; expires_at: string | null; created_at: string; }
+export interface AlertRow { id: string; level: 'urgent' | 'today' | 'fyi'; title: string; body: string; created_at: string; location_id: number | null; source: string; }
+export interface Signup { id: string; full_name: string; phone: string; location_ids: number[]; selfie: string | null; created_at: string; }

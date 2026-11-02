@@ -65,12 +65,16 @@ function Form({ locations, defaultId, onSent }: { locations: Location[]; default
   const [item, setItem] = useState<DeptItem | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const found = useMemo(() => { const t = q.trim().toLowerCase(); return t ? items.filter((i) => i.name.toLowerCase().includes(t) || (i.local_names?.hi ?? '').includes(t)).slice(0, 6) : []; }, [q, items]);
+  const recentKey = `compass-sos-recent-${locationId}`;
+  const recent = useMemo(() => { try { const ids: number[] = JSON.parse(localStorage.getItem(recentKey) ?? '[]'); return ids.map((id) => items.find((i) => i.id === id)).filter((x): x is DeptItem => !!x).slice(0, 6); } catch { return []; } }, [items, recentKey]);
+  const found = useMemo(() => { const t = q.trim().toLowerCase(); return t ? items.filter((i) => i.name.toLowerCase().includes(t) || (i.local_names?.hi ?? '').includes(t)).slice(0, 8) : []; }, [q, items]);
+  function choose(i: DeptItem) { setItem(i); setQ(''); }
   async function send() {
     setBusy(true);
     const { data, error } = await supabase.rpc('raise_sos', { p_location_id: locationId, p_item_id: item?.id ?? null, p_note: note });
     setBusy(false);
     if (error) { toast(errText(error)); return; }
+    try { const ids: number[] = JSON.parse(localStorage.getItem(recentKey) ?? '[]'); if (item) localStorage.setItem(recentKey, JSON.stringify([item.id, ...ids.filter((x) => x !== item.id)].slice(0, 8))); } catch { /* ignore */ }
     onSent(data as SosAlert);
   }
   return (
@@ -84,9 +88,10 @@ function Form({ locations, defaultId, onSent }: { locations: Location[]; default
       ) : (
         <div className="stack">
           <label className="field"><span>{t('Which item? (you can skip this)')}</span>
-            <div className="searchbox"><Icon name="search" size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Type a few letters')} /></div>
+            <div className="searchbox"><Icon name="search" size={18} /><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && found[0]) choose(found[0]); }} placeholder={t('Type a few letters')} /></div>
           </label>
-          {found.map((i) => <button key={i.id} className="btn secondary" style={{ justifyContent: 'flex-start' }} onClick={() => { setItem(i); setQ(''); }}>{nm(i)}</button>)}
+          {!q && recent.length > 0 && <div className="chips" aria-label={t('Often needed')}>{recent.map((i) => <button key={i.id} className="btn secondary" onClick={() => choose(i)}>{nm(i)}</button>)}</div>}
+          {found.map((i) => <button key={i.id} className="btn secondary" style={{ justifyContent: 'flex-start' }} onClick={() => choose(i)}>{nm(i)}</button>)}
         </div>
       )}
       <div className="seg">{QUICK_NOTES.map((n) => <button key={n} aria-pressed={note === n} onClick={() => setNote(note === n ? '' : n)}>{t(n)}</button>)}</div>

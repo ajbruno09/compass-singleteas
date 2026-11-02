@@ -8,6 +8,7 @@ import { appsFor } from '../lib/apps';
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
 import { SosWatcher } from './SosWatcher';
 import { PushSetup } from './PushSetup';
+import { PhotoPrompt, QuickUnlock } from './BioLock';
 
 interface NavItem { to: string; label: string; icon: string; roles: Role[] }
 export const NAV: NavItem[] = [
@@ -18,6 +19,9 @@ export const NAV: NavItem[] = [
   { to: '/stock', label: 'Opening stock', icon: 'layers', roles: ['owner', 'store'] },
   { to: '/vendors', label: 'Vendors', icon: 'truck', roles: ['owner', 'manager', 'store', 'accounts'] },
   { to: '/bills', label: 'Bills and payments', icon: 'receipt', roles: ['owner', 'manager', 'accounts'] },
+  { to: '/menu', label: 'Menu items', icon: 'box', roles: ['owner', 'manager', 'store'] },
+  { to: '/notices', label: 'Notices', icon: 'bell', roles: ['owner', 'manager'] },
+  { to: '/rules', label: 'Rules', icon: 'scale', roles: ['owner', 'manager'] },
   { to: '/people', label: 'People', icon: 'users', roles: ['owner', 'manager'] }
 ];
 
@@ -38,7 +42,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="who">
           {profile && appsFor(profile.role).length > 1 && <Link to="/apps" className="navlink"><span className="row" style={{ gap: 10 }}><Icon name="grid" />All apps</span></Link>}
           <div className="row" style={{ gap: 10, flexWrap: 'nowrap', padding: '0 6px' }}>
-            <span className="avatar">{initials(profile?.full_name || profile?.email || 'C')}</span>
+            {profile?.photo ? <img className="avatar" src={profile.photo} alt="" style={{ objectFit: 'cover' }} /> : <span className="avatar">{initials(profile?.full_name || profile?.email || 'C')}</span>}
             <div style={{ minWidth: 0, flex: 1 }}><div style={{ fontWeight: 550, lineHeight: '16px' }}>{profile?.full_name || profile?.email}</div><div className="small muted">{profile ? ROLE_LABEL[profile.role] : ''}</div></div>
             <button className="btn quiet" onClick={signOut} aria-label="Sign out"><Icon name="out" /></button>
           </div>
@@ -52,7 +56,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </select>
         <button className="btn quiet" onClick={signOut} aria-label="Sign out"><Icon name="out" /></button>
       </header>
-      <main className="main"><PushSetup /><SosWatcher />{children}</main>
+      <main className="main"><PhotoPrompt /><PushSetup /><QuickUnlock /><SosWatcher />{children}</main>
     </div>
   );
 }

@@ -91,6 +91,7 @@ export function Login() {
             {mode === 'owner' && <button type="button" className="btn quiet" onClick={() => setMode('owner-new')}>First time? Set up</button>}
           </div>
           <p className="small muted">Trouble signing in? Ask Devid or J to reset your PIN.</p>
+          <a className="small" href="/join">New here? Join Compass</a>
         </form>
         <p className="small muted">Internal use only · Single Teas Operations</p>
       </div>

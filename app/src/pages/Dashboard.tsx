@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { money } from '../lib/format';
 import { dayLabel } from '../lib/ist';
+import { AlertsPanel } from '../components/AlertsPanel';
 
 interface VendorDue { name: string; balance: number; bills: number }
 
@@ -64,6 +65,7 @@ export function Dashboard() {
         <div><p className="label">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
           <h1 style={{ fontSize: 26, lineHeight: '34px' }}>{greet}{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}</h1></div>
       </div>
+      <AlertsPanel />
       <div className="grid-tiles">
         <Link to="/items" className="card tile" style={tile}><span className="label">Items</span><span className="big">{counts.items}</span><span className="small muted">{counts.noPhoto ? `${counts.noPhoto} without a photo` : 'All have photos'}</span></Link>
         <Link to="/vendors" className="card tile" style={tile}><span className="label">Vendors</span><span className="big">{counts.vendors}</span><span className="small" style={{ color: counts.noPhone ? 'var(--warn)' : undefined, fontWeight: counts.noPhone ? 550 : 400 }}>{counts.noPhone ? `${counts.noPhone} without WhatsApp` : 'All reachable'}</span></Link>

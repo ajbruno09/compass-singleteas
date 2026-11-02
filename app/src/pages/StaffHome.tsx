@@ -8,6 +8,8 @@ import { useLang } from '../lib/i18n';
 import { Icon } from '../components/Icon';
 import { SosButton } from '../components/Sos';
 import { PushSetup } from '../components/PushSetup';
+import { NoticeStack } from '../components/NoticeStack';
+import { PhotoPrompt, QuickUnlock } from '../components/BioLock';
 
 export function StaffHome() {
   const { profile, myLocations, signOut } = useSession();
@@ -33,7 +35,7 @@ export function StaffHome() {
     <div className="phone">
       <div className="phone-head">
         <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
-          <img src="/icon.svg" alt="" width={32} height={32} />
+          {profile?.photo ? <img src={profile.photo} alt="" width={36} height={36} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <img src="/icon.svg" alt="" width={32} height={32} />}
           <div><p style={{ font: '800 18px/20px var(--font-display)' }}>{t('Hello, {name}', { name: profile?.full_name?.split(' ')[0] ?? '' })}</p>
             <p className="small muted">{date ? t('Indent for {day}', { day: dayLabel(date) }) : ''}</p></div>
         </div>
@@ -43,13 +45,16 @@ export function StaffHome() {
         </div>
       </div>
 
+      <NoticeStack />
       <p className={'banner' + (win === 'late' ? ' warn' : '')}>
         {win === 'open' ? t('Indent time is on. Please send by {time}.', { time: clock12(rem.indent_due ?? '17:00') })
           : win === 'early' ? t('Indent time starts at {time}. You can start earlier.', { time: clock12(rem.indent_open ?? '15:30') })
           : t('Indent time was until {time}. Please send now if you have not.', { time: clock12(rem.indent_due ?? '17:00') })}
       </p>
 
+      <PhotoPrompt />
       <PushSetup />
+      <QuickUnlock />
       <div className="stack">
         {myLocations.map((l) => {
           const r = status[l.id];

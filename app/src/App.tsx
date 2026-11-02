@@ -15,10 +15,15 @@ import { IndentPage } from './pages/Indent';
 import { Indents } from './pages/Indents';
 import { Buying } from './pages/Buying';
 import { Apps } from './pages/Apps';
+import { MenuItems } from './pages/MenuItems';
+import { Rules } from './pages/Rules';
+import { Notices } from './pages/Notices';
+import { Join } from './pages/Join';
+import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/stock': <OpeningStock />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
+  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/menu': <MenuItems />, '/rules': <Rules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
 };
 
 // After signing in, people with more than one app choose which to open. Once per visit.
@@ -32,7 +37,7 @@ function Gate() {
   const { session, profile, loading, signOut } = useSession();
   if (!configured) return <div className="login"><div className="card"><h1>Compass</h1><p>This copy of the app is not connected to its database yet.</p></div></div>;
   if (loading) return <div className="login"><p className="muted">Loading…</p></div>;
-  if (!session) return <Login />;
+  if (!session) return window.location.pathname === '/join' ? <Join /> : <Login />;
   if (!profile || !profile.active) {
     return (
       <div className="login"><div className="card">
@@ -44,24 +49,24 @@ function Gate() {
   }
   if (profile.role === 'department' || profile.role === 'closing') {
     return (
-      <Routes>
+      <LockGate><Routes>
         <Route path="/" element={<StaffHome />} />
         <Route path="/indent" element={<IndentPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      </Routes></LockGate>
     );
   }
   const allowed = NAV.filter((n) => n.roles.includes(profile.role));
   const several = appsFor(profile.role).length > 1;
   return (
-    <Routes>
+    <LockGate><Routes>
       <Route path="/apps" element={several ? <Apps /> : <Navigate to="/" replace />} />
       <Route element={<Layout><Outlet /></Layout>}>
         <Route path="/" element={<Home several={several} />} />
         {allowed.filter((n) => n.to !== '/').map((n) => <Route key={n.to} path={n.to} element={PAGES[n.to]} />)}
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    </Routes></LockGate>
   );
 }
 
