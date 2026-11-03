@@ -27,6 +27,7 @@ export function People() {
   const { profile, locations } = useSession();
   const [rows, setRows] = useState<Person[]>([]);
   const [editing, setEditing] = useState<Person | 'new' | null>(null);
+  const [myPin, setMyPin] = useState(false);
   const isOwner = profile?.role === 'owner';
 
   async function load() {
@@ -46,7 +47,7 @@ export function People() {
       <p className="muted">Staff sign in with their mobile number and a 6-digit PIN. Each person sees only their own area. New people can join themselves at the Join page and wait here for your approval.</p>
       <div className="tablewrap">
         <table>
-          <thead><tr><th>Name</th><th>Mobile</th><th>Role</th><th>Works at</th><th>Extra language</th><th>Access</th></tr></thead>
+          <thead><tr><th>Name</th><th>Mobile</th><th>Role</th><th>Works at</th><th>Extra language</th><th>Access</th><th></th></tr></thead>
           <tbody>
             {rows.map((p) => (
               <tr key={p.id} className={isOwner && p.role !== 'owner' ? 'click' : ''} onClick={() => isOwner && p.role !== 'owner' && setEditing(p)}>
@@ -56,11 +57,13 @@ export function People() {
                 <td className="small">{p.profile_locations.map((l) => locName(l.location_id)).join(', ') || '—'}</td>
                 <td className="small">{p.extra_language ? LANGUAGES[p.extra_language] ?? p.extra_language : '—'}</td>
                 <td>{p.active ? <span className="chip done">Active</span> : <span className="chip off">No access</span>}</td>
+                <td>{isOwner && (p.role === 'owner' ? <button className="btn secondary" onClick={(e) => { e.stopPropagation(); setMyPin(true); }}>Change my PIN</button> : <button className="btn secondary" onClick={(e) => { e.stopPropagation(); setEditing(p); }}>Edit</button>)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {myPin && <MyPin onClose={() => setMyPin(false)} />}
       {editing && <PersonForm person={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </>
   );
@@ -196,6 +199,33 @@ function ApproveForm({ r, locations, onClose, onDone }: { r: Signup; locations: 
         {locations.map((l) => <label key={l.id} className="row" style={{ gap: 10 }}><input type="checkbox" checked={locs.includes(l.id)} onChange={(e) => setLocs((p) => (e.target.checked ? [...p, l.id] : p.filter((x) => x !== l.id)))} />{l.name}</label>)}
       </fieldset>
       <div className="row" style={{ gap: 10 }}><span>First code: <b className="num" style={{ fontSize: 20, letterSpacing: 3 }}>{code}</b></span><button className="btn quiet" onClick={() => setCode(newCode())}>New code</button></div>
+      {error && <p className="banner bad" role="alert">{error}</p>}
+    </Sheet>
+  );
+}
+
+function MyPin({ onClose }: { onClose: () => void }) {
+  const toast = useToast();
+  const [pin, setPin] = useState('');
+  const [again, setAgain] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function save() {
+    setError('');
+    if (!/^[0-9]{6}$/.test(pin)) return setError('Your PIN must be 6 digits.');
+    if (pin !== again) return setError('The two PINs do not match.');
+    setBusy(true);
+    const { error: e } = await supabase.auth.updateUser({ password: pin });
+    setBusy(false);
+    if (e) return setError(errText(e));
+    toast('Your PIN is changed');
+    onClose();
+  }
+  return (
+    <Sheet title="Change my PIN" onClose={onClose}
+      footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save PIN'}</button></>}>
+      <label className="field"><span>New PIN</span><input className="num" type="password" inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} placeholder="6 digits" /></label>
+      <label className="field"><span>Type it again</span><input className="num" type="password" inputMode="numeric" maxLength={6} value={again} onChange={(e) => setAgain(e.target.value.replace(/\D/g, ''))} placeholder="6 digits" /></label>
       {error && <p className="banner bad" role="alert">{error}</p>}
     </Sheet>
   );
