@@ -15,6 +15,25 @@ export function Login() {
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
 
+  async function forgot() {
+    setError(''); setNote('');
+    if (mode === 'staff') {
+      if (!/^[6-9][0-9]{9}$/.test(phone)) return setError('Type your 10-digit mobile number above first, then tap Forgot PIN.');
+      setBusy(true);
+      const { error } = await supabase.rpc('request_pin_reset', { p_phone: phone });
+      setBusy(false);
+      if (error) return setError(errText(error));
+      setNote('Done. The owner has been told and will give you a new PIN.');
+    } else {
+      if (!email.trim()) return setError('Type your email above first, then tap Forgot password.');
+      setBusy(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
+      setBusy(false);
+      if (error) return setError(errText(error));
+      setNote('If that email is registered, a link to choose a new password is on its way. Check your inbox and spam.');
+    }
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(''); setNote(''); setBusy(true);
@@ -90,6 +109,7 @@ export function Login() {
               : <button type="button" className="btn quiet" onClick={() => setMode('staff')}>Staff sign in with mobile</button>}
             {mode === 'owner' && <button type="button" className="btn quiet" onClick={() => setMode('owner-new')}>First time? Set up</button>}
           </div>
+          {mode !== 'owner-new' && <button type="button" className="btn quiet" style={{ justifySelf: 'start' }} disabled={busy} onClick={() => void forgot()}>{mode === 'staff' ? 'Forgot PIN?' : 'Forgot password?'}</button>}
           <p className="small muted">Trouble signing in? Ask Devid or J to reset your PIN.</p>
           <a className="small" href="/join">New here? Join Compass</a>
         </form>

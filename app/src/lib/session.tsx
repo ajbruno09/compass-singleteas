@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { Location, Profile } from './types';
 
-interface Ctx { session: Session | null; profile: Profile | null; locations: Location[]; myLocations: Location[]; loading: boolean; reload: () => Promise<void>; signOut: () => Promise<void>; }
+interface Ctx { session: Session | null; profile: Profile | null; locations: Location[]; myLocations: Location[]; loading: boolean; recovery: boolean; clearRecovery: () => void; reload: () => Promise<void>; signOut: () => Promise<void>; }
 const SessionCtx = createContext<Ctx | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -12,6 +12,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [myLocations, setMyLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recovery, setRecovery] = useState(false);
 
   async function load(s: Session | null) {
     setSession(s);
@@ -31,12 +32,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => load(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_e, s) => { load(s); });
+    const { data } = supabase.auth.onAuthStateChange((e, s) => { if (e === 'PASSWORD_RECOVERY') setRecovery(true); load(s); });
     return () => data.subscription.unsubscribe();
   }, []);
 
   return (
-    <SessionCtx.Provider value={{ session, profile, locations, myLocations, loading, reload: () => load(session), signOut: async () => { await supabase.auth.signOut(); } }}>
+    <SessionCtx.Provider value={{ session, profile, locations, myLocations, loading, recovery, clearRecovery: () => setRecovery(false), reload: () => load(session), signOut: async () => { await supabase.auth.signOut(); } }}>
       {children}
     </SessionCtx.Provider>
   );
