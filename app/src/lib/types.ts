@@ -1,5 +1,5 @@
 export type Role = 'owner' | 'manager' | 'store' | 'department' | 'closing' | 'accounts';
-export interface Profile { id: string; full_name: string; phone: string | null; email: string | null; role: Role; extra_language: string | null; active: boolean; photo?: string | null; }
+export interface Profile { id: string; full_name: string; phone: string | null; email: string | null; role: Role; extra_language: string | null; active: boolean; photo?: string | null; setup_done_at?: string | null; }
 export interface Location { id: number; code: string; name: string; kind: 'store' | 'department'; sort: number; active: boolean; }
 export interface Category { id: number; code: string; name: string; sort: number; }
 export interface Unit { code: string; name: string; kind: 'weight' | 'volume' | 'count'; decimals: number; }

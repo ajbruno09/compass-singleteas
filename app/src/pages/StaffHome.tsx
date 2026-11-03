@@ -1,3 +1,4 @@
+import { ProfileSheet } from '../components/ProfileSheet';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -7,9 +8,7 @@ import { type IndentRec } from '../lib/types';
 import { useLang } from '../lib/i18n';
 import { Icon } from '../components/Icon';
 import { SosButton } from '../components/Sos';
-import { PushSetup } from '../components/PushSetup';
 import { NoticeStack } from '../components/NoticeStack';
-import { PhotoPrompt, QuickUnlock } from '../components/BioLock';
 
 export function StaffHome() {
   const { profile, myLocations, signOut } = useSession();
@@ -18,6 +17,7 @@ export function StaffHome() {
   const [date, setDate] = useState('');
   const [rem, setRem] = useState<Reminders>({});
   const { t, local, toggle, canSwitch } = useLang();
+  const [me, setMe] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -33,9 +33,10 @@ export function StaffHome() {
 
   return (
     <div className="phone">
+      {me && <ProfileSheet onClose={() => setMe(false)} />}
       <div className="phone-head">
         <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
-          {profile?.photo ? <img src={profile.photo} alt="" width={36} height={36} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <img src="/logo-mark.png" alt="" width={32} height={32} />}
+          <button className="btn quiet" style={{ padding: 0, minHeight: 0 }} onClick={() => setMe(true)} aria-label="My profile">{profile?.photo ? <img src={profile.photo} alt="" width={36} height={36} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <img src="/logo-mark.png" alt="" width={32} height={32} />}</button>
           <div><p style={{ font: '800 18px/20px var(--font-display)' }}>{t('Hello, {name}', { name: profile?.full_name?.split(' ')[0] ?? '' })}</p>
             <p className="small muted">{date ? t('Indent for {day}', { day: dayLabel(date) }) : ''}</p></div>
         </div>
@@ -52,10 +53,7 @@ export function StaffHome() {
           : t('Indent time was until {time}. Please send now if you have not.', { time: clock12(rem.indent_due ?? '17:00') })}
       </p>
 
-      <PhotoPrompt />
-      <PushSetup />
-      <QuickUnlock />
-      <div className="stack">
+            <div className="stack">
         {myLocations.map((l) => {
           const r = status[l.id];
           const s = sentText(r);

@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync } from 'node:fs';
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8')) as { version: string };
 
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(pkg.version.split('.').slice(0, 2).join('.')) },
   plugins: [
     react(),
     VitePWA({
@@ -11,7 +15,7 @@ export default defineConfig({
       workbox: { importScripts: ['push-sw.js'], skipWaiting: true, clientsClaim: true, cleanupOutdatedCaches: true },
       includeAssets: ['logo-mark.png', 'favicon-64.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Compass · Single Teas',
+        name: 'Compass · SToMS',
         short_name: 'Compass',
         description: 'Single Teas operations: indents, stock, purchases and closing.',
         theme_color: '#0F4D2A',

@@ -20,6 +20,7 @@ import { MenuItems } from './pages/MenuItems';
 import { Rules } from './pages/Rules';
 import { Notices } from './pages/Notices';
 import { Join } from './pages/Join';
+import { Setup } from './pages/Setup';
 import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
@@ -49,6 +50,7 @@ function Gate() {
       </div></div>
     );
   }
+  if (!profile.setup_done_at) return <Setup />;
   if (profile.role === 'department' || profile.role === 'closing') {
     return (
       <LockGate><Routes>

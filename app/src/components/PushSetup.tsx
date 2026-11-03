@@ -24,10 +24,11 @@ async function save(profileId: string, sub: PushSubscription) {
 }
 
 // One tap on each phone. After that, alerts arrive even when Compass is closed.
-export function PushSetup() {
+export type PushState = 'checking' | 'on' | 'off' | 'blocked' | 'unsupported' | 'needs-install';
+export function usePush() {
   const { profile } = useSession();
   const toast = useToast();
-  const [state, setState] = useState<'checking' | 'on' | 'off' | 'blocked' | 'unsupported' | 'needs-install'>('checking');
+  const [state, setState] = useState<PushState>('checking');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -54,7 +55,11 @@ export function PushSetup() {
       setState('on'); toast('Alerts are on for this phone');
     } catch (e) { toast(errText(e)); } finally { setBusy(false); }
   }
+  return { state, busy, turnOn };
+}
 
+export function PushSetup() {
+  const { state, busy, turnOn } = usePush();
   if (state === 'checking' || state === 'on') return state === 'on' ? <p className="small muted row" style={{ gap: 6 }}><Icon name="bell" size={16} /> Alerts are on for this phone.</p> : null;
   if (state === 'needs-install') return <p className="banner">To get alerts on an iPhone, open this page in Safari, tap Share, then Add to Home Screen, and open Compass from there.</p>;
   if (state === 'unsupported') return null;
