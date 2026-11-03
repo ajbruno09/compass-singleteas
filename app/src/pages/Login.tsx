@@ -16,7 +16,7 @@ export function Login() {
   const [note, setNote] = useState('');
   const [adminPhone, setAdminPhone] = useState('');
   useEffect(() => { supabase.rpc('get_admin_contact').then(({ data }) => { if (typeof data === 'string') setAdminPhone(data); }); }, []);
-  const adminLink = adminPhone ? `https://wa.me/91${adminPhone}?text=${encodeURIComponent(`Hi, I am having trouble signing in to Compass.${/^[6-9][0-9]{9}$/.test(phone) ? ` My mobile number is ${phone}.` : ''}`)}` : '';
+  const adminLink = adminPhone ? `https://wa.me/91${adminPhone}?text=${encodeURIComponent(`Hi, I am having trouble signing in to SToMS.${/^[6-9][0-9]{9}$/.test(phone) ? ` My mobile number is ${phone}.` : ''}`)}` : '';
 
   async function forgot() {
     setError(''); setNote('');
@@ -65,7 +65,7 @@ export function Login() {
   return (
     <div className="split">
       <div className="split-form">
-        <div className="logo"><img src="/logo-mark.png" alt="" /><b>Compass</b><span className="small muted">Single Teas</span></div>
+        <div className="logo"><img src="/logo-mark.png" alt="" /><b>SToMS</b><span className="small muted">Single Teas Operations Management System</span></div>
         <form onSubmit={submit}>
           <div>
             <h1 style={{ fontSize: 24, lineHeight: '32px' }}>{mode === 'owner-new' ? 'Set up your owner account' : 'Welcome back'}</h1>
@@ -114,7 +114,7 @@ export function Login() {
           </div>
           {mode !== 'owner-new' && <button type="button" className="btn quiet" style={{ justifySelf: 'start' }} disabled={busy} onClick={() => void forgot()}>{mode === 'staff' ? 'Forgot PIN?' : 'Forgot password?'}</button>}
           <p className="small muted">Trouble signing in? {adminLink ? <a href={adminLink} target="_blank" rel="noreferrer">Contact Admin</a> : 'Contact Admin'}</p>
-          <a className="small" href="/join">New here? Join Compass</a>
+          <a className="small" href="/join">New here? Join SToMS</a>
         </form>
         <p className="small muted">Internal use only · Single Teas Operations</p>
       </div>

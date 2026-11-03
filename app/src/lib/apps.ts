@@ -3,7 +3,7 @@ import type { Role } from './types';
 // The apps shown on the "Your apps" screen after sign in. Staff on counters never see it.
 export interface AppDef { id: string; name: string; blurb: string; icon: string; roles: Role[]; to?: string; href?: string; status: 'live' | 'soon' | 'separate'; badge?: string }
 
-// Daily Closing still lives on its own address until it is rebuilt inside Compass (Release 4).
+// Daily Closing still lives on its own address until it is rebuilt inside SToMS (Release 4).
 export const CLOSING_URL: string = (import.meta.env.VITE_CLOSING_URL as string | undefined) ?? 'https://compass.singleteas.com';
 
 export const APPS: AppDef[] = [

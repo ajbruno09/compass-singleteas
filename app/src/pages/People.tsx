@@ -27,9 +27,9 @@ function inviteText(t: InviteTarget): string {
   const first = t.name.trim().split(' ')[0];
   const link = window.location.origin;
   if (t.lang === 'hi') {
-    return `नमस्ते ${first}, Compass में आपका स्वागत है। यह Single Teas का ऐप है।\n\nइस लिंक को खोलें: ${link}\n\nअपने मोबाइल नंबर ${t.phone} से साइन इन करें${t.pin ? `। आपका PIN है ${t.pin}` : ' और अपना PIN डालें'}।\n\nटिप: ब्राउज़र के मेनू में Add to Home Screen दबाएँ, ताकि यह ऐप की तरह खुले।`;
+    return `नमस्ते ${first}, SToMS में आपका स्वागत है। यह Single Teas का ऐप है।\n\nइस लिंक को खोलें: ${link}\n\nअपने मोबाइल नंबर ${t.phone} से साइन इन करें${t.pin ? `। आपका PIN है ${t.pin}` : ' और अपना PIN डालें'}।\n\nटिप: ब्राउज़र के मेनू में Add to Home Screen दबाएँ, ताकि यह ऐप की तरह खुले।`;
   }
-  return `Hi ${first}, welcome to Compass, the Single Teas app.\n\nOpen this link: ${link}\n\nSign in with your mobile number ${t.phone}${t.pin ? `. Your PIN is ${t.pin}` : ' and your PIN'}.\n\nTip: tap the browser menu and choose Add to Home Screen, so it opens like an app.`;
+  return `Hi ${first}, welcome to SToMS, the Single Teas app.\n\nOpen this link: ${link}\n\nSign in with your mobile number ${t.phone}${t.pin ? `. Your PIN is ${t.pin}` : ' and your PIN'}.\n\nTip: tap the browser menu and choose Add to Home Screen, so it opens like an app.`;
 }
 const STAFF_ROLES: Role[] = ['department', 'store', 'closing', 'accounts', 'manager'];
 

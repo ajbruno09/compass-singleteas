@@ -11,8 +11,8 @@ export default defineConfig({
       workbox: { importScripts: ['push-sw.js'], skipWaiting: true, clientsClaim: true, cleanupOutdatedCaches: true },
       includeAssets: ['logo-mark.png', 'favicon-64.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Compass · Single Teas',
-        short_name: 'Compass',
+        name: 'SToMS · Single Teas Operations Management System',
+        short_name: 'SToMS',
         description: 'Single Teas operations: indents, stock, purchases and closing.',
         theme_color: '#0F4D2A',
         background_color: '#F6F7F6',

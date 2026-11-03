@@ -1,4 +1,4 @@
-/* Compass design language v1: calm neutral surfaces, one tea-green accent, Inter, thin borders.
+/* SToMS design language v1: calm neutral surfaces, one tea-green accent, Inter, thin borders.
    Legacy token names (indigo, turmeric) are kept as aliases so older markup keeps working. */
 :root {
   --bg: #F6F7F6; --surface: #FFFFFF; --sunken: #EFF1F0; --line: #E3E7E5; --line-strong: #C4CBC8;

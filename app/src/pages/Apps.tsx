@@ -30,7 +30,7 @@ export function Apps() {
   return (
     <div style={{ minHeight: '100%' }}>
       <header className="apps-top">
-        <div className="logo"><img src="/logo-mark.png" alt="" /><b>Compass</b></div>
+        <div className="logo"><img src="/logo-mark.png" alt="" /><b>SToMS</b></div>
         <div className="row" style={{ gap: 12, flexWrap: 'nowrap' }}>
           <div style={{ textAlign: 'right' }}><div style={{ fontWeight: 550, lineHeight: '16px' }}>{profile.full_name}</div><div className="small muted">{ROLE_LABEL[profile.role]}</div></div>
           <span className="avatar">{initials(profile.full_name || 'C')}</span>

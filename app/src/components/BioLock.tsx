@@ -61,12 +61,12 @@ export function QuickUnlock() {
   if (on) return <p className="small muted" style={{ textAlign: 'center' }}>Fingerprint or face unlock is on. <button className="btn quiet" style={{ minHeight: 28 }} onClick={() => { bioOff(uid); setOn(false); toast('Unlock turned off'); }}>Turn off</button></p>;
   if (hide) return null;
   async function enable() {
-    try { await bioOn(uid, profile?.full_name || 'Compass'); setOn(true); toast('Done. Next time you open Compass, use your fingerprint or face.'); }
+    try { await bioOn(uid, profile?.full_name || 'SToMS'); setOn(true); toast('Done. Next time you open SToMS, use your fingerprint or face.'); }
     catch (e) { toast(errText(e)); }
   }
   return (
     <section className="card" style={{ display: 'grid', gap: 8 }}>
-      <b>Open Compass with your fingerprint or face</b>
+      <b>Open SToMS with your fingerprint or face</b>
       <p className="small muted">No need to type your PIN again on this phone.</p>
       <div className="row" style={{ gap: 8 }}>
         <button className="btn primary" onClick={() => void enable()}>Turn on</button>
@@ -96,7 +96,7 @@ export function PhotoPrompt() {
   return (
     <section className="card" style={{ display: 'grid', gap: 8 }}>
       <b>Please take your photo, only once</b>
-      <p className="small muted">It shows as your picture in Compass and confirms that this is you.</p>
+      <p className="small muted">It shows as your picture in SToMS and confirms that this is you.</p>
       <label className="btn primary" style={{ cursor: 'pointer', justifySelf: 'start' }}>
         <Icon name="camera" /> {busy ? 'Saving…' : 'Take photo'}
         <input type="file" accept="image/*" capture="user" hidden disabled={busy} onChange={(e) => void pick(e.target.files?.[0])} />

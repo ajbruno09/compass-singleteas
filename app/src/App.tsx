@@ -36,7 +36,7 @@ function Home({ several }: { several: boolean }) {
 
 function Gate() {
   const { session, profile, loading, signOut, recovery } = useSession();
-  if (!configured) return <div className="login"><div className="card"><h1>Compass</h1><p>This copy of the app is not connected to its database yet.</p></div></div>;
+  if (!configured) return <div className="login"><div className="card"><h1>SToMS</h1><p>This copy of the app is not connected to its database yet.</p></div></div>;
   if (loading) return <div className="login"><p className="muted">Loading…</p></div>;
   if (session && recovery) return <NewPassword />;
   if (!session) return window.location.pathname === '/join' ? <Join /> : <Login />;
