@@ -36,6 +36,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!session) return;
+    const beat = () => { if (document.visibilityState === 'visible') void supabase.rpc('touch_me'); };
+    beat();
+    const id = window.setInterval(beat, 3 * 60 * 1000);
+    document.addEventListener('visibilitychange', beat);
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', beat); };
+  }, [session?.user.id]);
+
   return (
     <SessionCtx.Provider value={{ session, profile, locations, myLocations, loading, recovery, clearRecovery: () => setRecovery(false), reload: () => load(session), signOut: async () => { await supabase.auth.signOut(); } }}>
       {children}

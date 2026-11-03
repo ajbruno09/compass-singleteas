@@ -32,17 +32,17 @@ export function Join() {
 
   if (done) return (
     <div className="login"><div className="card" style={{ display: 'grid', gap: 12, maxWidth: 380, textAlign: 'center' }}>
-      <img src="/icon.svg" alt="" width={56} height={56} style={{ justifySelf: 'center' }} />
+      <img src="/logo-mark.png" alt="" width={56} height={56} style={{ justifySelf: 'center' }} />
       <h1 style={{ fontSize: 22 }}>Thank you, {name.split(' ')[0]}</h1>
-      <p>Your request is with the owner. Once approved, you will get your first code. Use it to sign in the first time.</p>
+      <p>Your request is with Admin. Once approved, you will get your first code. Use it to sign in the first time.</p>
       <a className="btn secondary" href="/">Back to sign in</a>
     </div></div>
   );
   return (
     <div className="login"><div className="card" style={{ display: 'grid', gap: 14, maxWidth: 380, width: '100%' }}>
-      <div className="logo"><img src="/icon.svg" alt="" /><b>Compass</b><span className="small muted">Single Teas</span></div>
+      <div className="logo"><img src="/logo-mark.png" alt="" /><b>Compass</b><span className="small muted">Single Teas</span></div>
       <h1 style={{ fontSize: 22 }}>Join Compass</h1>
-      <p className="muted">Fill this once. The owner will approve you and give you your first code.</p>
+      <p className="muted">Fill this once. Admin will approve you and give you your first code.</p>
       <label className="field"><span>Your name</span><input id="j-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} style={{ minHeight: 44 }} /></label>
       <label className="field"><span>Mobile number</span><input id="j-phone" className="num" inputMode="numeric" autoComplete="tel-national" maxLength={10} value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))} placeholder="10 digits" style={{ minHeight: 44 }} /></label>
       <div className="field"><span>Your photo (one clear photo of your face)</span>
@@ -52,7 +52,7 @@ export function Join() {
         </div>
       </div>
       {error && <p className="banner bad" role="alert">{error}</p>}
-      <button className="btn primary floor" disabled={busy} onClick={() => void send()}>{busy ? 'Sending…' : 'Send to the owner'}</button>
+      <button className="btn primary floor" disabled={busy} onClick={() => void send()}>{busy ? 'Sending…' : 'Send to Admin'}</button>
       <a className="small muted" href="/">Already have a login? Sign in</a>
     </div></div>
   );

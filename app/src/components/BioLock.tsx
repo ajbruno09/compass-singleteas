@@ -39,7 +39,7 @@ export function LockGate({ children }: { children: ReactNode }) {
   if (!locked) return <>{children}</>;
   return (
     <div className="login"><div className="card" style={{ textAlign: 'center', display: 'grid', gap: 14, justifyItems: 'center', maxWidth: 360 }}>
-      {profile?.photo ? <img src={profile.photo} alt="" width={96} height={96} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <img src="/icon.svg" alt="" width={64} height={64} />}
+      {profile?.photo ? <img src={profile.photo} alt="" width={96} height={96} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <img src="/logo-mark.png" alt="" width={64} height={64} />}
       <h1 style={{ fontSize: 22 }}>Hello, {profile?.full_name?.split(' ')[0]}</h1>
       <button className="btn primary floor" onClick={() => void unlock()}><Icon name="lock" /> Unlock</button>
       {msg && <p className="banner warn">{msg}</p>}

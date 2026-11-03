@@ -45,7 +45,7 @@ const HI: Record<string, string> = {
   'Anything else to tell the store?': 'स्टोर को और कुछ बताना है?', 'Optional': 'ज़रूरी नहीं', 'Send SOS to the store': 'स्टोर को SOS भेजें',
   'SOS sent to the store': 'स्टोर को SOS भेज दिया', 'Request': 'अनुरोध', 'Sent at {time}': '{time} पर भेजा',
   'The store is on it.': 'स्टोर इस पर काम कर रहा है।', 'The store is on it. About {n} minutes.': 'स्टोर इस पर काम कर रहा है। लगभग {n} मिनट।',
-  'No answer from the store yet. The owner is being alerted too. You can also call.': 'स्टोर से अभी जवाब नहीं आया। मालिक को भी बताया जा रहा है। आप फ़ोन भी कर सकते हैं।',
+  'No answer from the store yet. Admin is being alerted too. You can also call.': 'स्टोर से अभी जवाब नहीं आया। एडमिन को भी बताया जा रहा है। आप फ़ोन भी कर सकते हैं।',
   'Waiting for the store to answer…': 'स्टोर के जवाब का इंतज़ार…', 'Call {name}': '{name} को फ़ोन करें',
   'I got it, close this': 'मिल गया, इसे बंद करें', 'Cancel, no longer needed': 'रद्द करें, अब ज़रूरत नहीं',
   // voice

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { supabase, staffEmail } from '../lib/supabase';
 import { errText } from '../lib/format';
 import { Icon } from '../components/Icon';
@@ -14,6 +14,9 @@ export function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
+  const [adminPhone, setAdminPhone] = useState('');
+  useEffect(() => { supabase.rpc('get_admin_contact').then(({ data }) => { if (typeof data === 'string') setAdminPhone(data); }); }, []);
+  const adminLink = adminPhone ? `https://wa.me/91${adminPhone}?text=${encodeURIComponent(`Hi, I am having trouble signing in to Compass.${/^[6-9][0-9]{9}$/.test(phone) ? ` My mobile number is ${phone}.` : ''}`)}` : '';
 
   async function forgot() {
     setError(''); setNote('');
@@ -23,7 +26,7 @@ export function Login() {
       const { error } = await supabase.rpc('request_pin_reset', { p_phone: phone });
       setBusy(false);
       if (error) return setError(errText(error));
-      setNote('Done. The owner has been told and will give you a new PIN.');
+      setNote('Done. Admin has been told and will give you a new PIN.');
     } else {
       if (!email.trim()) return setError('Type your email above first, then tap Forgot password.');
       setBusy(true);
@@ -42,7 +45,7 @@ export function Login() {
         if (!/^[6-9][0-9]{9}$/.test(phone)) throw new Error('Enter your 10-digit mobile number.');
         if (!/^[0-9]{6}$/.test(pin)) throw new Error('Your PIN has 6 digits.');
         const { error } = await supabase.auth.signInWithPassword({ email: staffEmail(phone), password: pin });
-        if (error) throw new Error('Mobile number or PIN is wrong. Ask the owner to reset your PIN if you forgot it.');
+        if (error) throw new Error('Mobile number or PIN is wrong. Tap Forgot PIN or contact Admin.');
       } else if (mode === 'owner') {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
@@ -62,7 +65,7 @@ export function Login() {
   return (
     <div className="split">
       <div className="split-form">
-        <div className="logo"><img src="/icon.svg" alt="" /><b>Compass</b><span className="small muted">Single Teas</span></div>
+        <div className="logo"><img src="/logo-mark.png" alt="" /><b>Compass</b><span className="small muted">Single Teas</span></div>
         <form onSubmit={submit}>
           <div>
             <h1 style={{ fontSize: 24, lineHeight: '32px' }}>{mode === 'owner-new' ? 'Set up your owner account' : 'Welcome back'}</h1>
@@ -110,7 +113,7 @@ export function Login() {
             {mode === 'owner' && <button type="button" className="btn quiet" onClick={() => setMode('owner-new')}>First time? Set up</button>}
           </div>
           {mode !== 'owner-new' && <button type="button" className="btn quiet" style={{ justifySelf: 'start' }} disabled={busy} onClick={() => void forgot()}>{mode === 'staff' ? 'Forgot PIN?' : 'Forgot password?'}</button>}
-          <p className="small muted">Trouble signing in? Ask Devid or J to reset your PIN.</p>
+          <p className="small muted">Trouble signing in? {adminLink ? <a href={adminLink} target="_blank" rel="noreferrer">Contact Admin</a> : 'Contact Admin'}</p>
           <a className="small" href="/join">New here? Join Compass</a>
         </form>
         <p className="small muted">Internal use only · Single Teas Operations</p>

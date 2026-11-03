@@ -33,7 +33,7 @@ export function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <aside className="sidebar" aria-label="Main menu">
-        <div className="brand"><img src="/icon.svg" alt="" /><span>Compass</span></div>
+        <div className="brand"><img src="/logo-mark.png" alt="" /><span>Compass</span></div>
         {nav.map((n) => (
           <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => 'navlink' + (isActive ? ' active' : '')}>
             <span className="row" style={{ gap: 10 }}><Icon name={n.icon} />{n.label}</span>
@@ -49,7 +49,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <header className="topbar">
-        <div className="brand" style={{ padding: 0 }}><img src="/icon.svg" alt="" /><span>Compass</span></div>
+        <div className="brand" style={{ padding: 0 }}><img src="/logo-mark.png" alt="" /><span>Compass</span></div>
         <select aria-label="Go to" value={nav.find((n) => n.to === loc.pathname)?.to ?? '/'} onChange={(e) => navigate(e.target.value)}>
           {nav.map((n) => <option key={n.to} value={n.to}>{n.label}</option>)}
           {profile && appsFor(profile.role).length > 1 && <option value="/apps">All apps</option>}

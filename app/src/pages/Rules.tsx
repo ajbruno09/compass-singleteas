@@ -44,6 +44,7 @@ export function Rules() {
           </table>
         </section>
       ))}
+      {isOwner && <AdminContact />}
       {isOwner && <StartFresh />}
       {editing && <RuleForm rule={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void load(); }} />}
     </>
@@ -121,6 +122,27 @@ function StartFresh() {
           <div className="row" style={{ gap: 8 }}><button className="btn secondary" onClick={() => { setOpen(false); setTxt(''); }}>Cancel</button><button className="btn primary" disabled={busy || txt.trim().toUpperCase() !== 'START FRESH'} onClick={() => void go()}>{busy ? 'Clearing…' : 'Clear test data'}</button></div>
         </>
       )}
+    </section>
+  );
+}
+
+function AdminContact() {
+  const toast = useToast();
+  const [num, setNum] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { supabase.rpc('get_admin_contact').then(({ data }) => { if (typeof data === 'string') setNum(data); }); }, []);
+  async function save() {
+    setBusy(true);
+    const { error } = await supabase.rpc('set_admin_contact', { p_phone: num });
+    setBusy(false);
+    toast(error ? errText(error) : 'Admin number saved');
+  }
+  return (
+    <section className="card" style={{ display: 'grid', gap: 10, maxWidth: 640, marginTop: 24 }}>
+      <h2>Admin contact number</h2>
+      <p className="muted">The Contact Admin link on the sign in page opens WhatsApp to this number. Change it here whenever Admin changes.</p>
+      <label className="field"><span>WhatsApp number</span><input id="admin-number" className="num" inputMode="numeric" maxLength={10} value={num} onChange={(e) => setNum(e.target.value.replace(/\D/g, ''))} /></label>
+      <button className="btn primary" style={{ justifySelf: 'start' }} disabled={busy || num.length !== 10} onClick={() => void save()}>{busy ? 'Saving…' : 'Save number'}</button>
     </section>
   );
 }

@@ -35,7 +35,7 @@ export function StaffHome() {
     <div className="phone">
       <div className="phone-head">
         <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
-          {profile?.photo ? <img src={profile.photo} alt="" width={36} height={36} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <img src="/icon.svg" alt="" width={32} height={32} />}
+          {profile?.photo ? <img src={profile.photo} alt="" width={36} height={36} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <img src="/logo-mark.png" alt="" width={32} height={32} />}
           <div><p style={{ font: '800 18px/20px var(--font-display)' }}>{t('Hello, {name}', { name: profile?.full_name?.split(' ')[0] ?? '' })}</p>
             <p className="small muted">{date ? t('Indent for {day}', { day: dayLabel(date) }) : ''}</p></div>
         </div>

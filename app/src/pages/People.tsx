@@ -8,7 +8,29 @@ import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 import type { Signup } from '../lib/types';
 
-interface Person extends Profile { profile_locations: { location_id: number }[] }
+interface Person extends Profile { profile_locations: { location_id: number }[]; first_login_at?: string | null; last_seen_at?: string | null; invited_at?: string | null }
+interface InviteTarget { name: string; phone: string; lang: string; pin: string }
+
+const dshort = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+const tshort = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+function presence(p: Person): { tone: 'on' | 'seen' | 'wait' | 'none'; label: string } {
+  const seen = p.last_seen_at ? new Date(p.last_seen_at).getTime() : 0;
+  if (seen && Date.now() - seen < 5 * 60 * 1000) return { tone: 'on', label: 'Active now' };
+  if (p.first_login_at && p.last_seen_at) { const sameDay = new Date(p.last_seen_at).toDateString() === new Date().toDateString(); return { tone: 'seen', label: sameDay ? `Last seen ${tshort(p.last_seen_at)}` : `Last seen ${dshort(p.last_seen_at)}` }; }
+  if (p.invited_at) return { tone: 'wait', label: `Invited ${dshort(p.invited_at)}` };
+  return { tone: 'none', label: 'Not invited' };
+}
+const LIGHT: Record<string, string> = { on: '#1F9D55', seen: '#9AD3B0', wait: '#E8A317', none: '#C9CDCB' };
+
+function inviteText(t: InviteTarget): string {
+  const first = t.name.trim().split(' ')[0];
+  const link = window.location.origin;
+  if (t.lang === 'hi') {
+    return `नमस्ते ${first}, Compass में आपका स्वागत है। यह Single Teas का ऐप है।\n\nइस लिंक को खोलें: ${link}\n\nअपने मोबाइल नंबर ${t.phone} से साइन इन करें${t.pin ? `। आपका PIN है ${t.pin}` : ' और अपना PIN डालें'}।\n\nटिप: ब्राउज़र के मेनू में Add to Home Screen दबाएँ, ताकि यह ऐप की तरह खुले।`;
+  }
+  return `Hi ${first}, welcome to Compass, the Single Teas app.\n\nOpen this link: ${link}\n\nSign in with your mobile number ${t.phone}${t.pin ? `. Your PIN is ${t.pin}` : ' and your PIN'}.\n\nTip: tap the browser menu and choose Add to Home Screen, so it opens like an app.`;
+}
 const STAFF_ROLES: Role[] = ['department', 'store', 'closing', 'accounts', 'manager'];
 
 async function callAdmin(body: Record<string, unknown>) {
@@ -28,6 +50,7 @@ export function People() {
   const [rows, setRows] = useState<Person[]>([]);
   const [editing, setEditing] = useState<Person | 'new' | null>(null);
   const [myPin, setMyPin] = useState(false);
+  const [invite, setInvite] = useState<InviteTarget | null>(null);
   const isOwner = profile?.role === 'owner';
 
   async function load() {
@@ -44,10 +67,11 @@ export function People() {
         {isOwner && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" />Add person</button>}
       </div>
       {isOwner && <SignupApprovals onChanged={load} />}
+      {rows.length > 0 && (() => { const act = rows.filter((r) => r.active); const joined = act.filter((r) => r.first_login_at).length; const now = act.filter((r) => presence(r).tone === 'on').length; const wait = act.filter((r) => !r.first_login_at && r.invited_at).length; const none = act.filter((r) => !r.first_login_at && !r.invited_at).length; return <p className="small"><b>{act.length}</b> people, <b>{joined}</b> signed in, <b>{now}</b> active now{wait ? <>, <b>{wait}</b> invited and not yet in</> : null}{none ? <>, <b>{none}</b> not invited yet</> : null}.</p>; })()}
       <p className="muted">Staff sign in with their mobile number and a 6-digit PIN. Each person sees only their own area. New people can join themselves at the Join page and wait here for your approval.</p>
       <div className="tablewrap">
         <table>
-          <thead><tr><th>Name</th><th>Mobile</th><th>Role</th><th>Works at</th><th>Extra language</th><th>Access</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Mobile</th><th>Role</th><th>Works at</th><th>Extra language</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {rows.map((p) => (
               <tr key={p.id} className={isOwner && p.role !== 'owner' ? 'click' : ''} onClick={() => isOwner && p.role !== 'owner' && setEditing(p)}>
@@ -56,20 +80,23 @@ export function People() {
                 <td>{ROLE_LABEL[p.role]}</td>
                 <td className="small">{p.profile_locations.map((l) => locName(l.location_id)).join(', ') || '—'}</td>
                 <td className="small">{p.extra_language ? LANGUAGES[p.extra_language] ?? p.extra_language : '—'}</td>
-                <td>{p.active ? <span className="chip done">Active</span> : <span className="chip off">No access</span>}</td>
-                <td>{isOwner && (p.role === 'owner' ? <button className="btn secondary" onClick={(e) => { e.stopPropagation(); setMyPin(true); }}>Change my PIN</button> : <button className="btn secondary" onClick={(e) => { e.stopPropagation(); setEditing(p); }}>Edit</button>)}</td>
+                <td>{!p.active ? <span className="chip off">No access</span> : (() => { const st = presence(p); return <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }} title={st.label}><span aria-hidden style={{ width: 11, height: 11, borderRadius: '50%', background: LIGHT[st.tone], boxShadow: st.tone === 'on' ? '0 0 0 4px rgba(31,157,85,.2)' : 'none', flex: 'none' }} /><span className="small">{st.label}</span></span>; })()}</td>
+                <td className="row" style={{ gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>{isOwner && (p.role === 'owner' ? <button className="btn secondary" onClick={(e) => { e.stopPropagation(); setMyPin(true); }}>Change my PIN</button> : <>
+                  {p.first_login_at ? <span className="small muted">Joined {dshort(p.first_login_at)}</span> : <button className="btn secondary" disabled={!p.phone} onClick={(e) => { e.stopPropagation(); setInvite({ name: p.full_name, phone: p.phone ?? '', lang: p.extra_language ?? '', pin: '' }); }}>{p.invited_at ? 'Send again' : 'Invite'}</button>}
+                  <button className="btn secondary" onClick={(e) => { e.stopPropagation(); setEditing(p); }}>Edit</button></>)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {invite && <InviteSheet target={invite} onClose={() => setInvite(null)} onSent={() => { setInvite(null); load(); }} />}
       {myPin && <MyPin onClose={() => setMyPin(false)} />}
-      {editing && <PersonForm person={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && <PersonForm person={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={(t) => { setEditing(null); load(); if (t) setInvite(t); }} />}
     </>
   );
 }
 
-function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClose: () => void; onSaved: () => void }) {
+function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClose: () => void; onSaved: (t?: InviteTarget) => void }) {
   const { locations } = useSession();
   const toast = useToast();
   const [name, setName] = useState(person?.full_name ?? '');
@@ -94,6 +121,7 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
         if (!/^[0-9]{6}$/.test(pin)) throw new Error('Set a 6-digit PIN for their first sign-in.');
         await callAdmin({ action: 'create', phone, pin, full_name: name.trim(), role, extra_language: lang || null, location_ids: locs });
         toast(`${name.trim()} can now sign in`);
+        onSaved({ name: name.trim(), phone, lang, pin }); return;
       } else {
         const up = await supabase.from('profiles').update({ full_name: name.trim(), role, extra_language: lang || null, active }).eq('id', person.id);
         if (up.error) throw up.error;
@@ -101,6 +129,7 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
         if (locs.length) { const ins = await supabase.from('profile_locations').insert(locs.map((l) => ({ profile_id: person.id, location_id: l }))); if (ins.error) throw ins.error; }
         if (pin) { if (!/^[0-9]{6}$/.test(pin)) throw new Error('A new PIN must be 6 digits.'); await callAdmin({ action: 'reset_pin', user_id: person.id, pin }); }
         toast('Saved');
+        if (pin && person.phone) { onSaved({ name: name.trim(), phone: person.phone, lang, pin }); return; }
       }
       onSaved();
     } catch (e) { setError(errText(e)); } finally { setBusy(false); }
@@ -125,7 +154,7 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
       </fieldset>
       <label className="field"><span>{person ? 'New PIN (leave empty to keep)' : 'First PIN'}</span>
         <input id="person-pin" className="num" inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} placeholder="6 digits" />
-        <span className="small muted">Tell the person their PIN directly. It is never shown again.</span></label>
+        <span className="small muted">After you save, you can send this PIN to them on WhatsApp. It is never shown again.</span></label>
       {person && person.photo && <button className="btn secondary" style={{ justifySelf: 'start' }} onClick={async () => { await supabase.rpc('clear_photo', { p_user: person.id }); toast('Photo cleared. They will take a new one.'); onSaved(); }}>Clear photo so they retake it</button>}
       {person && <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Can sign in</label>}
       {error && <p className="banner bad" role="alert">{error}</p>}
@@ -227,6 +256,28 @@ function MyPin({ onClose }: { onClose: () => void }) {
       <label className="field"><span>New PIN</span><input className="num" type="password" inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} placeholder="6 digits" /></label>
       <label className="field"><span>Type it again</span><input className="num" type="password" inputMode="numeric" maxLength={6} value={again} onChange={(e) => setAgain(e.target.value.replace(/\D/g, ''))} placeholder="6 digits" /></label>
       {error && <p className="banner bad" role="alert">{error}</p>}
+    </Sheet>
+  );
+}
+
+function InviteSheet({ target, onClose, onSent }: { target: InviteTarget; onClose: () => void; onSent: () => void }) {
+  const [pin, setPin] = useState(target.pin);
+  const [lang, setLang] = useState(target.lang === 'hi' ? 'hi' : '');
+  const msg = inviteText({ ...target, pin, lang });
+  async function send() {
+    const { data } = await supabase.from('profiles').select('id').eq('phone', target.phone).maybeSingle();
+    if (data?.id) await supabase.rpc('mark_invited', { p_user: data.id });
+    window.open(`https://wa.me/91${target.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+    onSent();
+  }
+  return (
+    <Sheet title={`Invite ${target.name}`} onClose={onClose}
+      footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn primary" onClick={() => void send()}>Open WhatsApp</button></>}>
+      <label className="field"><span>PIN to include (optional)</span>
+        <input className="num" inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} placeholder="6 digits, or leave empty" />
+        <span className="small muted">PINs are stored scrambled, so the app cannot look up an old one. To include a PIN, set a new one with Edit first.</span></label>
+      <label className="field"><span>Message language</span><select value={lang} onChange={(e) => setLang(e.target.value)}><option value="">English</option><option value="hi">हिंदी (Hindi)</option></select></label>
+      <pre className="card small" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{msg}</pre>
     </Sheet>
   );
 }

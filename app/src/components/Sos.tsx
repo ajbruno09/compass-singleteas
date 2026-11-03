@@ -123,7 +123,7 @@ function Status({ alert, contacts, now, onDone }: { alert: SosAlert; contacts: C
       {alert.acked_at
         ? <p className="banner ok">{alert.eta_minutes ? t('The store is on it. About {n} minutes.', { n: alert.eta_minutes }) : t('The store is on it.')}</p>
         : escalated
-          ? <p className="banner bad">{t('No answer from the store yet. The owner is being alerted too. You can also call.')}</p>
+          ? <p className="banner bad">{t('No answer from the store yet. Admin is being alerted too. You can also call.')}</p>
           : <p className="banner warn">{t('Waiting for the store to answer…')}</p>}
       {!alert.acked_at && escalated && (
         <div className="stack">

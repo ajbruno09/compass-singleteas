@@ -44,7 +44,7 @@ function Gate() {
     return (
       <div className="login"><div className="card">
         <h1>Almost there</h1>
-        <p>Your account is waiting for the owner to give you access. Ask the owner to add you in Compass.</p>
+        <p>Your account is waiting for Admin to give you access. Please contact Admin.</p>
         <button className="btn secondary" onClick={signOut}>Sign out</button>
       </div></div>
     );
