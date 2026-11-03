@@ -7,6 +7,9 @@ export interface Item {
   id: number; name: string; local_names: Record<string, string>; category_id: number; unit: string;
   purchase_unit: string | null; purchase_factor: number | null; quick_amounts: number[]; photo_path: string | null;
   count_frequency: 'daily' | 'weekly'; tolerance_pct: number; last_cost: number | null; active: boolean;
+  base_unit?: string | null; counts_as?: string | null; show_as?: string | null; pack_name?: string | null; pack_size?: number | null;
+  pieces_per_pack?: number | null; slices_per_pack?: number | null; weight_per_pack_g?: number | null; wastage_pct?: number | null;
+  usable_gas_g?: number | null; receiving_tolerance_g?: number | null; opening_base?: number | null;
 }
 export interface Vendor {
   id: string; name: string; code: string | null; category: string | null; contact_person: string | null; phone: string | null;

@@ -87,6 +87,14 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
   const [tol, setTol] = useState(String(item?.tolerance_pct ?? 5));
   const [cost, setCost] = useState(item?.last_cost?.toString() ?? '');
   const [active, setActive] = useState(item?.active ?? true);
+  const [baseUnit, setBaseUnit] = useState(item?.base_unit ?? '');
+  const [countsAs, setCountsAs] = useState(item?.counts_as ?? '');
+  const [packName, setPackName] = useState(item?.pack_name ?? '');
+  const [packSize, setPackSize] = useState(item?.pack_size?.toString() ?? '');
+  const [pieces, setPieces] = useState(item?.pieces_per_pack?.toString() ?? '');
+  const [slices, setSlices] = useState(item?.slices_per_pack?.toString() ?? '');
+  const [packG, setPackG] = useState(item?.weight_per_pack_g?.toString() ?? '');
+  const [waste, setWaste] = useState(item?.wastage_pct?.toString() ?? '');
   const [local, setLocal] = useState<Record<string, string>>(item?.local_names ?? {});
   const [locs, setLocs] = useState<Record<number, string>>(() => Object.fromEntries((item?.item_locations ?? []).map((l) => [l.location_id, l.par_level?.toString() ?? ''])));
   const [file, setFile] = useState<File | null>(null);
@@ -109,6 +117,10 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
         name: name.trim(), category_id: categoryId, unit, purchase_unit: purchaseUnit || null,
         purchase_factor: purchaseUnit ? Number(factor) : null, quick_amounts: quickVals, count_frequency: freq,
         tolerance_pct: Number(tol) || 0, last_cost: cost === '' ? null : Number(cost), active,
+        base_unit: baseUnit || null, counts_as: countsAs || null, pack_name: packName || null,
+        pack_size: packSize === '' ? null : Number(packSize), pieces_per_pack: pieces === '' ? null : Number(pieces),
+        slices_per_pack: slices === '' ? null : Number(slices), weight_per_pack_g: packG === '' ? null : Number(packG),
+        wastage_pct: waste === '' ? null : Number(waste),
         local_names: Object.fromEntries(Object.entries(local).filter(([, v]) => v.trim()))
       };
       let id = item?.id;
@@ -156,6 +168,20 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
         <label className="field"><span>Bought in (if different)</span>
           <select id="item-punit" value={purchaseUnit} onChange={(e) => setPurchaseUnit(e.target.value)}><option value="">Same</option>{units.map((u) => <option key={u.code} value={u.code}>{u.name}</option>)}</select></label>
         {purchaseUnit && <label className="field"><span>{unit} in one {purchaseUnit}</span><input id="item-factor" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} className="num" /></label>}
+      </div>
+      <h2 style={{ marginTop: 8 }}>Stock details</h2>
+      <p className="small muted">Optional. Leave anything blank and Compass simply shows “Not set yet”. You can fill these in later.</p>
+      <div className="form-grid">
+        <label className="field"><span>Stored and issued in</span>
+          <select id="item-base" value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)}><option value="">Not set yet</option>{['g', 'ml', 'nos', 'slices', 'bottle', 'roll', 'box', 'bunch', 'cyl'].map((u) => <option key={u} value={u}>{u}</option>)}</select></label>
+        <label className="field"><span>Counted how</span>
+          <select id="item-counts" value={countsAs} onChange={(e) => setCountsAs(e.target.value)}><option value="">Not set yet</option>{['By weight', 'By volume', 'By count', 'Whole packs only'].map((u) => <option key={u} value={u}>{u}</option>)}</select></label>
+        <label className="field"><span>Pack name</span><input id="item-packname" value={packName} onChange={(e) => setPackName(e.target.value)} placeholder="e.g. Packet, Pouch, Tub" /></label>
+        <label className="field"><span>Pack size (in the unit above)</span><input id="item-packsize" inputMode="decimal" className="num" value={packSize} onChange={(e) => setPackSize(e.target.value)} /></label>
+        <label className="field"><span>Pieces in a pack</span><input id="item-pieces" inputMode="decimal" className="num" value={pieces} onChange={(e) => setPieces(e.target.value)} /></label>
+        <label className="field"><span>Slices in a pack</span><input id="item-slices" inputMode="decimal" className="num" value={slices} onChange={(e) => setSlices(e.target.value)} /></label>
+        <label className="field"><span>Weight of a pack (g)</span><input id="item-packg" inputMode="decimal" className="num" value={packG} onChange={(e) => setPackG(e.target.value)} /></label>
+        <label className="field"><span>Wastage allowed (%)</span><input id="item-waste" inputMode="decimal" className="num" value={waste} onChange={(e) => setWaste(e.target.value)} /></label>
       </div>
       <label className="field"><span>Quick amounts (in {unit})</span>
         <input id="item-quick" value={quickText} onChange={(e) => setQuickText(e.target.value)} className="num" />

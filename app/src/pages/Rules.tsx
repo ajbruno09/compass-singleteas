@@ -44,6 +44,7 @@ export function Rules() {
           </table>
         </section>
       ))}
+      {isOwner && <StartFresh />}
       {editing && <RuleForm rule={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void load(); }} />}
     </>
   );
@@ -94,5 +95,32 @@ function RuleForm({ rule, onClose, onSaved }: { rule: Rule; onClose: () => void;
       {error && <p className="banner bad" role="alert">{error}</p>}
       {hist.length > 0 && <div className="card" style={{ display: 'grid', gap: 4 }}><b>History</b>{hist.map((h) => <div key={h.id} className="small row" style={{ justifyContent: 'space-between' }}><span>{show(rule, h.value)}{h.note ? ` · ${h.note}` : ''}</span><span className="muted">from {h.effective_from}</span></div>)}</div>}
     </Sheet>
+  );
+}
+
+function StartFresh() {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [txt, setTxt] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    setBusy(true);
+    const { data, error } = await supabase.rpc('start_fresh');
+    setBusy(false);
+    if (error) { toast(errText(error)); return; }
+    const d = data as { indents: number; stock_rows: number };
+    toast(`Cleared ${d.indents} indents and ${d.stock_rows} test stock entries`); setOpen(false); setTxt('');
+  }
+  return (
+    <section className="card" style={{ display: 'grid', gap: 10, maxWidth: 640, marginTop: 24 }}>
+      <h2>Start fresh</h2>
+      <p className="muted">Removes every test indent, purchase order, urgent request and alert, so the real work starts clean. Your items, people, vendors, rules and opening stock stay exactly as they are. This cannot be undone.</p>
+      {!open ? <button className="btn secondary" style={{ justifySelf: 'start' }} onClick={() => setOpen(true)}>Start fresh…</button> : (
+        <>
+          <label className="field"><span>Type START FRESH to confirm</span><input id="fresh-confirm" value={txt} onChange={(e) => setTxt(e.target.value)} /></label>
+          <div className="row" style={{ gap: 8 }}><button className="btn secondary" onClick={() => { setOpen(false); setTxt(''); }}>Cancel</button><button className="btn primary" disabled={busy || txt.trim().toUpperCase() !== 'START FRESH'} onClick={() => void go()}>{busy ? 'Clearing…' : 'Clear test data'}</button></div>
+        </>
+      )}
+    </section>
   );
 }
