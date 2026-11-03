@@ -4,7 +4,7 @@ import { usePush } from './PushSetup';
 import { bioEnabled, bioOn, bioSupported } from '../lib/biolock';
 import { alarmUnlocked, testBeep, unlockAlarm } from '../lib/alarm';
 import { errText } from '../lib/format';
-import { Icon } from './Icon';
+import { BellRing, Check, Fingerprint, Siren } from 'lucide-react';
 import { useToast } from './Toast';
 
 interface Chip { key: string; icon: string; label: string; on: boolean; hint: string; act?: () => void; busy?: boolean }
@@ -44,8 +44,8 @@ export function StatusStrip() {
   return (
     <div className="statusstrip" role="group" aria-label="This phone">
       {chips.map((c) => (
-        <button key={c.key} className={'stat ' + (c.on ? 'on' : 'off')} title={c.hint} disabled={c.busy || (!c.act)} onClick={c.act} aria-label={c.hint}>
-          <Icon name={c.icon} size={16} /><span>{c.busy ? 'Please wait…' : c.label}</span>{c.on ? <Icon name="check" size={14} stroke={2.4} /> : null}
+        <button key={c.key} className={'stat ' + (c.on ? 'on' : 'off') + (c.key === 'sos' ? ' sos' : '')} title={c.hint} disabled={c.busy || (!c.act)} onClick={c.act} aria-label={c.hint}>
+          {c.icon === 'bell' ? <BellRing size={18} strokeWidth={2} /> : c.icon === 'finger' ? <Fingerprint size={18} strokeWidth={2} /> : <Siren size={18} strokeWidth={2} />}<span>{c.busy ? 'Please wait…' : c.label}</span>{c.on ? <Check size={15} strokeWidth={2.6} /> : null}
         </button>
       ))}
     </div>

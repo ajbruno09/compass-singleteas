@@ -351,3 +351,7 @@ tr.click { cursor: pointer; }
 .stat.off { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn); }
 .stat:disabled { opacity: .7; }
 .stat.on:disabled { opacity: 1; }
+
+.stat.sos.off { background: #FDE9E2; border-color: #F5C1B0; color: #C2410C; }
+.stat.sos.on { color: #1B6A4D; }
+.stat.sos.off svg { color: #E4572E; }
