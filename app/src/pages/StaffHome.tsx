@@ -1,3 +1,4 @@
+import { StatusStrip } from '../components/StatusStrip';
 import { ProfileSheet } from '../components/ProfileSheet';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -46,6 +47,7 @@ export function StaffHome() {
         </div>
       </div>
 
+      <StatusStrip />
       <NoticeStack />
       <p className={'banner' + (win === 'late' ? ' warn' : '')}>
         {win === 'open' ? t('Indent time is on. Please send by {time}.', { time: clock12(rem.indent_due ?? '17:00') })

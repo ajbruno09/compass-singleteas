@@ -342,3 +342,12 @@ tr.click { cursor: pointer; }
 .setup .bar { height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
 .setup .bar > i { display: block; height: 100%; background: #F7821B; transition: width .25s; }
 .setup .big { min-height: 52px; font-size: 17px; }
+
+/* Phone status strip */
+.statusstrip { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.stat { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font: 550 13px/1 var(--font); color: var(--ink-2); cursor: pointer; }
+.stat.on { background: var(--ok-bg); border-color: transparent; color: var(--ok); cursor: default; }
+.stat.on[title*="test"] { cursor: pointer; }
+.stat.off { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn); }
+.stat:disabled { opacity: .7; }
+.stat.on:disabled { opacity: 1; }

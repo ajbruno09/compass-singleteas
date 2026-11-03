@@ -3,10 +3,9 @@ import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText } from '../lib/format';
 import { timeOf } from '../lib/ist';
-import { alarmUnlocked, keepAwake, startAlarm, stopAlarm, testBeep, unlockAlarm } from '../lib/alarm';
+import { alarmUnlocked, keepAwake, startAlarm, stopAlarm, unlockAlarm } from '../lib/alarm';
 import { SOS_AFTER_SECONDS, type SosAlert } from '../lib/types';
 import { useToast } from './Toast';
-import { Icon } from './Icon';
 
 // Lives on the store phone and the owner's phone. The store rings at once; the owner rings if nobody answers.
 export function SosWatcher() {
@@ -16,6 +15,7 @@ export function SosWatcher() {
   const [names, setNames] = useState<Record<number, string>>({});
   const [now, setNow] = useState(Date.now());
   const [armed, setArmed] = useState(alarmUnlocked());
+  useEffect(() => { const f = () => setArmed(alarmUnlocked()); window.addEventListener('compass-armed', f); return () => window.removeEventListener('compass-armed', f); }, []);
   const role = profile?.role;
   const watching = role === 'store' || role === 'owner' || role === 'manager';
 
@@ -76,14 +76,6 @@ export function SosWatcher() {
   if (!watching) return null;
   return (
     <>
-      {!armed ? (
-        <button className="banner warn alarmbar" onClick={() => { setArmed(unlockAlarm()); testBeep(); }}>
-          <Icon name="bell" /> Tap here to turn on the SOS alarm sound on this phone
-        </button>
-      ) : (
-        <div className="row small muted"><Icon name="bell" size={16} /> SOS siren is on. Keep Compass open for the loud siren. Alerts still reach this phone when it is closed. <button className="btn quiet" style={{ minHeight: 28 }} onClick={testBeep}>Test sound</button></div>
-      )}
-
       {alerts.filter((a) => a.acked_at).map((a) => (
         <div key={a.id} className="banner ok row" style={{ justifyContent: 'space-between' }}>
           <span>{where(a)}: {names[a.item_id ?? -1] ?? 'request'}{a.note ? `, ${a.note}` : ''}{a.eta_minutes ? ` · about ${a.eta_minutes} min` : ''}</span>
