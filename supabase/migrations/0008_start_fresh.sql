@@ -1,0 +1,2 @@
+-- start_fresh(): owner only. Clears test indents, orders, alerts and non-opening stock movements.
+-- (applied to the project as migration "start_fresh")
