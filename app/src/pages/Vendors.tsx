@@ -6,6 +6,14 @@ import type { Vendor } from '../lib/types';
 import { Sheet } from '../components/Sheet';
 import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
+import { photoUrl } from '../lib/masters';
+
+async function qrUrl(path: string | null | undefined): Promise<string | null> {
+  if (!path) return null;
+  const { data } = await supabase.storage.from('vendor-qr').createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
+}
+void photoUrl;
 
 interface Totals { vendor_id: string; billed: number; balance: number; bills: number }
 
@@ -14,6 +22,7 @@ export function Vendors() {
   const [rows, setRows] = useState<Vendor[]>([]);
   const [totals, setTotals] = useState<Record<string, Totals>>({});
   const [editing, setEditing] = useState<Vendor | 'new' | null>(null);
+  const [paying, setPaying] = useState<Vendor | null>(null);
   const [q, setQ] = useState('');
   const canEdit = profile?.role === 'owner' || profile?.role === 'accounts';
   const seesMoney = profile?.role !== 'store';
@@ -47,7 +56,7 @@ export function Vendors() {
       <input id="vendor-search" placeholder="Search vendors" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 320 }} />
       <div className="tablewrap">
         <table>
-          <thead><tr><th>Vendor</th><th>WhatsApp</th><th>Credit days</th>{seesMoney && <><th className="r">Bills</th><th className="r">Billed</th><th className="r">Unpaid</th></>}</tr></thead>
+          <thead><tr><th>Vendor</th><th>WhatsApp</th><th>Credit days</th>{canEdit && <th style={{ width: 150 }} />}{seesMoney && <><th className="r">Bills</th><th className="r">Billed</th><th className="r">Unpaid</th></>}</tr></thead>
           <tbody>
             {shown.map((v) => {
               const t = totals[v.id];
@@ -56,6 +65,7 @@ export function Vendors() {
                   <td><strong>{v.name}</strong>{!v.active && <span className="chip off" style={{ marginLeft: 8 }}>Inactive</span>}{v.category && <div className="small muted">{v.category}</div>}</td>
                   <td className="num small">{v.whatsapp || v.phone || <span className="chip late">Missing</span>}</td>
                   <td className="num">{v.credit_days ?? '—'}</td>
+                  {canEdit && <td onClick={(e) => e.stopPropagation()}><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="btn quiet" onClick={() => setEditing(v)}>Edit</button><button className="btn quiet" onClick={() => setPaying(v)}>Pay</button></div></td>}
                   {seesMoney && <><td className="r num">{t?.bills ?? 0}</td><td className="r num">{money(t?.billed ?? 0)}</td>
                     <td className="r num" style={{ color: (t?.balance ?? 0) > 0 ? 'var(--watch)' : undefined, fontWeight: (t?.balance ?? 0) > 0 ? 700 : 400 }}>{money(t?.balance ?? 0)}</td></>}
                 </tr>
@@ -65,6 +75,7 @@ export function Vendors() {
         </table>
         {shown.length === 0 && <p className="empty">No vendors yet.</p>}
       </div>
+      {paying && <PaySheet vendor={paying} onClose={() => setPaying(null)} onEdit={() => { setEditing(paying); setPaying(null); }} />}
       {editing && <VendorForm vendor={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </>
   );
@@ -83,6 +94,9 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
   const [remarks, setRemarks] = useState(vendor?.remarks ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [qrFile, setQrFile] = useState<File | null>(null);
+  const [qrPrev, setQrPrev] = useState<string | null>(null);
+  useEffect(() => { void qrUrl(vendor?.qr_path).then(setQrPrev); }, [vendor]);
 
   async function save() {
     setError('');
@@ -93,8 +107,16 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
       const body: Record<string, unknown> = Object.fromEntries(Object.entries(v).map(([k, val]) => [k, val.trim() === '' ? null : val.trim()]));
       body.credit_days = v.credit_days ? Number(v.credit_days) : null;
       body.active = active; body.remarks = remarks;
-      const res = vendor ? await supabase.from('vendors').update(body).eq('id', vendor.id) : await supabase.from('vendors').insert(body);
+      const res = vendor ? await supabase.from('vendors').update(body).eq('id', vendor.id).select('id').single() : await supabase.from('vendors').insert(body).select('id').single();
       if (res.error) throw res.error;
+      if (qrFile) {
+        const vid = (res.data as { id: string }).id;
+        const path = `${vid}/${Date.now()}.${(qrFile.name.split('.').pop() || 'png').toLowerCase()}`;
+        const up = await supabase.storage.from('vendor-qr').upload(path, qrFile, { upsert: true });
+        if (up.error) throw up.error;
+        const u2 = await supabase.from('vendors').update({ qr_path: path }).eq('id', vid);
+        if (u2.error) throw u2.error;
+      }
       toast(vendor ? 'Vendor saved' : 'Vendor added');
       onSaved();
     } catch (e) { setError(errText(e)); } finally { setBusy(false); }
@@ -110,9 +132,30 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
               value={v[k]} onChange={(e) => setV((p) => ({ ...p, [k]: e.target.value }))} /></label>
         ))}
       </div>
+      <fieldset className="card" style={{ display: 'grid', gap: 10 }}>
+        <legend className="label">Payment QR code</legend>
+        <div className="row" style={{ gap: 16, alignItems: 'flex-start' }}>
+          <div style={{ width: 120, height: 120, borderRadius: 10, background: 'var(--surface-200)', overflow: 'hidden', display: 'grid', placeItems: 'center' }}>{qrPrev ? <img src={qrPrev} alt="Payment QR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Icon name="camera" size={30} />}</div>
+          <label className="field" style={{ flex: 1 }}><span>Upload the vendor's QR image</span><input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] ?? null; setQrFile(f); if (f) setQrPrev(URL.createObjectURL(f)); }} /><span className="small muted">A screenshot of their UPI QR works. It shows large when you tap Pay, so you can scan it.</span></label>
+        </div>
+      </fieldset>
       <label className="field"><span>Remarks</span><textarea id="vendor-remarks" value={remarks} onChange={(e) => setRemarks(e.target.value)} /></label>
       <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Active</label>
       {error && <p className="banner bad" role="alert">{error}</p>}
+    </Sheet>
+  );
+}
+
+function PaySheet({ vendor, onClose, onEdit }: { vendor: Vendor; onClose: () => void; onEdit: () => void }) {
+  const toast = useToast();
+  const [qr, setQr] = useState<string | null>(null);
+  useEffect(() => { void qrUrl(vendor.qr_path).then(setQr); }, [vendor]);
+  const copy = (t: string) => { void navigator.clipboard?.writeText(t).then(() => toast('Copied')); };
+  const rows: [string, string | null][] = [['UPI ID', vendor.upi], ['Bank', vendor.bank_name], ['Account number', vendor.bank_account], ['IFSC', vendor.ifsc], ['Phone', vendor.phone || vendor.whatsapp]];
+  return (
+    <Sheet title={`Pay ${vendor.name}`} onClose={onClose} footer={<button className="btn secondary" onClick={onEdit}>Edit vendor</button>}>
+      {qr ? <div style={{ display: 'grid', placeItems: 'center' }}><img src={qr} alt="Payment QR" style={{ width: 'min(320px, 100%)', background: '#fff', padding: 8, borderRadius: 12 }} /></div> : <p className="banner warn">No QR uploaded yet. Tap Edit vendor to add the QR image.</p>}
+      <div className="stack">{rows.filter(([, v]) => v).map(([k, v]) => <div key={k} className="row" style={{ justifyContent: 'space-between' }}><span className="muted">{k}</span><span className="row" style={{ gap: 6 }}><b className="num">{v}</b><button className="btn quiet" onClick={() => copy(v!)}>Copy</button></span></div>)}</div>
     </Sheet>
   );
 }

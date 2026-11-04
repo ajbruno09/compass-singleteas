@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText, money } from '../lib/format';
@@ -89,7 +90,8 @@ export function MenuItems() {
     <>
       <div className="pagehead">
         <div><p className="label">What you sell</p><h1>Menu items</h1></div>
-        {canAdd && tab === 'items' && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" />Add item</button>}
+        <div className="row">{canAdd && <Link to="/upload?tab=menu" className="btn"><Icon name="layers" />Bulk upload</Link>}
+        {canAdd && tab === 'items' && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" />Add item</button>}</div>
       </div>
       <p className="muted">{nActive} on the menu, {items.length - nActive} switched off{nCheck ? `, ${nCheck} to check` : ''}. Each item belongs to one counter. Switch an item off to keep it for later, or delete it for good.</p>
       <div className="seg" role="group" aria-label="View">

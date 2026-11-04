@@ -20,6 +20,10 @@ import { MenuItems } from './pages/MenuItems';
 import { Rules } from './pages/Rules';
 import { Notices } from './pages/Notices';
 import { Join } from './pages/Join';
+import { Upload } from './pages/Upload';
+import { Recipes } from './pages/Recipes';
+import { Inventory } from './pages/Inventory';
+import { Maintenance } from './pages/Maintenance';
 import { Receive } from './pages/Receive';
 import { Issue } from './pages/Issue';
 import { StockView } from './pages/StockView';
@@ -31,7 +35,7 @@ import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/menu': <MenuItems />, '/rules': <Rules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/receive': <Receive />, '/issue': <Issue />, '/stockview': <StockView />, '/counts': <Counts />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
+  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/menu': <MenuItems />, '/rules': <Rules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/receive': <Receive />, '/issue': <Issue />, '/stockview': <StockView />, '/counts': <Counts />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
 };
 
 // After signing in, people with more than one app choose which to open. Once per visit.

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useMasters, DEFAULT_QUICK, photoUrl } from '../lib/masters';
 import { useSession } from '../lib/session';
@@ -34,7 +35,8 @@ export function Items() {
     <>
       <div className="pagehead">
         <div><p className="label">Masters</p><h1>Items</h1></div>
-        {canEdit && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" />Add item</button>}
+        <div className="row">{canEdit && <Link to="/upload?tab=items" className="btn"><Icon name="layers" />Bulk upload</Link>}
+        {canEdit && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" />Add item</button>}</div>
       </div>
       <div className="row">
         <div className="seg" role="group" aria-label="Category">
