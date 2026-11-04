@@ -9,12 +9,16 @@ import { Icon } from './Icon';
 
 // Only ask again after the app has been away for a good while, never for a quick look at another tab.
 const RELOCK_MS = 30 * 60 * 1000;
+const seenKey = (uid: string) => `compass-active-${uid}`;
+const markActive = (uid: string) => { try { localStorage.setItem(seenKey(uid), String(Date.now())); } catch { /* ignore */ } };
+// True when this phone or computer used Compass within the last 30 minutes, so a refresh does not ask again.
+const recentlyActive = (uid: string) => { try { return Date.now() - Number(localStorage.getItem(seenKey(uid)) ?? 0) < RELOCK_MS; } catch { return false; } };
 
 // Opens behind the phone's own fingerprint or face check, when the person has turned it on.
 export function LockGate({ children }: { children: ReactNode }) {
   const { profile, signOut } = useSession();
   const uid = profile?.id ?? '';
-  const [locked, setLocked] = useState(() => !!uid && bioEnabled(uid));
+  const [locked, setLocked] = useState(() => !!uid && bioEnabled(uid) && !recentlyActive(uid));
   const [msg, setMsg] = useState('');
   const hiddenAt = useRef(0);
   const trying = useRef(false);
@@ -22,15 +26,26 @@ export function LockGate({ children }: { children: ReactNode }) {
   const unlock = useCallback(async () => {
     if (!uid || trying.current) return;
     trying.current = true; setMsg('');
-    try { if (await bioCheck(uid)) { hiddenAt.current = 0; setLocked(false); } }
+    try { if (await bioCheck(uid)) { hiddenAt.current = 0; markActive(uid); setLocked(false); } }
     catch { setMsg('Not recognised. Try again, or use your PIN.'); }
     finally { trying.current = false; }
   }, [uid]);
 
-  useEffect(() => { if (uid && bioEnabled(uid)) { setLocked(true); void unlock(); } }, [uid, unlock]);
+  useEffect(() => {
+    if (!uid || !bioEnabled(uid)) return;
+    if (recentlyActive(uid)) { setLocked(false); markActive(uid); return; }
+    setLocked(true); void unlock();
+  }, [uid, unlock]);
+  useEffect(() => {
+    if (!uid) return;
+    const beat = () => { if (!document.hidden) markActive(uid); };
+    const id = window.setInterval(beat, 30000);
+    window.addEventListener('pagehide', beat);
+    return () => { window.clearInterval(id); window.removeEventListener('pagehide', beat); };
+  }, [uid]);
   useEffect(() => {
     const v = () => {
-      if (document.hidden) { if (!hiddenAt.current) hiddenAt.current = Date.now(); return; }
+      if (document.hidden) { if (uid) markActive(uid); if (!hiddenAt.current) hiddenAt.current = Date.now(); return; }
       if (uid && bioEnabled(uid) && hiddenAt.current && Date.now() - hiddenAt.current > RELOCK_MS) { hiddenAt.current = 0; setLocked(true); void unlock(); }
       else hiddenAt.current = 0;
     };
