@@ -12,16 +12,21 @@ export function OpeningStock() {
   const toast = useToast();
   const [items, setItems] = useState<Item[]>([]);
   const [onHand, setOnHand] = useState<OnHand[]>([]);
+  const [links, setLinks] = useState<{ item_id: number; location_id: number }[]>([]);
+  const [q, setQ] = useState('');
+  const [all, setAll] = useState(false);
   const [loc, setLoc] = useState<number | null>(null);
   const [vals, setVals] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   async function load() {
-    const [{ data: it }, { data: oh }] = await Promise.all([
+    const [{ data: it }, { data: oh }, { data: lk }] = await Promise.all([
       supabase.from('items').select('*').eq('active', true).order('name'),
-      supabase.from('stock_on_hand').select('*')
+      supabase.from('stock_on_hand').select('*'),
+      supabase.from('item_locations').select('item_id, location_id')
     ]);
+    setLinks((lk as { item_id: number; location_id: number }[]) ?? []);
     setItems((it as Item[]) ?? []);
     setOnHand((oh as OnHand[]) ?? []);
   }
@@ -29,6 +34,10 @@ export function OpeningStock() {
   useEffect(() => { if (loc == null && locations.length) setLoc(locations[0].id); }, [locations, loc]);
 
   const have = useMemo(() => new Map(onHand.filter((o) => o.location_id === loc).map((o) => [o.item_id, Number(o.qty)])), [onHand, loc]);
+
+  const linked = useMemo(() => new Set(links.filter((l) => l.location_id === loc).map((l) => l.item_id)), [links, loc]);
+  const isStore = locations.find((l) => l.id === loc)?.kind === 'store';
+  const shown = items.filter((i) => (all || isStore || linked.has(i.id) || have.has(i.id)) && i.name.toLowerCase().includes(q.toLowerCase()));
 
   async function save() {
     setError('');
@@ -54,11 +63,14 @@ export function OpeningStock() {
       <div className="seg" role="group" aria-label="Place">
         {locations.map((l) => <button key={l.id} aria-pressed={loc === l.id} onClick={() => { setLoc(l.id); setVals({}); }}>{l.name}</button>)}
       </div>
+      <div className="row"><input placeholder="Find an item" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 280 }} />
+        {!isStore && <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} /> Show items from every counter</label>}
+        <span className="small muted">{shown.length} items</span></div>
       <div className="tablewrap">
         <table>
           <thead><tr><th>Item</th><th>Unit</th><th className="r">Already entered</th><th className="r">Count now</th></tr></thead>
           <tbody>
-            {items.map((i) => (
+            {shown.map((i) => (
               <tr key={i.id}>
                 <td><strong>{i.name}</strong></td><td>{i.unit}</td>
                 <td className="r num">{have.has(i.id) ? qty(have.get(i.id), i.unit) : '—'}</td>
