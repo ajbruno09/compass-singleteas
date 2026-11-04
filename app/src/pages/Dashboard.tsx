@@ -16,10 +16,12 @@ export function Dashboard() {
   const [dues, setDues] = useState<VendorDue[]>([]);
   const [unpaid, setUnpaid] = useState(0);
   const [flagged, setFlagged] = useState(0);
+  const [flow, setFlow] = useState({ pos_waiting: 0, issues_unconfirmed: 0, counts_done: 0, counters: 0 });
   const seesMoney = profile?.role !== 'store';
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
+  useEffect(() => { supabase.rpc('flow_status').then(({ data }) => { if (data) setFlow(data as typeof flow); }); }, []);
   useEffect(() => {
     (async () => {
       const d = await supabase.rpc('indent_for_date');
@@ -90,6 +92,9 @@ export function Dashboard() {
           <section className="card" style={{ display: 'grid', gap: 10 }}>
             <h2>Needs a look</h2>
             {seesMoney && <Link to="/bills" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Bills waiting for a check</span><span className={'chip ' + (flagged ? 'late' : 'done')}>{flagged}</span></Link>}
+            <Link to="/receive" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Orders waiting to be received</span><span className={'chip ' + (flow.pos_waiting ? 'late' : 'done')}>{flow.pos_waiting}</span></Link>
+            <Link to="/issue" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Issues not yet confirmed by counters</span><span className={'chip ' + (flow.issues_unconfirmed ? 'late' : 'done')}>{flow.issues_unconfirmed}</span></Link>
+            <Link to="/counts" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Closing counts done today</span><span className={'chip ' + (flow.counts_done >= flow.counters && flow.counters > 0 ? 'done' : 'due')}>{flow.counts_done} of {flow.counters}</span></Link>
             <Link to="/vendors" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Vendors with no WhatsApp group yet</span><span className={'chip ' + (counts.noPhone ? 'late' : 'done')}>{counts.noPhone}</span></Link>
           </section>
           {counters.length > 0 && (

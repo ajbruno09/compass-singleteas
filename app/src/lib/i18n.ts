@@ -48,6 +48,14 @@ const HI: Record<string, string> = {
   'No answer from the store yet. Admin is being alerted too. You can also call.': 'स्टोर से अभी जवाब नहीं आया। एडमिन को भी बताया जा रहा है। आप फ़ोन भी कर सकते हैं।',
   'Waiting for the store to answer…': 'स्टोर के जवाब का इंतज़ार…', 'Call {name}': '{name} को फ़ोन करें',
   'I got it, close this': 'मिल गया, इसे बंद करें', 'Cancel, no longer needed': 'रद्द करें, अब ज़रूरत नहीं',
+  // store flow
+  'Items from the store': 'स्टोर से आया सामान', 'Please confirm what you received': 'कृपया बताएँ क्या मिला', 'Nothing waiting': 'कुछ इंतज़ार में नहीं',
+  'Closing stock': 'बंद होने पर स्टॉक', 'Count sent': 'गिनती भेज दी', 'Count what is left at closing': 'बंद होने पर जो बचा है गिनें',
+  "Today's count is already sent. Thank you.": 'आज की गिनती भेजी जा चुकी है। धन्यवाद।', 'Send count': 'गिनती भेजें',
+  'Count what is left. Type the number for each item. Leave out only what you do not have.': 'जो बचा है उसे गिनें। हर सामान की संख्या लिखें। जो आपके पास नहीं है केवल उसे छोड़ें।',
+  'Count what actually reached your counter and type it for each item.': 'जो सच में आपके काउंटर पर पहुँचा उसे गिनें और हर सामान के लिए लिखें।',
+  'Confirm received': 'मिल गया, पक्का करें', 'Thank you. Confirmed.': 'धन्यवाद। पक्का हो गया।', 'Nothing is waiting to be confirmed.': 'पक्का करने के लिए कुछ नहीं है।', 'Delivery': 'डिलीवरी',
+  '{n} items have no number. They will count as not received. Continue?': '{n} सामान की संख्या नहीं लिखी। उन्हें न मिला माना जाएगा। आगे बढ़ें?',
   // voice
   'Speak your order': 'बोलकर ऑर्डर करें', "I'm listening": 'मैं सुन रहा हूँ',
   'Say the item and quantity, for example: "onion 5 kg, tomato 10 kg"': 'सामान और मात्रा बोलें, जैसे: "प्याज़ 5 किलो, टमाटर 10 किलो"',

@@ -19,6 +19,8 @@ export function StaffHome() {
   const [rem, setRem] = useState<Reminders>({});
   const { t, local, toggle, canSwitch } = useLang();
   const [me, setMe] = useState(false);
+  const [waiting, setWaiting] = useState<Record<number, number>>({});
+  const [counted, setCounted] = useState<Record<number, string>>({});
 
   useEffect(() => {
     (async () => {
@@ -28,6 +30,19 @@ export function StaffHome() {
       setStatus(Object.fromEntries(((data as IndentRec[]) ?? []).map((r) => [r.location_id, r])));
     })();
   }, []);
+  useEffect(() => {
+    (async () => {
+      const bd = await supabase.rpc('business_date', { p_at: new Date().toISOString() });
+      const w: Record<number, number> = {}; const c: Record<number, string> = {};
+      for (const l of myLocations) {
+        const p = await supabase.rpc('pending_issues', { p_location_id: l.id });
+        w[l.id] = ((p.data as unknown[]) ?? []).length;
+        const k = await supabase.from('stock_counts').select('status').eq('location_id', l.id).eq('business_date', String(bd.data)).eq('frequency', 'daily').maybeSingle();
+        if (k.data) c[l.id] = (k.data as { status: string }).status;
+      }
+      setWaiting(w); setCounted(c);
+    })();
+  }, [myLocations]);
 
   const win = windowState(rem);
   const sentText = (r?: IndentRec) => !r || r.status === 'draft' ? null : r.nothing_needed ? t('Nothing needed') : t('Sent {time}', { time: timeOf(r.submitted_at) });
@@ -70,8 +85,21 @@ export function StaffHome() {
             </button>
           );
         })}
+        {myLocations.map((l) => (
+          <div key={'x' + l.id} className="stack">
+            <button className="countercard" onClick={() => nav(`/received?loc=${l.id}`)}>
+              <Icon name="box" size={34} stroke={1.6} />
+              <span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>{t('Items from the store')}</span><span className="small muted" style={{ fontWeight: 700 }}>{myLocations.length > 1 ? l.name + ' · ' : ''}{waiting[l.id] ? t('Please confirm what you received') : t('Nothing waiting')}</span></span>
+              <span className={'chip ' + (waiting[l.id] ? 'late' : 'off')}>{waiting[l.id] ? waiting[l.id] : '0'}</span>
+            </button>
+            <button className="countercard" onClick={() => nav(`/count?loc=${l.id}`)}>
+              <Icon name="moon" size={34} stroke={1.6} />
+              <span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>{t('Closing stock')}</span><span className="small muted" style={{ fontWeight: 700 }}>{myLocations.length > 1 ? l.name + ' · ' : ''}{counted[l.id] === 'submitted' ? t('Count sent') : counted[l.id] ? t('Started, not sent') : t('Count what is left at closing')}</span></span>
+              <span className={'chip ' + (counted[l.id] === 'submitted' ? 'done' : 'due')}>{counted[l.id] === 'submitted' ? t('Sent') : t('Open')}</span>
+            </button>
+          </div>
+        ))}
       </div>
-      <p className="small muted">{t('Receiving, counting and waste come next.')}</p>
       {myLocations.length > 0 && <SosButton locations={myLocations} />}
     </div>
   );

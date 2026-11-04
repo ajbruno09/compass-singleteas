@@ -20,12 +20,18 @@ import { MenuItems } from './pages/MenuItems';
 import { Rules } from './pages/Rules';
 import { Notices } from './pages/Notices';
 import { Join } from './pages/Join';
+import { Receive } from './pages/Receive';
+import { Issue } from './pages/Issue';
+import { StockView } from './pages/StockView';
+import { Counts } from './pages/Counts';
+import { CountPage } from './pages/Count';
+import { ReceivedPage } from './pages/Received';
 import { Setup } from './pages/Setup';
 import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/menu': <MenuItems />, '/rules': <Rules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
+  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/menu': <MenuItems />, '/rules': <Rules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/receive': <Receive />, '/issue': <Issue />, '/stockview': <StockView />, '/counts': <Counts />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
 };
 
 // After signing in, people with more than one app choose which to open. Once per visit.
@@ -56,6 +62,8 @@ function Gate() {
       <LockGate><Routes>
         <Route path="/" element={<StaffHome />} />
         <Route path="/indent" element={<IndentPage />} />
+        <Route path="/count" element={<CountPage />} />
+        <Route path="/received" element={<ReceivedPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes></LockGate>
     );
@@ -69,6 +77,8 @@ function Gate() {
         <Route path="/" element={<Home several={several} />} />
         {allowed.filter((n) => n.to !== '/').map((n) => <Route key={n.to} path={n.to} element={PAGES[n.to]} />)}
       </Route>
+      <Route path="/count" element={<CountPage />} />
+      <Route path="/received" element={<ReceivedPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes></LockGate>
   );

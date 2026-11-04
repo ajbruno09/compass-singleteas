@@ -9,7 +9,7 @@ export const CLOSING_URL: string = (import.meta.env.VITE_CLOSING_URL as string |
 export const APPS: AppDef[] = [
   { id: 'home', name: 'Dashboard', blurb: 'Where things stand today across the business.', icon: 'home', roles: ['owner', 'manager', 'store', 'accounts'], to: '/', status: 'live' },
   { id: 'indents', name: 'Indents', blurb: "Tomorrow's requests from every counter, with SOS alerts.", icon: 'clip', roles: ['owner', 'manager', 'store'], to: '/indents', status: 'live' },
-  { id: 'store', name: 'Store and purchases', blurb: 'Receive, issue, and purchase orders sent to vendors.', icon: 'layers', roles: ['owner', 'manager', 'store'], status: 'soon', badge: 'Coming next' },
+  { id: 'store', name: 'Store and purchases', blurb: 'Buy, receive goods, issue to counters, and check stock.', icon: 'layers', roles: ['owner', 'manager', 'store'], to: '/receive', status: 'live' },
   { id: 'master', name: 'Items and vendors', blurb: 'The item list, units, photos, and who supplies what.', icon: 'tag', roles: ['owner', 'manager', 'store'], to: '/items', status: 'live' },
   { id: 'bills', name: 'Bills and payments', blurb: 'Vendor bills, what is unpaid, and what needs a check.', icon: 'receipt', roles: ['owner', 'manager', 'accounts'], to: '/bills', status: 'live' },
   { id: 'closing', name: 'Daily closing', blurb: 'End of day cash and POS reconciliation. Opens in its own window.', icon: 'moon', roles: ['owner', 'manager', 'accounts'], href: CLOSING_URL, status: 'separate', badge: 'Separate sign in for now' },
