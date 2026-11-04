@@ -53,7 +53,7 @@ export function Items() {
             {shown.map((r) => (
               <tr key={r.id} className={canEdit ? 'click' : ''} onClick={() => canEdit && setEditing(r)}>
                 <td><strong>{r.name}</strong>{!r.active && <span className="chip off" style={{ marginLeft: 8 }}>Inactive</span>}
-                  {Object.values(r.local_names ?? {}).filter(Boolean).length > 0 && <div className="small muted">{Object.values(r.local_names).join(' · ')}</div>}</td>
+                  {!!profile?.extra_language && Object.values(r.local_names ?? {}).filter(Boolean).length > 0 && <div className="small muted">{Object.values(r.local_names).join(' · ')}</div>}</td>
                 <td className="small">{categories.find((c) => c.id === r.category_id)?.name}</td>
                 <td>{r.unit}</td>
                 <td className="small num">{(r.quick_amounts ?? []).map((n) => quick(Number(n), r.unit)).join('  ')}</td>
