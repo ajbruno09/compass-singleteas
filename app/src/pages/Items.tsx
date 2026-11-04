@@ -74,7 +74,7 @@ export function Items() {
 }
 
 function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: () => void; onSaved: () => void }) {
-  const { locations } = useSession();
+  const { locations, profile } = useSession();
   const { categories, units } = useMasters();
   const toast = useToast();
   const [name, setName] = useState(item?.name ?? '');
@@ -104,6 +104,16 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
 
   useEffect(() => { photoUrl(item?.photo_path ?? null).then(setPreview); }, [item]);
   useEffect(() => { if (!item) setQuickText((DEFAULT_QUICK[unit] ?? [1]).join(', ')); }, [unit, item]);
+
+  async function remove() {
+    if (!item) return;
+    if (!window.confirm(`Delete "${item.name}" for good? This cannot be undone. Any opening stock entered for it will be removed too.`)) return;
+    setBusy(true); setError('');
+    const { error } = await supabase.rpc('delete_item', { p_id: item.id });
+    setBusy(false);
+    if (error) return setError(errText(error));
+    toast('Item deleted'); onSaved();
+  }
 
   async function save() {
     setError('');
@@ -148,7 +158,7 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
 
   return (
     <Sheet title={item ? 'Edit item' : 'Add item'} onClose={onClose}
-      footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save item'}</button></>}>
+      footer={<>{item && profile?.role === 'owner' && <button className="btn quiet" style={{ color: '#B42335', marginRight: 'auto' }} disabled={busy} onClick={remove}><Icon name="trash" /> Delete item</button>}<button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save item'}</button></>}>
       <div className="row" style={{ gap: 16, alignItems: 'flex-start' }}>
         <div style={{ width: 96, height: 96, borderRadius: 12, background: 'var(--surface-200)', overflow: 'hidden', display: 'grid', placeItems: 'center' }}>
           {preview ? <img src={preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="camera" size={32} />}
