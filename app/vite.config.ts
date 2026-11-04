@@ -12,7 +12,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: false,
-      workbox: { importScripts: ['push-sw.js'], skipWaiting: true, clientsClaim: true, cleanupOutdatedCaches: true },
+      workbox: { globIgnores: ['**/exceljs*'], importScripts: ['push-sw.js'], skipWaiting: true, clientsClaim: true, cleanupOutdatedCaches: true },
       includeAssets: ['logo-mark.png', 'favicon-64.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Compass · SToMS',
