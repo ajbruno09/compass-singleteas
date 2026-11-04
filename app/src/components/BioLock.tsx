@@ -7,7 +7,8 @@ import { errText } from '../lib/format';
 import { useToast } from './Toast';
 import { Icon } from './Icon';
 
-const RELOCK_MS = 2 * 60 * 1000;
+// Only ask again after the app has been away for a good while, never for a quick look at another tab.
+const RELOCK_MS = 30 * 60 * 1000;
 
 // Opens behind the phone's own fingerprint or face check, when the person has turned it on.
 export function LockGate({ children }: { children: ReactNode }) {
@@ -21,7 +22,7 @@ export function LockGate({ children }: { children: ReactNode }) {
   const unlock = useCallback(async () => {
     if (!uid || trying.current) return;
     trying.current = true; setMsg('');
-    try { if (await bioCheck(uid)) setLocked(false); }
+    try { if (await bioCheck(uid)) { hiddenAt.current = 0; setLocked(false); } }
     catch { setMsg('Not recognised. Try again, or use your PIN.'); }
     finally { trying.current = false; }
   }, [uid]);
@@ -29,8 +30,9 @@ export function LockGate({ children }: { children: ReactNode }) {
   useEffect(() => { if (uid && bioEnabled(uid)) { setLocked(true); void unlock(); } }, [uid, unlock]);
   useEffect(() => {
     const v = () => {
-      if (document.hidden) { hiddenAt.current = Date.now(); return; }
-      if (uid && bioEnabled(uid) && hiddenAt.current && Date.now() - hiddenAt.current > RELOCK_MS) { setLocked(true); void unlock(); }
+      if (document.hidden) { if (!hiddenAt.current) hiddenAt.current = Date.now(); return; }
+      if (uid && bioEnabled(uid) && hiddenAt.current && Date.now() - hiddenAt.current > RELOCK_MS) { hiddenAt.current = 0; setLocked(true); void unlock(); }
+      else hiddenAt.current = 0;
     };
     document.addEventListener('visibilitychange', v);
     return () => document.removeEventListener('visibilitychange', v);
