@@ -45,7 +45,7 @@ export function InstallGate() {
       <div className="setup"><div className="box">
         <Brand />
         <h1>Done{first ? `, ${first}` : ''}</h1>
-        <p>Compass is on your phone now. <b>Close this page and open the Compass icon</b> on your home screen. Sign in there with the same number and PIN.</p>
+        <p>Compass is on your phone now. <b>Close this page and open the SToMS icon</b> on your home screen. Sign in there with the same number and PIN.</p>
       </div></div>
     );
   }
@@ -61,7 +61,7 @@ export function InstallGate() {
             <li>Open this page in <b>Safari</b>.</li>
             <li>Tap the <b>Share</b> button at the bottom (a square with an arrow going up).</li>
             <li>Scroll down. Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
-            <li>Open the <b>Compass</b> icon on your home screen and sign in there.</li>
+            <li>Open the <b>SToMS</b> icon on your home screen and sign in there.</li>
           </ol>
           <button className="btn secondary" onClick={signOut}>Go back</button>
         </>
