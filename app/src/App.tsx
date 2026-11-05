@@ -31,6 +31,7 @@ import { Counts } from './pages/Counts';
 import { CountPage } from './pages/Count';
 import { ReceivedPage } from './pages/Received';
 import { Setup } from './pages/Setup';
+import { InstallGate, needsInstall } from './pages/Install';
 import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
@@ -70,7 +71,7 @@ function Gate() {
       </div></div>
     );
   }
-  if (!profile.setup_done_at) return <Setup />;
+  if (!profile.setup_done_at) return needsInstall(profile.role === 'owner') ? <InstallGate /> : <Setup />;
   if (profile.role === 'department' || profile.role === 'closing') {
     return (
       <LockGate><Routes>
