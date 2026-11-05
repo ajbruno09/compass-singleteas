@@ -46,7 +46,7 @@ export function SosButton({ locations, defaultId }: { locations: Location[]; def
       {open && (
         <Sheet title={alert ? t('Your SOS') : t('Need something right now?')} onClose={() => setOpen(false)}>
           {alert
-            ? <Status alert={alert} contacts={contacts} now={now} onDone={() => { setAlert(null); setOpen(false); }} />
+            ? <Status locationIds={ids} alert={alert} contacts={contacts} now={now} onDone={() => { setAlert(null); setOpen(false); }} />
             : <Form contacts={contacts} locations={locations} defaultId={defaultId ?? ids[0]} onSent={(a) => { setAlert(a); toast(t('SOS sent to the store')); }} />}
         </Sheet>
       )}
@@ -117,11 +117,19 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
   );
 }
 
-function Status({ alert, contacts, now, onDone }: { alert: SosAlert; contacts: Contact[]; now: number; onDone: () => void }) {
+function Status({ locationIds, alert, contacts, now, onDone }: { locationIds: number[]; alert: SosAlert; contacts: Contact[]; now: number; onDone: () => void }) {
   const toast = useToast();
   const { t, local } = useLang();
   const [items, setItems] = useState<DeptItem[]>([]);
-  useEffect(() => { supabase.rpc('department_items', { p_location_id: alert.location_id }).then(({ data }) => setItems((data as DeptItem[]) ?? [])); }, [alert.location_id]);
+  useEffect(() => {
+    const all = [...new Set([alert.location_id, ...locationIds])];
+    Promise.all(all.map((id) => supabase.rpc('department_items', { p_location_id: id }))).then((rs) => {
+      const seen = new Map<number, DeptItem>();
+      rs.forEach((r) => ((r.data as DeptItem[]) ?? []).forEach((i) => seen.set(i.id, i)));
+      setItems([...seen.values()]);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alert.location_id, locationIds.join(',')]);
   const waited = Math.floor((now - new Date(alert.created_at).getTime()) / 1000);
   const escalated = !alert.acked_at && waited >= SOS_AFTER_SECONDS;
   const wanted = (alert.item_ids && alert.item_ids.length ? alert.item_ids : alert.item_id != null ? [alert.item_id] : []).map((id) => items.find((i) => i.id === id)).filter((x): x is DeptItem => !!x);
