@@ -6,50 +6,69 @@ interface InstallEvent extends Event { prompt: () => Promise<void>; userChoice: 
 
 export const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
 const ua = () => navigator.userAgent;
-export const isPhone = () => /android|iphone|ipad|ipod/i.test(ua());
-const isIos = () => /iphone|ipad|ipod/i.test(ua());
+const iPadAsMac = () => navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+const isIos = () => /iphone|ipad|ipod/i.test(ua()) || iPadAsMac();
+export const isPhone = () => /android/i.test(ua()) || isIos();
 
 // Shown once, before first time setup, on a phone that has not installed Compass yet.
 export function needsInstall(isOwner: boolean) { return isPhone() && !isStandalone() && !isOwner; }
 
-export function InstallGate({ onSkip }: { onSkip?: () => void }) {
+export function InstallGate() {
   const { profile, signOut } = useSession();
   const [ev, setEv] = useState<InstallEvent | null>(null);
-  const [asked, setAsked] = useState(false);
+  const [state, setState] = useState<'ask' | 'done'>('ask');
   useEffect(() => {
     const h = (e: Event) => { e.preventDefault(); setEv(e as InstallEvent); };
     window.addEventListener('beforeinstallprompt', h);
-    return () => window.removeEventListener('beforeinstallprompt', h);
+    const ok = () => setState('done');
+    window.addEventListener('appinstalled', ok);
+    return () => { window.removeEventListener('beforeinstallprompt', h); window.removeEventListener('appinstalled', ok); };
   }, []);
-  async function install() { if (!ev) return; setAsked(true); await ev.prompt(); await ev.userChoice; }
+  async function install() {
+    if (!ev) return;
+    await ev.prompt();
+    const r = await ev.userChoice;
+    if (r.outcome === 'accepted') setState('done');
+  }
   const first = (profile?.full_name ?? '').split(' ')[0];
+
+  if (state === 'done') {
+    return (
+      <div className="setup"><div className="box">
+        <Brand />
+        <h1>Done{first ? `, ${first}` : ''}</h1>
+        <p>Compass is on your phone now. <b>Close this page and open the Compass icon</b> on your home screen. Sign in there with the same number and PIN.</p>
+      </div></div>
+    );
+  }
   return (
     <div className="setup"><div className="box">
       <Brand />
-      <h1>Install Compass first{first ? `, ${first}` : ''}</h1>
-      <p>Add Compass to your phone so it opens like an app. Do this before anything else, then open the new Compass icon and sign in again.</p>
+      <h1>Welcome{first ? `, ${first}` : ''}</h1>
+      <p>Compass needs to be on your phone like an app. It takes one tap.</p>
       {isIos() ? (
-        <ol className="stack">
-          <li>Open this page in <b>Safari</b>.</li>
-          <li>Tap the <b>Share</b> button at the bottom (a square with an arrow).</li>
-          <li>Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
-          <li>Close this page. Open the <b>Compass</b> icon on your home screen and sign in again.</li>
-        </ol>
+        <>
+          <div style={{ fontSize: 44, textAlign: 'center', animation: 'pulse 1s infinite alternate' }} aria-hidden>👇</div>
+          <ol className="stack">
+            <li>Open this page in <b>Safari</b>.</li>
+            <li>Tap the <b>Share</b> button at the bottom (a square with an arrow going up).</li>
+            <li>Scroll down. Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+            <li>Open the <b>Compass</b> icon on your home screen and sign in there.</li>
+          </ol>
+          <button className="btn secondary" onClick={signOut}>Go back</button>
+        </>
+      ) : ev ? (
+        <>
+          <button className="btn primary" style={{ fontSize: 18, padding: '16px 20px' }} onClick={install}>Yes, add Compass to my phone</button>
+          <button className="btn secondary" onClick={signOut}>No, go back</button>
+        </>
       ) : (
         <>
-          {ev && <button className="btn primary" onClick={install} disabled={asked}>{asked ? 'Installing…' : 'Install Compass'}</button>}
-          <ol className="stack">
-            {!ev && <li>Tap the <b>three dots</b> at the top right of your browser.</li>}
-            {!ev && <li>Tap <b>Install app</b> or <b>Add to Home screen</b>, then <b>Install</b>.</li>}
-            <li>Open the <b>Compass</b> icon on your home screen and sign in again.</li>
-          </ol>
+          <p>Tap the <b>three dots</b> at the top right of the browser, then <b>Install app</b> (or <b>Add to Home screen</b>).</p>
+          <p className="small muted">If you do not see it, please tell Admin.</p>
+          <button className="btn secondary" onClick={signOut}>Go back</button>
         </>
       )}
-      <p className="small muted">This page goes away by itself once Compass is opened from the home screen icon.</p>
-      <div className="row" style={{ gap: 8 }}>
-        {onSkip && <button className="btn secondary" onClick={onSkip}>Skip for now</button>}
-        <button className="btn secondary" onClick={signOut}>Sign out</button>
-      </div>
     </div></div>
   );
 }
