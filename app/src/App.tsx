@@ -35,6 +35,8 @@ import { Setup } from './pages/Setup';
 import { InstallGate, needsInstall, isStandalone, isPhone } from './pages/Install';
 import { Welcome, welcomed } from './pages/Welcome';
 import { MyCompass } from './pages/MyCompass';
+import { OpenInChrome, inAppBrowser } from './pages/OpenInChrome';
+import { OfflineBar } from './components/OfflineBar';
 import { SalesEntry } from './pages/SalesEntry';
 import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
@@ -60,6 +62,8 @@ function FirstRun({ uid, owner }: { uid: string; owner: boolean }) {
 
 function Gate() {
   const { session, profile, loading, signOut, recovery, loadError, reload } = useSession();
+  const inApp = inAppBrowser();
+  if (inApp) return <OpenInChrome kind={inApp} />;
   if (!configured) return <div className="login"><div className="card"><h1>Compass</h1><p>This copy of the app is not connected to its database yet.</p></div></div>;
   if (loading) return <div className="login"><p className="muted">Loading…</p></div>;
   if (session && recovery) return <NewPassword />;
@@ -117,6 +121,7 @@ export default function App() {
     <BrowserRouter>
       <SessionProvider>
         <ToastProvider>
+          <OfflineBar />
           <Gate />
         </ToastProvider>
       </SessionProvider>

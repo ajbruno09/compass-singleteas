@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText } from '../lib/format';
-import { selfieFromFile } from '../lib/photo';
+import { FaceCam } from '../components/FaceCam';
 import { bioEnabled, bioOn, bioSupported } from '../lib/biolock';
 import { usePush } from '../components/PushSetup';
 import { PinFields } from '../components/PinFields';
 import { Brand } from '../components/Brand';
 import { welcomeLang } from './Welcome';
-import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 
 const STEPS = ['Your photo', 'Your own PIN', 'Fingerprint or face', 'Alerts', 'Language'];
@@ -19,12 +18,13 @@ export function Setup() {
   const toast = useToast();
   const push = usePush();
   const uid = profile?.id ?? '';
-  const [i, setI] = useState(0);
+  const [i, setI] = useState(profile?.photo ? 1 : 0); // picks up after the photo if setup was left half way
   const [pinDone, setPinDone] = useState(false);
   const [bioOk, setBioOk] = useState<boolean | null>(null);
   const [unlockOn, setUnlockOn] = useState(false);
   const [lang, setLang] = useState(profile?.extra_language === 'hi' ? 'hi' : welcomeLang(profile?.id ?? ''));
   const [busy, setBusy] = useState(false);
+  const [retake, setRetake] = useState(false);
 
   useEffect(() => { void bioSupported().then(setBioOk); setUnlockOn(!!uid && bioEnabled(uid)); }, [uid]);
 
@@ -34,15 +34,13 @@ export function Setup() {
   const done = [photoDone, pinDone, unlockDone, alertsDone, true];
   const canNext = done[i];
 
-  async function pick(f: File | undefined) {
-    if (!f) return;
+  async function savePhoto(data: string) {
     setBusy(true);
     try {
-      const data = await selfieFromFile(f);
       const { data: r, error } = await supabase.rpc('set_my_photo', { p_photo: data });
       if (error) throw error;
       if (r !== 'ok') throw new Error(String(r));
-      await reload();
+      await reload(); setRetake(false);
     } catch (e) { toast(errText(e)); } finally { setBusy(false); }
   }
   async function unlock() {
@@ -71,12 +69,13 @@ export function Setup() {
 
       {i === 0 && (
         <div style={{ display: 'grid', gap: 14, justifyItems: 'center', textAlign: 'center' }}>
-          {profile?.photo ? <img src={profile.photo} alt="" width={132} height={132} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <span className="avatar" style={{ width: 132, height: 132, fontSize: 48 }}>{(profile?.full_name || '?')[0]}</span>}
           <p className="muted">Take a clear photo of your face. It is your picture in Compass and shows that this is you.</p>
-          <label className="btn primary big" style={{ cursor: 'pointer' }}>
-            <Icon name="camera" /> {busy ? 'Saving…' : photoDone ? 'Retake photo' : 'Take photo'}
-            <input type="file" accept="image/*" capture="user" hidden disabled={busy} onChange={(e) => void pick(e.target.files?.[0])} />
-          </label>
+          {photoDone && !retake
+            ? <>
+                <img src={profile!.photo!} alt="" width={132} height={132} style={{ borderRadius: '50%', objectFit: 'cover' }} />
+                <button className="btn secondary" onClick={() => setRetake(true)}>Retake photo</button>
+              </>
+            : <FaceCam busy={busy} onPhoto={savePhoto} onError={(m) => toast(m)} />}
         </div>
       )}
 

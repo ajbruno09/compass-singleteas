@@ -356,3 +356,22 @@ tr.click { cursor: pointer; }
 .stat.sos.on { color: #1B6A4D; }
 .stat.sos.off svg { color: #E4572E; }
 @keyframes nudge{from{transform:translateY(0)}to{transform:translateY(8px)}}
+
+/* Face camera: ring is red or amber until the face sits right, then glows green. */
+.facecam { display: grid; gap: 12px; justify-items: center; text-align: center; }
+.facering { --ring: #E39B1B; position: relative; width: 232px; height: 288px; border-radius: 50%; overflow: hidden; border: 6px solid var(--ring); background: #101512; transition: border-color .25s, box-shadow .25s; animation: ringBreath 1.8s ease-in-out infinite; }
+.facering.bad { --ring: #D64545; }
+.facering.warn { --ring: #E39B1B; }
+.facering.ok { --ring: #1FA45B; box-shadow: 0 0 26px 4px rgba(31, 164, 91, .55); animation: ringGlow 1.2s ease-in-out infinite; }
+.facering video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.facering .scan { position: absolute; left: 0; right: 0; height: 3px; top: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .85), transparent); animation: scanMove 2.2s linear infinite; }
+.facering .checkpop { position: absolute; inset: 0; display: grid; place-items: center; font-size: 84px; color: #fff; background: rgba(31, 164, 91, .55); animation: checkPop .45s ease-out both; }
+.facehint { font-weight: 600; min-height: 22px; }
+.facehint.ok { color: #1FA45B; }
+.facehint.bad { color: #D64545; }
+.facehint.warn { color: #B97A0E; }
+@keyframes ringBreath { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 16px 2px color-mix(in srgb, var(--ring) 55%, transparent); } }
+@keyframes ringGlow { 0%, 100% { box-shadow: 0 0 20px 3px rgba(31, 164, 91, .5); } 50% { box-shadow: 0 0 34px 8px rgba(31, 164, 91, .75); } }
+@keyframes scanMove { from { top: 0; } to { top: calc(100% - 3px); } }
+@keyframes checkPop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .facering, .facering.ok, .facering .scan, .facering .checkpop { animation: none; } }

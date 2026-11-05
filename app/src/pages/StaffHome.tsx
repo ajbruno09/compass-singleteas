@@ -100,6 +100,7 @@ export function StaffHome() {
           </div>
         ))}
       </div>
+      {myLocations.length === 0 && <p className="banner warn">No counter has been given to you yet. Please tell Admin, so they can set it up.</p>}
       <button className="countercard" style={{ marginTop: 10 }} onClick={() => nav('/mine')}>
         <Icon name="scale" size={34} stroke={1.6} />
         <span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>My Compass</span><span className="small muted" style={{ fontWeight: 700 }}>My sales, targets and incentives</span></span>
