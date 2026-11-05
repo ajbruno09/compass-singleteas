@@ -36,7 +36,7 @@ export interface DeptItem {
 export interface IndentRec { id: string; location_id: number; for_date: string; status: 'draft' | 'submitted' | 'locked' | 'cancelled'; submitted_at: string | null; nothing_needed: boolean; }
 export interface Usual { item_id: number; usual: number; last_qty: number; runs: number; }
 export interface SosAlert {
-  id: string; location_id: number; raised_by: string; item_id: number | null; item_ids?: number[]; issue_id?: string | null; issued_at?: string | null; auto_closed?: boolean; extended_minutes?: number; note: string; created_at: string;
+  id: string; location_id: number; raised_by: string; item_id: number | null; item_ids?: number[]; issue_id?: string | null; issued_at?: string | null; auto_closed?: boolean; extended_minutes?: number; item_qtys?: Record<string, number>; note: string; created_at: string;
   acked_by: string | null; acked_at: string | null; eta_minutes: number | null; resolved_at: string | null;
 }
 export interface Contact { full_name: string; phone: string; role: Role; }

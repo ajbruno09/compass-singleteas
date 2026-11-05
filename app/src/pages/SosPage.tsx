@@ -47,7 +47,7 @@ export function SosPage() {
   }, [load]);
 
   const where = (a: SosAlert) => locations.find((l) => l.id === a.location_id)?.name ?? 'A counter';
-  const names = (a: SosAlert) => idsOf(a).map((i) => items[i]?.name).filter(Boolean).join(', ');
+  const names = (a: SosAlert) => idsOf(a).filter((i) => items[i]).map((i) => { const q = a.item_qtys?.[String(i)]; return items[i].name + (q ? ` ${q} ${items[i].unit}` : ''); }).join(', ');
   const rows = (a: SosAlert) => [...new Set([...idsOf(a), ...(extra[a.id] ?? [])])].filter((i) => items[i]);
 
   // Time left. Before the store answers: to answer. After "On it": to issue within the promised minutes.
@@ -70,7 +70,7 @@ export function SosPage() {
   }
   async function issue(a: SosAlert) {
     const v = vals[a.id] ?? {};
-    const lines = rows(a).map((i) => ({ item_id: i, qty: Number(v[i] ?? 1) })).filter((l) => l.qty > 0);
+    const lines = rows(a).map((i) => ({ item_id: i, qty: Number(v[i] ?? a.item_qtys?.[String(i)] ?? 1) })).filter((l) => l.qty > 0);
     if (!lines.length) { toast('Enter a quantity for at least one item'); return; }
     setBusy(a.id);
     const { error } = await supabase.rpc('issue_sos', { p_id: a.id, p_lines: lines });
@@ -113,10 +113,10 @@ export function SosPage() {
                   <div className="tablewrap"><table style={{ tableLayout: 'fixed', width: '100%' }}>
                     <colgroup><col /><col style={{ width: 110 }} /><col style={{ width: 130 }} /></colgroup>
                     <thead><tr><th>Item</th><th className="r">In store</th><th className="r">{a.issued_at ? 'Issued' : 'Issue now'}</th></tr></thead>
-                    <tbody>{list.map((i) => { const it = items[i]; const have = store[i] ?? 0; const want = Number(vals[a.id]?.[i] ?? 1); const short = want > have;
-                      return <tr key={i}><td><b>{it.name}</b> <span className="muted small">{it.unit}</span></td>
+                    <tbody>{list.map((i) => { const it = items[i]; const have = store[i] ?? 0; const asked = a.item_qtys?.[String(i)]; const want = Number(vals[a.id]?.[i] ?? asked ?? 1); const short = want > have;
+                      return <tr key={i}><td><b>{it.name}</b> <span className="muted small">{asked ? `asked ${asked} ${it.unit}` : it.unit}</span></td>
                         <td className="r num" style={{ color: short ? 'var(--bad, #B42335)' : undefined, fontWeight: short ? 700 : 400 }}>{fmtQty(have, it.unit)}</td>
-                        <td className="r">{a.issued_at ? <span className="muted">done</span> : canIssue ? <input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 100 }} aria-label={`Issue ${it.name}`} value={vals[a.id]?.[i] ?? '1'} onChange={(e) => setVals((p) => ({ ...p, [a.id]: { ...(p[a.id] ?? {}), [i]: e.target.value } }))} /> : null}</td></tr>; })}</tbody>
+                        <td className="r">{a.issued_at ? <span className="muted">done</span> : canIssue ? <input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 100 }} aria-label={`Issue ${it.name}`} value={vals[a.id]?.[i] ?? String(asked ?? 1)} onChange={(e) => setVals((p) => ({ ...p, [a.id]: { ...(p[a.id] ?? {}), [i]: e.target.value } }))} /> : null}</td></tr>; })}</tbody>
                   </table></div>
                 )}
                 {!a.issued_at && canIssue && (

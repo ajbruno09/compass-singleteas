@@ -17,6 +17,7 @@ export function SosWatcher() {
   const nav = useNavigate();
   const [alerts, setAlerts] = useState<SosAlert[]>([]);
   const [names, setNames] = useState<Record<number, string>>({});
+  const [units, setUnits] = useState<Record<number, string>>({});
   const [now, setNow] = useState(Date.now());
   const [muted, setMuted] = useState<string[]>([]);
   const [armed, setArmed] = useState(alarmUnlocked());
@@ -31,8 +32,9 @@ export function SosWatcher() {
     setAlerts(list);
     const need = [...new Set(list.flatMap((a) => idsOf(a)))];
     if (need.length) {
-      const { data: its } = await supabase.from('items').select('id, name').in('id', need);
-      setNames(Object.fromEntries(((its as { id: number; name: string }[]) ?? []).map((i) => [i.id, i.name])));
+      const { data: its } = await supabase.from('items').select('id, name, unit').in('id', need);
+      const rows = (its as { id: number; name: string; unit: string }[]) ?? [];
+      setNames(Object.fromEntries(rows.map((i) => [i.id, i.name]))); setUnits(Object.fromEntries(rows.map((i) => [i.id, i.unit])));
     }
   }, [role]);
 
@@ -85,7 +87,7 @@ export function SosWatcher() {
     return () => { document.title = t; };
   }, [ringing.length]);
 
-  const what = (a: SosAlert, fallback: string) => { const n = idsOf(a).map((id) => names[id]).filter(Boolean); return n.length ? n.join(', ') : fallback; };
+  const what = (a: SosAlert, fallback: string) => { const n = idsOf(a).filter((id) => names[id]).map((id) => { const q = a.item_qtys?.[String(id)]; return names[id] + (q ? ` ${q} ${units[id] ?? ''}` : ''); }); return n.length ? n.join(', ') : fallback; };
   const where = (a: SosAlert) => locations.find((l) => l.id === a.location_id)?.name ?? 'A counter';
   async function ack(a: SosAlert, eta: number) {
     const { error } = await supabase.rpc('ack_sos', { p_id: a.id, p_eta: eta });
