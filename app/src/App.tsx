@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { SessionProvider, useSession } from './lib/session';
 import { configured } from './lib/supabase';
@@ -31,7 +32,8 @@ import { Counts } from './pages/Counts';
 import { CountPage } from './pages/Count';
 import { ReceivedPage } from './pages/Received';
 import { Setup } from './pages/Setup';
-import { InstallGate, needsInstall } from './pages/Install';
+import { InstallGate, needsInstall, isStandalone, isPhone } from './pages/Install';
+import { Welcome, welcomed } from './pages/Welcome';
 import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
@@ -44,6 +46,14 @@ function Home({ several }: { several: boolean }) {
   let picked = true;
   try { picked = sessionStorage.getItem('compass-picked') === '1'; } catch { /* ignore */ }
   return several && !picked ? <Navigate to="/apps" replace /> : <Dashboard />;
+}
+
+// First time on this account: Welcome, then (on a phone) install to the home screen, then the profile setup.
+// Inside the installed app the welcome was already agreed before installing, so it goes straight to setup.
+function FirstRun({ uid, owner }: { uid: string; owner: boolean }) {
+  const [agreed, setAgreed] = useState(() => welcomed(uid) || (isPhone() && isStandalone()));
+  if (!agreed && !owner) return <Welcome onAgree={() => setAgreed(true)} />;
+  return needsInstall(owner) ? <InstallGate /> : <Setup />;
 }
 
 function Gate() {
@@ -71,7 +81,7 @@ function Gate() {
       </div></div>
     );
   }
-  if (!profile.setup_done_at) return needsInstall(profile.role === 'owner') ? <InstallGate /> : <Setup />;
+  if (!profile.setup_done_at) return <FirstRun uid={profile.id} owner={profile.role === 'owner'} />;
   if (profile.role === 'department' || profile.role === 'closing') {
     return (
       <LockGate><Routes>
