@@ -122,9 +122,21 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
   const [food, setFood] = useState('');
   const [stay, setStay] = useState('');
   const [busy, setBusy] = useState(false);
+  const [sure, setSure] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => { if (!person || !isOwnerMe) return; void supabase.from('staff_package').select('food_monthly, stay_monthly').eq('profile_id', person.id).maybeSingle().then(({ data }) => { const d = data as { food_monthly: number; stay_monthly: number } | null; if (d) { setFood(d.food_monthly ? String(d.food_monthly) : ''); setStay(d.stay_monthly ? String(d.stay_monthly) : ''); } }); }, [person]);
   const needsLocation = role === 'department';
+
+  async function remove() {
+    if (!person) return;
+    setBusy(true); setError('');
+    try {
+      const { data, error } = await supabase.rpc('delete_person', { p_user: person.id });
+      if (error) throw error;
+      if (data === 'has_work') { setSure(false); setError(`${person.full_name || 'This person'} has work recorded in Compass (indents, counts or receipts), so they cannot be deleted. Untick "Can sign in" and save to switch them off instead.`); return; }
+      toast('Person deleted'); onSaved();
+    } catch (e) { setError(errText(e)); } finally { setBusy(false); }
+  }
 
   async function save() {
     setError('');
@@ -183,6 +195,15 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
       {person && person.photo && <button className="btn secondary" style={{ justifySelf: 'start' }} onClick={async () => { await supabase.rpc('clear_photo', { p_user: person.id }); toast('Photo cleared. They will take a new one.'); onSaved(); }}>Clear photo so they retake it</button>}
       {person && <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Can sign in</label>}
       {error && <p className="banner bad" role="alert">{error}</p>}
+      {person && person.role !== 'owner' && isOwnerMe && (
+        <div className="card" style={{ display: 'grid', gap: 8 }}>
+          {!sure
+            ? <button className="btn secondary" style={{ justifySelf: 'start', color: '#B3261E' }} onClick={() => setSure(true)}>Delete this person</button>
+            : <><p><b>Delete {person.full_name || 'this person'} for good?</b> Their login and photo are removed. This cannot be undone.</p>
+                <div className="row" style={{ gap: 8 }}><button className="btn secondary" onClick={() => setSure(false)}>No, keep</button><button className="btn primary" style={{ background: '#B3261E' }} disabled={busy} onClick={() => void remove()}>{busy ? 'Deleting…' : 'Yes, delete'}</button></div></>}
+          <span className="small muted">Only people with no work recorded can be deleted. For everyone else, untick "Can sign in" to switch them off.</span>
+        </div>
+      )}
     </Sheet>
   );
 }
