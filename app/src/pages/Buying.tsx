@@ -8,7 +8,7 @@ import { Sheet } from '../components/Sheet';
 import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 
-interface ItemRow { id: number; name: string; unit: string; group_id: number | null; default_vendor_id: string | null; last_cost: number | null; rate_varies: boolean; purchase_factor: number | null }
+interface ItemRow { id: number; name: string; unit: string; group_id: number | null; default_vendor_id: string | null; last_cost: number | null; rate_varies: boolean; purchase_factor: number | null; purchase_unit: string | null }
 interface VendorRow { id: string; name: string; order_channel: string; whatsapp_group: string; phone: string | null }
 interface VItem { vendor_id: string; item_id: number; agreed_rate: number | null }
 interface IndentRow { id: string; location_id: number; status: string; indent_lines: { item_id: number; qty: number }[] }
@@ -26,6 +26,11 @@ const istToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkat
 const ddmmyy = (iso: string) => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y.slice(2)}`; };
 const n2 = (n: number) => String(Math.round(n * 100) / 100);
 const stepOf = (unit: string) => (unit === 'kg' || unit === 'L' ? 0.5 : 1);
+// Quantities are kept in the counted unit (pcs). Vendors sell in packs (trays), so show and send packs.
+type PackItem = { unit: string; purchase_factor: number | null; purchase_unit: string | null };
+const packed = (i: PackItem, qty: number) => (i.purchase_factor && Number(i.purchase_factor) > 1 && i.purchase_unit && i.purchase_unit !== i.unit ? { qty: qty / Number(i.purchase_factor), unit: i.purchase_unit } : { qty, unit: i.unit });
+const packText = (i: PackItem, qty: number) => { const p = packed(i, qty); return p.unit === i.unit ? `${n2(qty)} ${i.unit}` : `${n2(p.qty)} ${p.unit}${Math.abs(p.qty - 1) < 1e-9 ? '' : 's'} (${n2(qty)} ${i.unit})`; };
+const packLine = (i: PackItem, qty: number) => { const p = packed(i, qty); return { qty: p.qty, unit: p.unit + (p.unit !== i.unit && Math.abs(p.qty - 1) >= 1e-9 ? 's' : '') }; };
 const roundUp = (n: number, step: number) => Math.ceil(n / step - 1e-9) * step;
 const SLOTS = (() => { const a: string[] = []; for (let m = 5 * 60; m <= 22 * 60; m += 30) { const h = Math.floor(m / 60); a.push(`${((h + 11) % 12) + 1}:${String(m % 60).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`); } return a; })();
 const lsGet = (k: string) => { try { return localStorage.getItem(k) ?? ''; } catch { return ''; } };
@@ -71,7 +76,7 @@ export function Buying() {
 
   const loadStatic = useCallback(async () => {
     const [it, vd, vi] = await Promise.all([
-      supabase.from('items').select('id, name, unit, group_id, default_vendor_id, last_cost, rate_varies, purchase_factor').eq('active', true),
+      supabase.from('items').select('id, name, unit, group_id, default_vendor_id, last_cost, rate_varies, purchase_factor, purchase_unit').eq('active', true),
       supabase.from('vendors').select('id, name, order_channel, whatsapp_group, phone').eq('active', true).order('name'),
       supabase.from('vendor_items').select('vendor_id, item_id, agreed_rate')
     ]);
@@ -191,7 +196,7 @@ export function Buying() {
               <div><b>{loose.length} {loose.length === 1 ? 'item has' : 'items have'} no usual vendor yet.</b> Pick where each comes from. Compass remembers it for next time.</div>
               {loose.map((r) => (
                 <div key={r.item.id} className="loose-row">
-                  <div className="loose-name"><b>{r.item.name}</b> <span className="num">{n2(r.qty)} {r.item.unit}</span></div>
+                  <div className="loose-name"><b>{r.item.name}</b> <span className="num">{packText(r.item, r.qty)}</span></div>
                   <div className="row" style={{ gap: 6 }}>
                     {baseVendors.map((v) => <button key={v.id} className="chip due pickchip" onClick={() => usual(r.item.id, v.id, v.name)}>{v.name}</button>)}
                     {shops.slice(0, 8).map((v) => <button key={v.id} className="chip done pickchip" onClick={() => usual(r.item.id, v.id, v.name)}>{v.name}</button>)}
@@ -241,10 +246,10 @@ export function Buying() {
                                 <td className="small">{r.by.map((b) => `${b.loc} ${n2(b.qty)}`).join(' · ')}</td>
                                 <td className="r num">{n2(r.asked)}</td>
                                 <td className="r num muted">{n2(r.inStore)} {r.item.unit}</td>
-                                <td className="r num muted">{n2(r.sug)} {r.item.unit}</td>
+                                <td className="r num muted">{packText(r.item, r.sug)}</td>
                                 <td><div className="stepper">
                                   <button aria-label="Less" onClick={() => setEdit((p) => ({ ...p, [r.item.id]: Math.max(0, r.qty - r.step) }))}>−</button>
-                                  <span className="num">{n2(r.qty)} {r.item.unit}</span>
+                                  <span className="num">{packText(r.item, r.qty)}</span>
                                   <button aria-label="More" onClick={() => setEdit((p) => ({ ...p, [r.item.id]: r.qty + r.step }))}>+</button>
                                 </div></td>
                                 <td className="r num">{r.rate != null ? money(r.qty * r.rate) : '—'}</td>
@@ -302,11 +307,11 @@ function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, onClose, onDone 
   // Viewing a PO that was already placed.
   const viewText = po ? buildMessage({
     vendor: vendor.name, poNo: po.po_number, notes: po.notes, orderDate: po.order_date, reqDate: po.required_date ?? po.for_date ?? today, reqTime: po.required_time ?? '', delivery: po.delivery,
-    lines: po.po_lines.map((l) => ({ name: itemMap.get(l.item_id)?.name ?? '', qty: Number(l.qty), unit: itemMap.get(l.item_id)?.unit ?? '' }))
+    lines: po.po_lines.map((l) => ({ name: itemMap.get(l.item_id)?.name ?? '', ...(itemMap.get(l.item_id) ? packLine(itemMap.get(l.item_id)!, Number(l.qty)) : { qty: Number(l.qty), unit: '' }) }))
   }) : '';
-  const viewList = po ? po.po_lines.map((l) => `${itemMap.get(l.item_id)?.name ?? ''}  ${n2(Number(l.qty))} ${itemMap.get(l.item_id)?.unit ?? ''}`).join('\n') : '';
+  const viewList = po ? po.po_lines.map((l) => `${itemMap.get(l.item_id)?.name ?? ''}  ${itemMap.get(l.item_id) ? packText(itemMap.get(l.item_id)!, Number(l.qty)) : n2(Number(l.qty))}`).join('\n') : '';
 
-  const previewLines = rows.map((r) => ({ name: r.item.name, qty: r.qty, unit: r.item.unit }));
+  const previewLines = rows.map((r) => ({ name: r.item.name, ...packLine(r.item, r.qty) }));
   const preview = buildMessage({ vendor: vendor.name, poNo: 'ST-PO-xxxx (added when you copy)', notes, orderDate: today, reqDate, reqTime: reqTime || 'Pick a time', delivery, lines: previewLines });
   const needTime = isMsg && !reqTime;
 
@@ -349,7 +354,7 @@ function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, onClose, onDone 
           </>
         ) : (
           <>
-            <button className="btn" onClick={() => { if (!printText(title, isMsg ? preview : rows.map((r) => `${r.item.name}  ${n2(r.qty)} ${r.item.unit}`).join('\n'))) toast('Allow pop-ups to print'); }}>Print</button>
+            <button className="btn" onClick={() => { if (!printText(title, isMsg ? preview : rows.map((r) => `${r.item.name}  ${packText(r.item, r.qty)}`).join('\n'))) toast('Allow pop-ups to print'); }}>Print</button>
             <button className="btn primary" disabled={busy || needTime || rows.length === 0} onClick={place}>{busy ? 'Saving…' : action}</button>
           </>
         )}
@@ -386,7 +391,7 @@ function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, onClose, onDone 
                 <button key={r.item.id} className="tickrow" onClick={() => setTicks((p) => ({ ...p, [r.item.id]: !on }))}>
                   <span className={'bx' + (on ? ' on' : '')}>{on && <Icon name="check" />}</span>
                   <span style={{ flex: 1, textAlign: 'left', textDecoration: on ? 'line-through' : 'none', color: on ? 'var(--ink-3)' : 'inherit' }}>{r.item.name}</span>
-                  <b className="num">{n2(r.qty)} {r.item.unit}</b>
+                  <b className="num">{packText(r.item, r.qty)}</b>
                 </button>
               );
             })}
