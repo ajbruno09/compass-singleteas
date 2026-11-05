@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { money } from '../lib/format';
+import { AvatarButton } from '../components/AvatarButton';
 import { Icon } from '../components/Icon';
 
 interface Sales { has_data: boolean; as_of?: string; day_mine?: number; day_share?: number; month_mine?: number; month_share?: number }
@@ -26,11 +27,11 @@ export function MyCompass() {
       <div className="phone-head">
         <button className="btn quiet" onClick={() => nav('/')} aria-label="Back">←</button>
         <p style={{ font: '800 18px/20px var(--font-display)' }}>My Compass</p>
-        <span />
+        <AvatarButton />
       </div>
       <div className="stack">
         <div className="card" style={{ display: 'grid', gap: 8 }}>
-          <p className="label">Sales of {names || 'your counters'}</p>
+          <p className="label">Sales of {myLocations.length > 3 ? 'your counters' : (names || 'your counters')}</p>
           {s?.has_data ? (
             <>
               <p style={{ font: '800 30px/34px var(--font-display)' }}>{money(s.day_mine ?? 0)}</p>

@@ -35,6 +35,7 @@ import { Setup } from './pages/Setup';
 import { InstallGate, needsInstall, isStandalone, isPhone } from './pages/Install';
 import { Welcome, welcomed } from './pages/Welcome';
 import { MyCompass } from './pages/MyCompass';
+import { ProfilePage } from './pages/Profile';
 import { OpenInChrome, inAppBrowser } from './pages/OpenInChrome';
 import { OfflineBar } from './components/OfflineBar';
 import { SalesEntry } from './pages/SalesEntry';
@@ -96,6 +97,7 @@ function Gate() {
         <Route path="/count" element={<CountPage />} />
         <Route path="/received" element={<ReceivedPage />} />
         <Route path="/mine" element={<MyCompass />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes></LockGate>
     );
@@ -111,6 +113,7 @@ function Gate() {
       </Route>
       <Route path="/count" element={<CountPage />} />
       <Route path="/received" element={<ReceivedPage />} />
+      <Route path="/profile" element={<ProfilePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes></LockGate>
   );

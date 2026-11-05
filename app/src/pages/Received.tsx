@@ -5,6 +5,7 @@ import { useSession } from '../lib/session';
 import { useLang } from '../lib/i18n';
 import { errText } from '../lib/format';
 import { timeOf } from '../lib/ist';
+import { AvatarButton } from '../components/AvatarButton';
 import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 
@@ -54,7 +55,7 @@ export function ReceivedPage() {
   if (!loc) return <div className="phone"><p>Choose a counter first.</p></div>;
   return (
     <div className="phone">
-      <div className="phone-head"><button className="btn quiet" onClick={() => (cur ? setCur(null) : nav(office ? '/issue' : '/'))}><Icon name="back" /> {t('Back')}</button><b>{t('Items from the store')} · {place}</b></div>
+      <div className="phone-head"><button className="btn quiet" onClick={() => (cur ? setCur(null) : nav(office ? '/issue' : '/'))}><Icon name="back" /> {t('Back')}</button><b>{t('Items from the store')} · {place}</b><AvatarButton /></div>
       {!cur ? (list.length === 0 ? <p className="card muted">{t('Nothing is waiting to be confirmed.')}</p> : (
         <div className="stack">{list.map((p) => <button key={p.id} className="countercard" onClick={() => open(p)}>
           <Icon name="box" size={30} stroke={1.6} /><span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>{t('Delivery')} {p.issue_number}</span><span className="small muted">{t('Sent {time}', { time: timeOf(p.issued_at) })}</span></span><span className="chip due">{t('Open')}</span></button>)}</div>

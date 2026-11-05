@@ -6,6 +6,7 @@ import { errText, qty as fmtQty } from '../lib/format';
 import { clock12, dayLabel, timeOf, windowState, type Reminders } from '../lib/ist';
 import { REASONS, type DeptItem, type Group, type IndentRec, type Usual } from '../lib/types';
 import { useToast } from '../components/Toast';
+import { AvatarButton } from '../components/AvatarButton';
 import { Icon } from '../components/Icon';
 import { Sheet } from '../components/Sheet';
 import { SosButton } from '../components/Sos';
@@ -160,6 +161,7 @@ export function IndentPage() {
           </div>
         </div>
         {canSwitch && <div className="langsw" role="group" aria-label="Language"><button aria-pressed={local} onClick={() => { if (!local) toggle(); }}>हिंदी</button><button aria-pressed={!local} onClick={() => { if (local) toggle(); }}>English</button></div>}
+        <AvatarButton />
       </div>
 
       <div className={`notice ${win === 'open' ? 'ok' : win === 'early' ? 'info' : 'warn'}`}>{winChip}</div>

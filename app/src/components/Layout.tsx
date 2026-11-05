@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Brand } from './Brand';
 import { ProfileSheet } from './ProfileSheet';
+import { AvatarButton } from './AvatarButton';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useSession } from '../lib/session';
@@ -66,6 +67,7 @@ export function Layout({ children }: { children: ReactNode }) {
           {nav.map((n) => <option key={n.to} value={n.to}>{n.label}</option>)}
           {profile && appsFor(profile.role).length > 1 && <option value="/apps">All apps</option>}
         </select>
+        <AvatarButton />
         <button className="btn quiet" onClick={signOut} aria-label="Sign out"><Icon name="out" /></button>
       </header>
       {me && <ProfileSheet onClose={() => setMe(false)} />}

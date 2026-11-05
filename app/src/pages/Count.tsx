@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { useLang } from '../lib/i18n';
 import { errText } from '../lib/format';
+import { AvatarButton } from '../components/AvatarButton';
 import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 
@@ -73,7 +74,7 @@ export function CountPage() {
   if (!loc) return <div className="phone"><p>Choose a counter first.</p></div>;
   return (
     <div className="phone">
-      <div className="phone-head"><button className="btn quiet" onClick={() => nav(office ? '/counts' : '/')}><Icon name="back" /> {t('Back')}</button><b>{t('Closing stock')} · {place}</b></div>
+      <div className="phone-head"><button className="btn quiet" onClick={() => nav(office ? '/counts' : '/')}><Icon name="back" /> {t('Back')}</button><b>{t('Closing stock')} · {place}</b><AvatarButton /></div>
       {sentAlready ? <p className="banner">{t('Today\'s count is already sent. Thank you.')}</p> : <>
         <p className="muted small">{t('Count what is left. Type the number for each item. Leave out only what you do not have.')}</p>
         <input placeholder={t('Find an item')} value={q} onChange={(e) => setQ(e.target.value)} />

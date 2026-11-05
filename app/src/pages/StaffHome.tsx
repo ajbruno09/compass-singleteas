@@ -1,5 +1,5 @@
 import { StatusStrip } from '../components/StatusStrip';
-import { ProfileSheet } from '../components/ProfileSheet';
+import { AvatarButton } from '../components/AvatarButton';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -18,7 +18,6 @@ export function StaffHome() {
   const [date, setDate] = useState('');
   const [rem, setRem] = useState<Reminders>({});
   const { t, local, toggle, canSwitch } = useLang();
-  const [me, setMe] = useState(false);
   const [waiting, setWaiting] = useState<Record<number, number>>({});
   const [counted, setCounted] = useState<Record<number, string>>({});
 
@@ -49,10 +48,9 @@ export function StaffHome() {
 
   return (
     <div className="phone">
-      {me && <ProfileSheet onClose={() => setMe(false)} />}
       <div className="phone-head">
         <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
-          <button className="btn quiet" style={{ padding: 0, minHeight: 0 }} onClick={() => setMe(true)} aria-label="My profile">{profile?.photo ? <img src={profile.photo} alt="" width={36} height={36} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <img src="/logo-mark.png" alt="" width={32} height={32} />}</button>
+          <AvatarButton size={40} />
           <div><p style={{ font: '800 18px/20px var(--font-display)' }}>{t('Hello, {name}', { name: profile?.full_name?.split(' ')[0] ?? '' })}</p>
             <p className="small muted">{date ? t('Indent for {day}', { day: dayLabel(date) }) : ''}</p></div>
         </div>
@@ -62,6 +60,7 @@ export function StaffHome() {
         </div>
       </div>
 
+      {!profile?.photo && <button className="banner warn" style={{ textAlign: 'left', width: '100%' }} onClick={() => nav('/profile')}>Please add your photo. Tap here.</button>}
       <StatusStrip />
       <NoticeStack />
       <p className={'banner' + (win === 'late' ? ' warn' : '')}>
