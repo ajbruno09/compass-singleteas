@@ -27,6 +27,7 @@ export const NAV: NavItem[] = [
   { to: '/inventory', label: 'Plates and glasses', icon: 'box', roles: ['owner', 'manager', 'store'] },
   { to: '/maintenance', label: 'Maintenance', icon: 'clock', roles: ['owner', 'manager', 'store'] },
   { to: '/stock', label: 'Opening stock', icon: 'clip', roles: ['owner', 'store'] },
+  { to: '/sales', label: 'Daily sales', icon: 'receipt', roles: ['owner', 'manager', 'accounts'] },
   { to: '/vendors', label: 'Vendors', icon: 'truck', roles: ['owner', 'manager', 'store', 'accounts'] },
   { to: '/bills', label: 'Bills and payments', icon: 'receipt', roles: ['owner', 'manager', 'accounts'] },
   { to: '/menu', label: 'Menu items', icon: 'box', roles: ['owner', 'manager', 'store'] },

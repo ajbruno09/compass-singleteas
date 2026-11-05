@@ -97,7 +97,8 @@ export function People() {
 }
 
 function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClose: () => void; onSaved: (t?: InviteTarget) => void }) {
-  const { locations } = useSession();
+  const { locations, profile: me } = useSession();
+  const isOwnerMe = me?.role === 'owner';
   const toast = useToast();
   const [name, setName] = useState(person?.full_name ?? '');
   const [phone, setPhone] = useState(person?.phone ?? '');
@@ -106,8 +107,11 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
   const [locs, setLocs] = useState<number[]>(person?.profile_locations.map((l) => l.location_id) ?? []);
   const [active, setActive] = useState(person?.active ?? true);
   const [pin, setPin] = useState('');
+  const [food, setFood] = useState('');
+  const [stay, setStay] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  useEffect(() => { if (!person || !isOwnerMe) return; void supabase.from('staff_package').select('food_monthly, stay_monthly').eq('profile_id', person.id).maybeSingle().then(({ data }) => { const d = data as { food_monthly: number; stay_monthly: number } | null; if (d) { setFood(d.food_monthly ? String(d.food_monthly) : ''); setStay(d.stay_monthly ? String(d.stay_monthly) : ''); } }); }, [person]);
   const needsLocation = role === 'department';
 
   async function save() {
@@ -125,6 +129,7 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
       } else {
         const up = await supabase.from('profiles').update({ full_name: name.trim(), role, extra_language: lang || null, active }).eq('id', person.id);
         if (up.error) throw up.error;
+        const pk = !isOwnerMe ? { error: null } : await supabase.rpc('save_package', { p_user: person.id, p_food: Number(food) || 0, p_stay: Number(stay) || 0 }); if (pk.error) throw pk.error;
         const del = await supabase.from('profile_locations').delete().eq('profile_id', person.id); if (del.error) throw del.error;
         if (locs.length) { const ins = await supabase.from('profile_locations').insert(locs.map((l) => ({ profile_id: person.id, location_id: l }))); if (ins.error) throw ins.error; }
         if (pin) { if (!/^[0-9]{6}$/.test(pin)) throw new Error('A new PIN must be 6 digits.'); await callAdmin({ action: 'reset_pin', user_id: person.id, pin }); }
@@ -152,6 +157,14 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
           </label>
         ))}
       </fieldset>
+      {person && person.role !== 'owner' && isOwnerMe && (
+        <fieldset className="card" style={{ display: 'grid', gap: 10 }}>
+          <legend className="label">Cost to the cafe each month (shown only to this person)</legend>
+          <label className="field"><span>Food</span><input className="num" inputMode="decimal" value={food} onChange={(e) => setFood(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" /></label>
+          <label className="field"><span>Stay</span><input className="num" inputMode="decimal" value={stay} onChange={(e) => setStay(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" /></label>
+          <span className="small muted">Salary is not stored in Compass. It always shows as XXXXX.</span>
+        </fieldset>
+      )}
       <label className="field"><span>{person ? 'New PIN (leave empty to keep)' : 'First PIN'}</span>
         <input id="person-pin" className="num" inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} placeholder="6 digits" />
         <span className="small muted">After you save, you can send this PIN to them on WhatsApp. It is never shown again.</span></label>

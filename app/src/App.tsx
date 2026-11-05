@@ -34,11 +34,13 @@ import { ReceivedPage } from './pages/Received';
 import { Setup } from './pages/Setup';
 import { InstallGate, needsInstall, isStandalone, isPhone } from './pages/Install';
 import { Welcome, welcomed } from './pages/Welcome';
+import { MyCompass } from './pages/MyCompass';
+import { SalesEntry } from './pages/SalesEntry';
 import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/menu': <MenuItems />, '/rules': <Rules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/receive': <Receive />, '/issue': <Issue />, '/stockview': <StockView />, '/counts': <Counts />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />
+  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/menu': <MenuItems />, '/rules': <Rules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/receive': <Receive />, '/issue': <Issue />, '/stockview': <StockView />, '/counts': <Counts />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />
 };
 
 // After signing in, people with more than one app choose which to open. Once per visit.
@@ -89,6 +91,7 @@ function Gate() {
         <Route path="/indent" element={<IndentPage />} />
         <Route path="/count" element={<CountPage />} />
         <Route path="/received" element={<ReceivedPage />} />
+        <Route path="/mine" element={<MyCompass />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes></LockGate>
     );
