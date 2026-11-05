@@ -11,7 +11,7 @@ export function Login() {
   const [note, setNote] = useState('');
   const [adminPhone, setAdminPhone] = useState('');
   useEffect(() => { supabase.rpc('get_admin_contact').then(({ data }) => { if (typeof data === 'string') setAdminPhone(data); }); }, []);
-  const adminLink = adminPhone ? `https://wa.me/91${adminPhone}?text=${encodeURIComponent(`Hi, I am having trouble signing in to Compass.${/^[6-9][0-9]{9}$/.test(phone) ? ` My mobile number is ${phone}.` : ''}`)}` : '';
+  const adminLink = adminPhone ? `https://wa.me/91${adminPhone}?text=${encodeURIComponent(`Hi, I am having trouble signing in to SToMS.${/^[6-9][0-9]{9}$/.test(phone) ? ` My mobile number is ${phone}.` : ''}`)}` : '';
 
   async function forgot() {
     setError(''); setNote('');
@@ -43,7 +43,7 @@ export function Login() {
       <div className="signin-art">
         <div className="in">
           <img src="/logo-mark.png" alt="" width={84} height={84} style={{ borderRadius: 22, boxShadow: "0 0 0 3px rgba(255,255,255,.35)" }} />
-          <h1>Compass</h1>
+          <h1>SToMS</h1>
           <span className="sbadge">SToMS</span>
           <div className="line" />
           <p className="tag">Operations made simple.</p>

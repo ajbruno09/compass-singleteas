@@ -1,5 +1,5 @@
 // Loud SOS alarm: a siren through the speaker plus vibration. Phones only allow sound after the person has tapped
-// something once, so the store phone taps "Turn on alarm" when it opens Compass.
+// something once, so the store phone taps "Turn on alarm" when it opens SToMS.
 let ctx: AudioContext | null = null;
 let osc: OscillatorNode | null = null;
 let gain: GainNode | null = null;

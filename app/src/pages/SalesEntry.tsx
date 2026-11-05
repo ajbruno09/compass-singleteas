@@ -6,7 +6,7 @@ import { useToast } from '../components/Toast';
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(Date.now() - 86400000));
 
-// Admin enters each counter's sales for a day. Staff then see their own counters on My Compass.
+// Admin enters each counter's sales for a day. Staff then see their own counters on My SToMS.
 export function SalesEntry() {
   const { locations } = useSession();
   const toast = useToast();
@@ -32,7 +32,7 @@ export function SalesEntry() {
   return (
     <div className="page">
       <h1>Daily sales</h1>
-      <p className="muted">Enter each counter's sales for the day. Your team sees their own counters, and their share of the cafe, on My Compass.</p>
+      <p className="muted">Enter each counter's sales for the day. Your team sees their own counters, and their share of the cafe, on My SToMS.</p>
       <label className="field" style={{ maxWidth: 220 }}><span>Day</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
       <div className="card" style={{ display: 'grid', gap: 10, maxWidth: 460 }}>
         {counters.map((c) => (

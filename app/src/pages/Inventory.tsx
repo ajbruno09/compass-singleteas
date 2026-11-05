@@ -57,7 +57,7 @@ function Count({ rows, canEdit, onSaved }: { rows: D[]; canEdit: boolean; onSave
   }
   if (!canEdit) return <p className="empty card">Only Admin or the store can do the weekly count.</p>;
   return <>
-    <p className="muted small">Count what is on the shelves and in use. Add how many broke and how many new ones were added since the last count. Compass works out what is missing.</p>
+    <p className="muted small">Count what is on the shelves and in use. Add how many broke and how many new ones were added since the last count. SToMS works out what is missing.</p>
     <div className="tablewrap"><table><thead><tr><th>Type</th><th className="r">Last count</th><th className="r" style={{ width: 90 }}>Added</th><th className="r" style={{ width: 90 }}>Broken</th><th className="r" style={{ width: 100 }}>Counted now</th><th className="r" style={{ width: 90 }}>Missing</th></tr></thead>
       <tbody>{rows.map((r) => { const x = v[r.id]; const exp = r.qty + Number(x?.a || 0) - Number(x?.b || 0); const miss = x?.c !== undefined && x.c !== '' ? exp - Number(x.c) : null;
         return <tr key={r.id}><td><b>{r.name}</b><div className="small muted">{r.category}</div></td><td className="r num">{r.qty}</td>

@@ -18,7 +18,7 @@ export function Upload() {
   const tabs = [['items', 'Items and opening stock'], ['menu', 'Menu'], ['recipes', 'Recipes'], ['durables', 'Plates, glasses and cutlery']];
   return (
     <>
-      <div className="pagehead"><div><p className="label">Masters</p><h1>Bulk upload</h1><p className="muted small" style={{ marginTop: 2 }}>Download the Excel template, fill it in, and upload it. Compass checks everything first and tells you what to fix before saving. Upload again any time to update.</p></div></div>
+      <div className="pagehead"><div><p className="label">Masters</p><h1>Bulk upload</h1><p className="muted small" style={{ marginTop: 2 }}>Download the Excel template, fill it in, and upload it. SToMS checks everything first and tells you what to fix before saving. Upload again any time to update.</p></div></div>
       <div className="seg" role="tablist">{tabs.map(([k, l]) => <button key={k} aria-pressed={tab === k} onClick={() => setSp({ tab: k })}>{l}</button>)}</div>
       {tab === 'items' && <ItemsUpload />}
       {tab === 'menu' && <MenuUpload />}
@@ -99,11 +99,11 @@ function ItemsUpload() {
       ], rows
     };
     const open: SheetDef = { name: 'Opening stock', help: 'Only needed once, at the start. One row per item and place, with the quantity you counted in the Counted in unit.', cols: [{ label: 'Item name', required: true, list: r.items.map((i) => i.name as string), width: 34 }, { label: 'Place', required: true, list: places.map((p) => p.name), width: 22 }, { label: 'Quantity', required: true, width: 14 }] };
-    await downloadWorkbook('Compass_Items_Template.xlsx', 'Compass items template', [
+    await downloadWorkbook('SToMS_Items_Template.xlsx', 'SToMS items template', [
       'Fill the Items sheet. One row per item. Dropdowns help you pick the category, unit, picture group, vendor and closing count.',
       'Put an x under each counter that uses the item.',
       'Optional: on the Opening stock sheet, enter what is on the shelf today for the Store and each counter.',
-      'Save the file and upload it on the Bulk upload page. Compass checks it first and tells you what to fix.',
+      'Save the file and upload it on the Bulk upload page. SToMS checks it first and tells you what to fix.',
       'To change items later, download the template again. It comes filled with your current items. Edit and upload.'
     ], [items, open]);
   }
@@ -178,7 +178,7 @@ function MenuUpload() {
   async function download() {
     const { data } = await supabase.from('menu_items').select('*').order('name').limit(3000);
     const rows = ((data ?? []) as Record<string, unknown>[]).map((m) => [m.name as string, (m.pos_name as string) ?? '', (m.price as number) ?? '', (m.menu_page as string) ?? '', (m.menu_group as string) ?? '', counters.find((c) => c.id === m.location_id)?.name ?? '', m.status as string]);
-    await downloadWorkbook('Compass_Menu_Template.xlsx', 'Compass menu template', ['Fill one row per dish.', 'Menu name is how it appears in Compass. POS name is exactly how Pet Pooja spells it, so sales match.', 'Pick the counter that makes it.', 'Upload on the Bulk upload page, Menu tab. Existing dishes are updated by name.'],
+    await downloadWorkbook('SToMS_Menu_Template.xlsx', 'SToMS menu template', ['Fill one row per dish.', 'Menu name is how it appears in SToMS. POS name is exactly how Pet Pooja spells it, so sales match.', 'Pick the counter that makes it.', 'Upload on the Bulk upload page, Menu tab. Existing dishes are updated by name.'],
       [{ name: 'Menu', cols: [{ label: 'Menu name', required: true, width: 34 }, { label: 'POS name', width: 34 }, { label: 'Price', width: 10 }, { label: 'Menu page', width: 22 }, { label: 'Group', width: 18 }, { label: 'Counter', list: counters.map((c) => c.name), width: 20 }, { label: 'Status', list: ['active', 'inactive'], width: 10 }], rows }]);
   }
   async function onFile(f: File): Promise<Preview> {
@@ -206,7 +206,7 @@ export async function recipeTemplate(dish?: string) {
   const rows: (string | number)[][] = [];
   for (const r of rec) { const d = menu.find((x) => x.id === r.menu_item_id); if (!d || (dish && d.name !== dish)) continue; for (const l of [...r.recipe_lines].sort((a, b) => a.sort - b.sort)) { const i = items.find((x) => x.id === l.item_id); rows.push([d.name, i?.name ?? '', l.qty, i?.unit ?? '', l.wastage_pct ?? '', r.portion_size, r.portions, l.note]); } }
   if (dish && rows.length === 0) rows.push([dish, '', '', '', '', '', 1, '']);
-  await downloadWorkbook(dish ? `Recipe_${dish.replace(/[^A-Za-z0-9]+/g, '_')}.xlsx` : 'Compass_Recipes_Template.xlsx', 'Compass recipe template',
+  await downloadWorkbook(dish ? `Recipe_${dish.replace(/[^A-Za-z0-9]+/g, '_')}.xlsx` : 'SToMS_Recipes_Template.xlsx', 'SToMS recipe template',
     ['One row per ingredient. Repeat the dish name on each row of that dish.', 'Pick the dish and the ingredient from the dropdowns. Ingredients come from your Items list, so add any missing item there first.', 'Quantity per portion is in the item\'s own counted unit shown in the Unit column. Use 0.05 for 50 g when the unit is kg.', 'Portion size is the serving, for example 250 ml or 1 plate. Portions this makes is for batch recipes, for example 20 if the whole recipe makes 20 portions. Leave 1 if the quantities are already per portion.', 'Upload on the Bulk upload page, Recipes tab, or from a dish on the Recipes page.'],
     [{ name: 'Recipes', help: 'One row per ingredient of a dish.', cols: [{ label: 'Dish', required: true, list: menu.map((x) => x.name), width: 32 }, { label: 'Ingredient', required: true, list: items.map((x) => x.name), width: 32 }, { label: 'Quantity per portion', required: true, width: 14 }, { label: 'Unit (shown for reference)', width: 12 }, { label: 'Wastage %', width: 10 }, { label: 'Portion size', width: 16 }, { label: 'Portions this makes', width: 12 }, { label: 'Note', width: 24 }], rows }]);
 }
@@ -238,7 +238,7 @@ function DurableUpload() {
   async function download() {
     const { data } = await supabase.from('durable_items').select('*').order('category').order('name');
     const rows = ((data ?? []) as Record<string, unknown>[]).map((d) => [d.name as string, d.category as string, d.qty as number, (d.replace_cost as number) ?? '', (d.kept_at as string) ?? '']);
-    await downloadWorkbook('Compass_Inventory_Template.xlsx', 'Compass plates, glasses and cutlery template', ['One row per type, for example Juice glass, Tea glass, Dinner plate, Service spoon, Ladle.', 'Quantity now is how many you own today. Replacement cost helps show what breakage costs.', 'Upload on the Bulk upload page. Existing types are updated by name; quantities of existing types change only through a weekly count.'],
+    await downloadWorkbook('SToMS_Inventory_Template.xlsx', 'SToMS plates, glasses and cutlery template', ['One row per type, for example Juice glass, Tea glass, Dinner plate, Service spoon, Ladle.', 'Quantity now is how many you own today. Replacement cost helps show what breakage costs.', 'Upload on the Bulk upload page. Existing types are updated by name; quantities of existing types change only through a weekly count.'],
       [{ name: 'Inventory', cols: [{ label: 'Name', required: true, width: 30 }, { label: 'Category', list: cats, width: 16 }, { label: 'Quantity now', width: 14 }, { label: 'Replacement cost', width: 16 }, { label: 'Kept at', width: 20 }], rows }]);
   }
   async function onFile(f: File): Promise<Preview> {

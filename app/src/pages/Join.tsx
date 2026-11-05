@@ -42,7 +42,7 @@ export function Join() {
   return (
     <div className="login"><div className="card" style={{ display: 'grid', gap: 14, maxWidth: 380, width: '100%' }}>
       <Brand />
-      <h1 style={{ fontSize: 22 }}>Join Compass</h1>
+      <h1 style={{ fontSize: 22 }}>Join SToMS</h1>
       <p className="muted">Fill this once. Admin will approve you and give you your first code.</p>
       <label className="field"><span>Your name</span><input id="j-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} style={{ minHeight: 44 }} /></label>
       <label className="field"><span>Mobile number</span><input id="j-phone" className="num" inputMode="numeric" autoComplete="tel-national" maxLength={10} value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))} placeholder="10 digits" style={{ minHeight: 44 }} /></label>

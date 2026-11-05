@@ -60,7 +60,7 @@ function FirstRun({ uid, owner }: { uid: string; owner: boolean }) {
 
 function Gate() {
   const { session, profile, loading, signOut, recovery, loadError, reload } = useSession();
-  if (!configured) return <div className="login"><div className="card"><h1>Compass</h1><p>This copy of the app is not connected to its database yet.</p></div></div>;
+  if (!configured) return <div className="login"><div className="card"><h1>SToMS</h1><p>This copy of the app is not connected to its database yet.</p></div></div>;
   if (loading) return <div className="login"><p className="muted">Loading…</p></div>;
   if (session && recovery) return <NewPassword />;
   if (!session) return window.location.pathname === '/join' ? <Join /> : <Login />;
@@ -68,7 +68,7 @@ function Gate() {
     return (
       <div className="login"><div className="card">
         <h1>Could not load</h1>
-        <p>Compass could not reach the server just now. Please check the internet and try again.</p>
+        <p>SToMS could not reach the server just now. Please check the internet and try again.</p>
         <button className="btn" onClick={() => { void reload(); }}>Try again</button>
         <button className="btn secondary" onClick={signOut}>Sign out</button>
       </div></div>
