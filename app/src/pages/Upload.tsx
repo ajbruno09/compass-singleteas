@@ -112,7 +112,7 @@ function ItemsUpload() {
     const r = await loadRefs();
     const sh = await readSheet(f, 'Items', 'Item name');
     if (!sh) throw new Error('This file has no sheet called Items. Please use the downloaded template.');
-    const problems: string[] = []; const good: Record<string, unknown>[] = []; const seen = new Set<string>();
+    const problems: string[] = []; const good: Record<string, unknown>[] = []; const seen = new Set<string>(); let noPack = 0;
     const existing = new Set(r.items.map((i) => String(i.name).toLowerCase()));
     let nNew = 0; let nUpd = 0;
     sh.rows.forEach((row, idx) => {
@@ -136,13 +136,15 @@ function ItemsUpload() {
         const v = num(row[k]); if (Number.isNaN(v)) bad = k; nums[key] = v;
       }
       if (bad) { problems.push(`${ln} ${name}: "${bad}" is not a number`); return; }
-      if (pu && !(nums.pf && nums.pf > 0)) { problems.push(`${ln} ${name}: say how many ${unit?.code ?? ''} are in one ${pu.code}`); return; }
+      let puCode = pu?.code ?? ''; let pfVal = nums.pf;
+      if (pu && unit && pu.code === unit.code) { puCode = ''; pfVal = null; }
+      else if (pu && !(nums.pf && nums.pf > 0)) { puCode = ''; pfVal = null; noPack++; }
       const fr = (row['Closing count'] ?? '').toLowerCase();
       if (fr && fr !== 'daily' && fr !== 'weekly') { problems.push(`${ln} ${name}: closing count must be Daily or Weekly`); return; }
       const qa = (row['Quick amounts'] ?? '').split(/[ ,;]+/).filter(Boolean).map(Number);
       if (qa.some((n) => !(n > 0))) { problems.push(`${ln} ${name}: quick amounts must be numbers like 0.5, 1, 2`); return; }
       const locs = counters.filter((c) => yes(row[`Used at: ${c.name}`] ?? '')).map((c) => c.id);
-      good.push({ name, category_id: cat?.id ?? '', unit: unit?.code ?? '', purchase_unit: pu?.code ?? '', purchase_factor: nums.pf, group_id: grp?.id ?? '', vendor_id: ven?.id ?? '', pack_name: row['Pack name'] ?? '', pack_size: nums.ps, pieces: nums.pc, slices: nums.sl, pack_g: nums.pg, waste: nums.w, freq: fr, tol: nums.tol, cost: nums.cost, quick: qa.length ? qa : isNew && unit ? (DEFAULT_QUICK[unit.code] ?? [1]) : [], locs });
+      good.push({ name, category_id: cat?.id ?? '', unit: unit?.code ?? '', purchase_unit: puCode, purchase_factor: pfVal, group_id: grp?.id ?? '', vendor_id: ven?.id ?? '', pack_name: row['Pack name'] ?? '', pack_size: nums.ps, pieces: nums.pc, slices: nums.sl, pack_g: nums.pg, waste: nums.w, freq: fr, tol: nums.tol, cost: nums.cost, quick: qa.length ? qa : isNew && unit ? (DEFAULT_QUICK[unit.code] ?? [1]) : [], locs });
       if (isNew) nNew++; else nUpd++;
     });
     const op = await readSheet(f, 'Opening stock', 'Item name');
@@ -156,7 +158,7 @@ function ItemsUpload() {
     });
     return {
       good: good.length + opening.length,
-      summary: `${nNew} new items, ${nUpd} existing items to update${opening.length ? `, ${opening.length} opening stock rows` : ''}.`,
+      summary: `${nNew} new items, ${nUpd} existing items to update${opening.length ? `, ${opening.length} opening stock rows` : ''}.${noPack ? ` ${noPack} items have a different Bought in unit but no pack count, so they will be saved as bought in the counted unit. Add the pack count later.` : ''}`,
       problems,
       apply: async () => {
         let a = 0; let u = 0;
