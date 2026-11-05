@@ -28,14 +28,14 @@ export function StatusStrip() {
     chips.push(push.state === 'on'
       ? { key: 'alerts', icon: 'bell', label: 'Alerts', on: true, hint: 'Alerts are on for this phone' }
       : push.state === 'blocked'
-        ? { key: 'alerts', icon: 'bell', label: 'Alerts blocked', on: false, hint: 'Allow notifications for SToMS in the phone settings', act: () => toast('Open the phone settings and allow notifications for SToMS') }
+        ? { key: 'alerts', icon: 'bell', label: 'Alerts blocked', on: false, hint: 'Allow notifications for Compass in the phone settings', act: () => toast('Open the phone settings and allow notifications for Compass') }
         : push.state === 'needs-install'
           ? { key: 'alerts', icon: 'bell', label: 'Alerts', on: false, hint: 'On an iPhone: Share, then Add to Home Screen', act: () => toast('Open in Safari, tap Share, then Add to Home Screen') }
-          : { key: 'alerts', icon: 'bell', label: 'Turn on alerts', on: false, hint: 'Get alerts even when SToMS is closed', act: () => void push.turnOn(), busy: push.busy });
+          : { key: 'alerts', icon: 'bell', label: 'Turn on alerts', on: false, hint: 'Get alerts even when Compass is closed', act: () => void push.turnOn(), busy: push.busy });
   if (bioOk)
     chips.push(bio
       ? { key: 'bio', icon: 'finger', label: 'Fingerprint', on: true, hint: 'Fingerprint or face unlock is on' }
-      : { key: 'bio', icon: 'finger', label: 'Turn on fingerprint', on: false, hint: 'Open SToMS with your fingerprint or face', busy, act: async () => { setBusy(true); try { await bioOn(uid, profile.full_name || 'SToMS'); setBio(true); } catch (e) { toast(errText(e)); } finally { setBusy(false); } } } as Chip);
+      : { key: 'bio', icon: 'finger', label: 'Turn on fingerprint', on: false, hint: 'Open Compass with your fingerprint or face', busy, act: async () => { setBusy(true); try { await bioOn(uid, profile.full_name || 'Compass'); setBio(true); } catch (e) { toast(errText(e)); } finally { setBusy(false); } } } as Chip);
   if (watching)
     chips.push(armed
       ? { key: 'sos', icon: 'siren', label: 'SOS sound', on: true, hint: 'SOS siren is on. Tap to test the sound', act: () => testBeep() }

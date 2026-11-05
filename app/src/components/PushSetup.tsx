@@ -23,7 +23,7 @@ async function save(profileId: string, sub: PushSubscription) {
   }, { onConflict: 'endpoint' });
 }
 
-// One tap on each phone. After that, alerts arrive even when SToMS is closed.
+// One tap on each phone. After that, alerts arrive even when Compass is closed.
 export type PushState = 'checking' | 'on' | 'off' | 'blocked' | 'unsupported' | 'needs-install';
 export function usePush() {
   const { profile } = useSession();
@@ -61,8 +61,8 @@ export function usePush() {
 export function PushSetup() {
   const { state, busy, turnOn } = usePush();
   if (state === 'checking' || state === 'on') return state === 'on' ? <p className="small muted row" style={{ gap: 6 }}><Icon name="bell" size={16} /> Alerts are on for this phone.</p> : null;
-  if (state === 'needs-install') return <p className="banner">To get alerts on an iPhone, open this page in Safari, tap Share, then Add to Home Screen, and open SToMS from there.</p>;
+  if (state === 'needs-install') return <p className="banner">To get alerts on an iPhone, open this page in Safari, tap Share, then Add to Home Screen, and open Compass from there.</p>;
   if (state === 'unsupported') return null;
-  if (state === 'blocked') return <p className="banner warn">Alerts are blocked for SToMS on this phone. Allow notifications for SToMS in the phone settings.</p>;
-  return <button className="banner warn alarmbar" disabled={busy} onClick={turnOn}><Icon name="bell" /> Tap here to turn on alerts, so SToMS can reach you even when it is closed</button>;
+  if (state === 'blocked') return <p className="banner warn">Alerts are blocked for Compass on this phone. Allow notifications for Compass in the phone settings.</p>;
+  return <button className="banner warn alarmbar" disabled={busy} onClick={turnOn}><Icon name="bell" /> Tap here to turn on alerts, so Compass can reach you even when it is closed</button>;
 }

@@ -26,8 +26,8 @@ export function Rules() {
 
   return (
     <>
-      <div className="pagehead"><div><p className="label">How SToMS decides</p><h1>Rules</h1></div></div>
-      <p className="muted">Every number and time that SToMS uses is here, so nothing is hidden in the code. {isOwner ? 'Tap a rule to change it. Each change keeps a history.' : 'Only the owner can change rules.'} “Live” rules already run today. “Not live yet” rules are saved and start working when their feature is switched on.</p>
+      <div className="pagehead"><div><p className="label">How Compass decides</p><h1>Rules</h1></div></div>
+      <p className="muted">Every number and time that Compass uses is here, so nothing is hidden in the code. {isOwner ? 'Tap a rule to change it. Each change keeps a history.' : 'Only the owner can change rules.'} “Live” rules already run today. “Not live yet” rules are saved and start working when their feature is switched on.</p>
       {groups.map(([g, list]) => (
         <section key={g} className="tablewrap">
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}><h2>{g}</h2></div>

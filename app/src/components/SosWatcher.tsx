@@ -59,7 +59,7 @@ export function SosWatcher() {
   useEffect(() => {
     if (ringing.length === 0) return;
     const t = document.title;
-    document.title = '🚨 SOS · SToMS';
+    document.title = '🚨 SOS · Compass';
     return () => { document.title = t; };
   }, [ringing.length]);
 

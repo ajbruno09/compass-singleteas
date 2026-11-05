@@ -25,7 +25,7 @@ export function MyCompass() {
     <div className="phone">
       <div className="phone-head">
         <button className="btn quiet" onClick={() => nav('/')} aria-label="Back">←</button>
-        <p style={{ font: '800 18px/20px var(--font-display)' }}>My SToMS</p>
+        <p style={{ font: '800 18px/20px var(--font-display)' }}>My Compass</p>
         <span />
       </div>
       <div className="stack">

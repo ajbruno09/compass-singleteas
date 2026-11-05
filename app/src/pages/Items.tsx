@@ -182,7 +182,7 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
         {purchaseUnit && <label className="field"><span>{unit} in one {purchaseUnit}</span><input id="item-factor" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} className="num" /></label>}
       </div>
       <h2 style={{ marginTop: 8 }}>Stock details</h2>
-      <p className="small muted">Optional. Leave anything blank and SToMS simply shows “Not set yet”. You can fill these in later.</p>
+      <p className="small muted">Optional. Leave anything blank and Compass simply shows “Not set yet”. You can fill these in later.</p>
       <div className="form-grid">
         <label className="field"><span>Stored and issued in</span>
           <select id="item-base" value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)}><option value="">Not set yet</option>{['g', 'ml', 'nos', 'slices', 'bottle', 'roll', 'box', 'bunch', 'cyl'].map((u) => <option key={u} value={u}>{u}</option>)}</select></label>

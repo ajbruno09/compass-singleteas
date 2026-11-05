@@ -188,7 +188,7 @@ export function Buying() {
         <>
           {loose.length > 0 && (
             <div className="banner warn buy-loose">
-              <div><b>{loose.length} {loose.length === 1 ? 'item has' : 'items have'} no usual vendor yet.</b> Pick where each comes from. SToMS remembers it for next time.</div>
+              <div><b>{loose.length} {loose.length === 1 ? 'item has' : 'items have'} no usual vendor yet.</b> Pick where each comes from. Compass remembers it for next time.</div>
               {loose.map((r) => (
                 <div key={r.item.id} className="loose-row">
                   <div className="loose-name"><b>{r.item.name}</b> <span className="num">{n2(r.qty)} {r.item.unit}</span></div>
@@ -371,7 +371,7 @@ function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, onClose, onDone 
               <div className="seg"><button aria-pressed={delivery} onClick={() => setDelivery(true)}>Yes</button><button aria-pressed={!delivery} onClick={() => setDelivery(false)}>No</button></div>
             </div>
           </div>
-          {needTime && <p className="banner warn">Pick the required time to continue. SToMS remembers it for {vendor.name}.</p>}
+          {needTime && <p className="banner warn">Pick the required time to continue. Compass remembers it for {vendor.name}.</p>}
           <label className="field"><span>Notes for the vendor (optional)</span><textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything extra to add to this order" /></label>
           <div className="field"><span>Message preview</span><pre className="wa">{preview}</pre></div>
         </>

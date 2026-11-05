@@ -58,7 +58,7 @@ export function OpeningStock() {
 
   return (
     <>
-      <div className="pagehead"><div><p className="label">Starting SToMS</p><h1>Opening stock</h1></div></div>
+      <div className="pagehead"><div><p className="label">Starting Compass</p><h1>Opening stock</h1></div></div>
       <p className="muted">Count what is on the shelf today, once per place. This is the starting point for every stock figure after it, so it cannot be edited later, only corrected with an adjustment.</p>
       <div className="seg" role="group" aria-label="Place">
         {locations.map((l) => <button key={l.id} aria-pressed={loc === l.id} onClick={() => { setLoc(l.id); setVals({}); }}>{l.name}</button>)}

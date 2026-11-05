@@ -4,8 +4,8 @@ export function Brand({ size = 28, light = false }: { size?: number; light?: boo
     <div className="brandmark">
       <img src="/logo-mark.png" alt="" width={size} height={size} style={{ borderRadius: size * 0.28 }} />
       <div>
-        <b style={light ? { color: '#fff' } : undefined}>SToMS</b>
-        <span className="ver" style={light ? { color: 'rgba(255,255,255,.75)' } : undefined}>Operations made simple · v{__APP_VERSION__}</span>
+        <b style={light ? { color: '#fff' } : undefined}>Compass</b>
+        <span className="ver" style={light ? { color: 'rgba(255,255,255,.75)' } : undefined}>SToMS v{__APP_VERSION__}</span>
       </div>
     </div>
   );

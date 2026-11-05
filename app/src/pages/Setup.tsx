@@ -47,7 +47,7 @@ export function Setup() {
   }
   async function unlock() {
     setBusy(true);
-    try { await bioOn(uid, profile?.full_name || 'SToMS'); setUnlockOn(true); } catch (e) { toast(errText(e)); } finally { setBusy(false); }
+    try { await bioOn(uid, profile?.full_name || 'Compass'); setUnlockOn(true); } catch (e) { toast(errText(e)); } finally { setBusy(false); }
   }
   async function finish() {
     setBusy(true);
@@ -72,7 +72,7 @@ export function Setup() {
       {i === 0 && (
         <div style={{ display: 'grid', gap: 14, justifyItems: 'center', textAlign: 'center' }}>
           {profile?.photo ? <img src={profile.photo} alt="" width={132} height={132} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <span className="avatar" style={{ width: 132, height: 132, fontSize: 48 }}>{(profile?.full_name || '?')[0]}</span>}
-          <p className="muted">Take a clear photo of your face. It is your picture in SToMS and shows that this is you.</p>
+          <p className="muted">Take a clear photo of your face. It is your picture in Compass and shows that this is you.</p>
           <label className="btn primary big" style={{ cursor: 'pointer' }}>
             <Icon name="camera" /> {busy ? 'Saving…' : photoDone ? 'Retake photo' : 'Take photo'}
             <input type="file" accept="image/*" capture="user" hidden disabled={busy} onChange={(e) => void pick(e.target.files?.[0])} />
@@ -89,18 +89,18 @@ export function Setup() {
           {bioOk === null && <p className="muted">Checking this phone…</p>}
           {bioOk === false && <p className="banner">This phone or computer cannot do fingerprint or face unlock, so there is nothing to set here. Tap Next.</p>}
           {bioOk && (unlockOn
-            ? <p className="banner ok">Done. Next time, open SToMS with your fingerprint or face.</p>
-            : <><p className="muted">Open SToMS with your fingerprint or face, with no need to type your PIN again on this phone.</p><button className="btn primary big" disabled={busy} onClick={() => void unlock()}>{busy ? 'Please wait…' : 'Turn on'}</button></>)}
+            ? <p className="banner ok">Done. Next time, open Compass with your fingerprint or face.</p>
+            : <><p className="muted">Open Compass with your fingerprint or face, with no need to type your PIN again on this phone.</p><button className="btn primary big" disabled={busy} onClick={() => void unlock()}>{busy ? 'Please wait…' : 'Turn on'}</button></>)}
         </div>
       )}
 
       {i === 3 && (
         <div style={{ display: 'grid', gap: 14 }}>
           {push.state === 'checking' && <p className="muted">Checking this phone…</p>}
-          {push.state === 'on' && <p className="banner ok">Done. Alerts will reach you even when SToMS is closed.</p>}
-          {push.state === 'off' && <><p className="muted">Turn on alerts so the store, SOS and indent reminders reach you even when SToMS is closed.</p><button className="btn primary big" disabled={push.busy} onClick={() => void push.turnOn()}>{push.busy ? 'Please wait…' : 'Turn on alerts'}</button></>}
-          {push.state === 'blocked' && <p className="banner warn">Alerts are blocked on this phone. Open the phone settings, allow notifications for SToMS, and then open SToMS again. You can continue for now.</p>}
-          {push.state === 'needs-install' && <p className="banner">On an iPhone, open this page in Safari, tap Share, then Add to Home Screen, and open SToMS from there to get alerts. You can continue for now.</p>}
+          {push.state === 'on' && <p className="banner ok">Done. Alerts will reach you even when Compass is closed.</p>}
+          {push.state === 'off' && <><p className="muted">Turn on alerts so the store, SOS and indent reminders reach you even when Compass is closed.</p><button className="btn primary big" disabled={push.busy} onClick={() => void push.turnOn()}>{push.busy ? 'Please wait…' : 'Turn on alerts'}</button></>}
+          {push.state === 'blocked' && <p className="banner warn">Alerts are blocked on this phone. Open the phone settings, allow notifications for Compass, and then open Compass again. You can continue for now.</p>}
+          {push.state === 'needs-install' && <p className="banner">On an iPhone, open this page in Safari, tap Share, then Add to Home Screen, and open Compass from there to get alerts. You can continue for now.</p>}
           {push.state === 'unsupported' && <p className="banner">This device cannot show alerts. You can continue.</p>}
         </div>
       )}

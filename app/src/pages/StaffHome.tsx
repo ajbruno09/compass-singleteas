@@ -102,7 +102,7 @@ export function StaffHome() {
       </div>
       <button className="countercard" style={{ marginTop: 10 }} onClick={() => nav('/mine')}>
         <Icon name="scale" size={34} stroke={1.6} />
-        <span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>My SToMS</span><span className="small muted" style={{ fontWeight: 700 }}>My sales, targets and incentives</span></span>
+        <span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>My Compass</span><span className="small muted" style={{ fontWeight: 700 }}>My sales, targets and incentives</span></span>
         <span className="chip due">New</span>
       </button>
       {myLocations.length > 0 && <SosButton locations={myLocations} />}

@@ -18,7 +18,7 @@ const iPadAsMac = () => navigator.platform === 'MacIntel' && navigator.maxTouchP
 const isIos = () => /iphone|ipad|ipod/i.test(ua()) || iPadAsMac();
 export const isPhone = () => /android/i.test(ua()) || isIos();
 
-// Shown once, before first time setup, on a phone that has not installed SToMS yet.
+// Shown once, before first time setup, on a phone that has not installed Compass yet.
 export function needsInstall(isOwner: boolean) { return isPhone() && !isStandalone() && !isOwner; }
 
 export function InstallGate() {
@@ -45,7 +45,7 @@ export function InstallGate() {
       <div className="setup"><div className="box">
         <Brand />
         <h1>Done{first ? `, ${first}` : ''}</h1>
-        <p>SToMS is on your phone now. <b>Close this page and open the SToMS icon</b> on your home screen. Sign in there with the same number and PIN.</p>
+        <p>Compass is on your phone now. <b>Close this page and open the Compass icon</b> on your home screen. Sign in there with the same number and PIN.</p>
       </div></div>
     );
   }
@@ -53,7 +53,7 @@ export function InstallGate() {
     <div className="setup"><div className="box">
       <Brand />
       <h1>Welcome{first ? `, ${first}` : ''}</h1>
-      <p>SToMS needs to be on your phone like an app. It takes one tap.</p>
+      <p>Compass needs to be on your phone like an app. It takes one tap.</p>
       {isIos() ? (
         <>
           <div style={{ fontSize: 44, textAlign: 'center', animation: 'nudge 0.8s infinite alternate' }} aria-hidden>👇</div>
@@ -61,13 +61,13 @@ export function InstallGate() {
             <li>Open this page in <b>Safari</b>.</li>
             <li>Tap the <b>Share</b> button at the bottom (a square with an arrow going up).</li>
             <li>Scroll down. Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
-            <li>Open the <b>SToMS</b> icon on your home screen and sign in there.</li>
+            <li>Open the <b>Compass</b> icon on your home screen and sign in there.</li>
           </ol>
           <button className="btn secondary" onClick={signOut}>Go back</button>
         </>
       ) : ev ? (
         <>
-          <button className="btn primary" style={{ fontSize: 18, padding: '16px 20px' }} onClick={install}>Yes, add SToMS to my phone</button>
+          <button className="btn primary" style={{ fontSize: 18, padding: '16px 20px' }} onClick={install}>Yes, add Compass to my phone</button>
           <button className="btn secondary" onClick={signOut}>No, go back</button>
         </>
       ) : (

@@ -15,8 +15,8 @@ export default defineConfig({
       workbox: { globIgnores: ['**/exceljs*'], importScripts: ['push-sw.js'], skipWaiting: true, clientsClaim: true, cleanupOutdatedCaches: true },
       includeAssets: ['logo-mark.png', 'favicon-64.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'SToMS',
-        short_name: 'SToMS',
+        name: 'Compass · SToMS',
+        short_name: 'Compass',
         description: 'Single Teas operations: indents, stock, purchases and closing.',
         theme_color: '#0F4D2A',
         background_color: '#F6F7F6',

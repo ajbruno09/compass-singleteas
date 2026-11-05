@@ -9,8 +9,8 @@ export function welcomeLang(uid: string): '' | 'hi' { try { return localStorage.
 
 const TEXT = {
   en: {
-    hi: (n: string) => `Hi${n ? `, ${n}` : ''}. Welcome to SToMS.`,
-    intro: 'SToMS is the Single Teas Operations Management System. It is made to make your work easy.',
+    hi: (n: string) => `Hi${n ? `, ${n}` : ''}. Welcome to Compass.`,
+    intro: 'Compass is the Single Teas Operations Management System. It is made to make your work easy.',
     here: 'Here you will:',
     l1: ['Send your ', 'daily indent', ', to ask for what you need'],
     l2: ['Do your ', 'daily closing stock', ' and ', 'weekly closing stock'],
@@ -21,8 +21,8 @@ const TEXT = {
     agree: 'I agree', no: 'Not now'
   },
   hi: {
-    hi: (n: string) => `नमस्ते${n ? `, ${n}` : ''}। SToMS में आपका स्वागत है।`,
-    intro: 'SToMS, Single Teas का Operations Management System है। इसे आपके काम को आसान बनाने के लिए बनाया गया है।',
+    hi: (n: string) => `नमस्ते${n ? `, ${n}` : ''}। Compass में आपका स्वागत है।`,
+    intro: 'Compass, Single Teas का Operations Management System है। इसे आपके काम को आसान बनाने के लिए बनाया गया है।',
     here: 'यहाँ आप:',
     l1: ['अपनी ज़रूरत का सामान माँगने के लिए ', 'रोज़ का indent', ' भेजेंगे'],
     l2: ['', 'रोज़ का closing stock', ' और ', 'हफ़्ते का closing stock', ' करेंगे'],

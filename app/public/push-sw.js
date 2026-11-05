@@ -1,9 +1,9 @@
-// Runs inside the installed app even when SToMS is closed. Shows alerts the moment they arrive.
+// Runs inside the installed app even when Compass is closed. Shows alerts the moment they arrive.
 self.addEventListener('push', (event) => {
   let d = {};
-  try { d = event.data ? event.data.json() : {}; } catch (e) { d = { title: 'SToMS', body: event.data ? event.data.text() : '' }; }
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = { title: 'Compass', body: event.data ? event.data.text() : '' }; }
   const urgent = !!d.urgent;
-  event.waitUntil(self.registration.showNotification(d.title || 'SToMS', {
+  event.waitUntil(self.registration.showNotification(d.title || 'Compass', {
     body: d.body || '',
     icon: '/icon-192.png',
     badge: '/icon-192.png',

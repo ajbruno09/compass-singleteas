@@ -15,7 +15,7 @@ export function bioEnabled(uid: string): boolean { try { return !!localStorage.g
 export function bioOff(uid: string) { try { localStorage.removeItem(key(uid)); } catch { /* ignore */ } }
 export async function bioOn(uid: string, name: string): Promise<void> {
   const cred = (await navigator.credentials.create({ publicKey: {
-    challenge: rnd(), rp: { name: 'SToMS' },
+    challenge: rnd(), rp: { name: 'Compass' },
     user: { id: new TextEncoder().encode(uid), name, displayName: name },
     pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
     authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' },

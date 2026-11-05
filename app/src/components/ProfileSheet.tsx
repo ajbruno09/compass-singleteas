@@ -54,10 +54,10 @@ export function ProfileSheet({ onClose }: { onClose: () => void }) {
       {ok && <section className="card row" style={{ justifyContent: 'space-between', gap: 10 }}>
         <div><b>Fingerprint or face unlock</b><p className="small muted">{on ? 'On for this phone' : 'Off'}</p></div>
         {on ? <button className="btn secondary" onClick={() => { bioOff(uid); setOn(false); }}>Turn off</button>
-          : <button className="btn primary" onClick={async () => { try { await bioOn(uid, profile?.full_name || 'SToMS'); setOn(true); } catch (e) { toast(errText(e)); } }}>Turn on</button>}
+          : <button className="btn primary" onClick={async () => { try { await bioOn(uid, profile?.full_name || 'Compass'); setOn(true); } catch (e) { toast(errText(e)); } }}>Turn on</button>}
       </section>}
       <section className="card row" style={{ justifyContent: 'space-between', gap: 10 }}>
-        <div><b>Alerts</b><p className="small muted">{push.state === 'on' ? 'On for this phone' : push.state === 'blocked' ? 'Blocked in the phone settings' : push.state === 'needs-install' ? 'Add SToMS to your Home Screen first' : push.state === 'unsupported' ? 'Not available here' : 'Off'}</p></div>
+        <div><b>Alerts</b><p className="small muted">{push.state === 'on' ? 'On for this phone' : push.state === 'blocked' ? 'Blocked in the phone settings' : push.state === 'needs-install' ? 'Add Compass to your Home Screen first' : push.state === 'unsupported' ? 'Not available here' : 'Off'}</p></div>
         {push.state === 'off' && <button className="btn primary" disabled={push.busy} onClick={() => void push.turnOn()}>Turn on</button>}
       </section>
       <section className="card" style={{ display: 'grid', gap: 8 }}>
@@ -67,7 +67,7 @@ export function ProfileSheet({ onClose }: { onClose: () => void }) {
           <button className={'btn ' + (profile?.extra_language === 'hi' ? 'primary' : 'secondary')} onClick={() => void setLang('hi')}>हिंदी</button>
         </div>
       </section>
-      <p className="small muted">SToMS v{__APP_VERSION__}</p>
+      <p className="small muted">Compass · SToMS v{__APP_VERSION__}</p>
     </Sheet>
   );
 }

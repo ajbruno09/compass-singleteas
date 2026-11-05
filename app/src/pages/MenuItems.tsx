@@ -202,7 +202,7 @@ function ItemForm({ item, isOwner, canEditAll, onClose, onSaved }: { item: MenuI
       {item && isOwner && (
         <div className="card" style={{ display: 'grid', gap: 8 }}>
           <b>Delete for good</b>
-          <p className="small muted">Removes this item from SToMS. Use it only if you will never bring it back. Switching it off is safer.</p>
+          <p className="small muted">Removes this item from Compass. Use it only if you will never bring it back. Switching it off is safer.</p>
           {sure ? <div className="row" style={{ gap: 8 }}><button className="btn primary" style={{ background: 'var(--bad)' }} disabled={busy} onClick={() => void purge()}>Yes, delete {item.name}</button><button className="btn quiet" onClick={() => setSure(false)}>Keep it</button></div>
             : <button className="btn secondary" style={{ justifySelf: 'start' }} onClick={() => setSure(true)}><Icon name="trash" /> Delete</button>}
         </div>
