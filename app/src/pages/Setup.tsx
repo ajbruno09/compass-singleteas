@@ -7,6 +7,7 @@ import { bioEnabled, bioOn, bioSupported } from '../lib/biolock';
 import { usePush } from '../components/PushSetup';
 import { PinFields } from '../components/PinFields';
 import { Brand } from '../components/Brand';
+import { welcomeLang } from './Welcome';
 import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 
@@ -22,7 +23,7 @@ export function Setup() {
   const [pinDone, setPinDone] = useState(false);
   const [bioOk, setBioOk] = useState<boolean | null>(null);
   const [unlockOn, setUnlockOn] = useState(false);
-  const [lang, setLang] = useState(profile?.extra_language === 'hi' ? 'hi' : '');
+  const [lang, setLang] = useState(profile?.extra_language === 'hi' ? 'hi' : welcomeLang(profile?.id ?? ''));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { void bioSupported().then(setBioOk); setUnlockOn(!!uid && bioEnabled(uid)); }, [uid]);
