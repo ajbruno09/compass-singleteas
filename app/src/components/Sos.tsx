@@ -62,9 +62,9 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
   const nm = (i: DeptItem) => (local && i.local_names?.hi) || i.name;
   const [locationId, setLocationId] = useState(defaultId);
   const [items, setItems] = useState<DeptItem[]>([]);
-  useEffect(() => { setPicked([]); supabase.rpc('department_items', { p_location_id: locationId }).then(({ data }) => setItems((data as DeptItem[]) ?? [])); }, [locationId]);
+  useEffect(() => { supabase.rpc('department_items', { p_location_id: locationId }).then(({ data }) => setItems((data as DeptItem[]) ?? [])); }, [locationId]);
   const [q, setQ] = useState('');
-  const [picked, setPicked] = useState<DeptItem[]>([]);
+  const [picked, setPicked] = useState<(DeptItem & { loc: number })[]>([]);
   const [left, setLeft] = useState<number | null>(null);
   useEffect(() => { setLeft(null); supabase.rpc('sos_left', { p_location_id: locationId }).then(({ data }) => setLeft(typeof data === 'number' ? data : null)); }, [locationId]);
   const [note, setNote] = useState('');
@@ -72,10 +72,10 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
   const recentKey = `compass-sos-recent-${locationId}`;
   const recent = useMemo(() => { try { const ids: number[] = JSON.parse(localStorage.getItem(recentKey) ?? '[]'); return ids.map((id) => items.find((i) => i.id === id)).filter((x): x is DeptItem => !!x).slice(0, 6); } catch { return []; } }, [items, recentKey]);
   const found = useMemo(() => { const t = q.trim().toLowerCase(); return t ? items.filter((i) => i.name.toLowerCase().includes(t) || (i.local_names?.hi ?? '').includes(t)).slice(0, 8) : []; }, [q, items]);
-  function choose(i: DeptItem) { setPicked((p) => (p.length >= MAX_ITEMS || p.some((x) => x.id === i.id) ? p : [...p, i])); setQ(''); }
+  function choose(i: DeptItem) { setPicked((p) => (p.length >= MAX_ITEMS || p.some((x) => x.id === i.id) ? p : [...p, { ...i, loc: locationId }])); setQ(''); }
   async function send() {
     setBusy(true);
-    const { data, error } = await supabase.rpc('raise_sos', { p_location_id: locationId, p_item_ids: picked.map((i) => i.id), p_note: note });
+    const { data, error } = await supabase.rpc('raise_sos', { p_location_id: picked[0]?.loc ?? locationId, p_item_ids: picked.map((i) => i.id), p_note: note });
     setBusy(false);
     if (error) { toast(errText(error)); return; }
     try { const ids: number[] = JSON.parse(localStorage.getItem(recentKey) ?? '[]'); if (picked.length) localStorage.setItem(recentKey, JSON.stringify([...picked.map((i) => i.id), ...ids.filter((x) => !picked.some((i) => i.id === x))].slice(0, 8))); } catch { /* ignore */ }
@@ -97,7 +97,7 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
       )}
       {picked.length > 0 && (
         <div className="chips" aria-label={t('Chosen items')}>
-          {picked.map((i) => <button key={i.id} className="btn secondary" onClick={() => setPicked(picked.filter((x) => x.id !== i.id))} aria-label={`${t('Remove')} ${nm(i)}`}>{nm(i)} ✕</button>)}
+          {picked.map((i) => <button key={i.id} className="btn secondary" onClick={() => setPicked(picked.filter((x) => x.id !== i.id))} aria-label={`${t('Remove')} ${nm(i)}`}>{nm(i)}{locations.length > 1 ? ` · ${locations.find((l) => l.id === i.loc)?.name ?? ''}` : ''} ✕</button>)}
         </div>
       )}
       {picked.length < MAX_ITEMS ? (
