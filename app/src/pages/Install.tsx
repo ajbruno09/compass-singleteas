@@ -48,7 +48,7 @@ export function InstallGate() {
       <p>Compass needs to be on your phone like an app. It takes one tap.</p>
       {isIos() ? (
         <>
-          <div style={{ fontSize: 44, textAlign: 'center', animation: 'pulse 1s infinite alternate' }} aria-hidden>👇</div>
+          <div style={{ fontSize: 44, textAlign: 'center', animation: 'nudge 0.8s infinite alternate' }} aria-hidden>👇</div>
           <ol className="stack">
             <li>Open this page in <b>Safari</b>.</li>
             <li>Tap the <b>Share</b> button at the bottom (a square with an arrow going up).</li>

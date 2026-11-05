@@ -355,4 +355,4 @@ tr.click { cursor: pointer; }
 .stat.sos.off { background: #FDE9E2; border-color: #F5C1B0; color: #C2410C; }
 .stat.sos.on { color: #1B6A4D; }
 .stat.sos.off svg { color: #E4572E; }
-@keyframes pulse{from{transform:translateY(0)}to{transform:translateY(8px)}}
+@keyframes nudge{from{transform:translateY(0)}to{transform:translateY(8px)}}
