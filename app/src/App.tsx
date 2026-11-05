@@ -46,11 +46,21 @@ function Home({ several }: { several: boolean }) {
 }
 
 function Gate() {
-  const { session, profile, loading, signOut, recovery } = useSession();
+  const { session, profile, loading, signOut, recovery, loadError, reload } = useSession();
   if (!configured) return <div className="login"><div className="card"><h1>Compass</h1><p>This copy of the app is not connected to its database yet.</p></div></div>;
   if (loading) return <div className="login"><p className="muted">Loading…</p></div>;
   if (session && recovery) return <NewPassword />;
   if (!session) return window.location.pathname === '/join' ? <Join /> : <Login />;
+  if (loadError && !profile) {
+    return (
+      <div className="login"><div className="card">
+        <h1>Could not load</h1>
+        <p>Compass could not reach the server just now. Please check the internet and try again.</p>
+        <button className="btn" onClick={() => { void reload(); }}>Try again</button>
+        <button className="btn secondary" onClick={signOut}>Sign out</button>
+      </div></div>
+    );
+  }
   if (!profile || !profile.active) {
     return (
       <div className="login"><div className="card">

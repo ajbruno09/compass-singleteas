@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { Location, Profile } from './types';
 
-interface Ctx { session: Session | null; profile: Profile | null; locations: Location[]; myLocations: Location[]; loading: boolean; recovery: boolean; clearRecovery: () => void; reload: () => Promise<void>; signOut: () => Promise<void>; }
+interface Ctx { loadError: boolean; session: Session | null; profile: Profile | null; locations: Location[]; myLocations: Location[]; loading: boolean; recovery: boolean; clearRecovery: () => void; reload: () => Promise<void>; signOut: () => Promise<void>; }
 const SessionCtx = createContext<Ctx | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -13,15 +13,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [myLocations, setMyLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [recovery, setRecovery] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   async function load(s: Session | null) {
     setSession(s);
     if (!s) { setProfile(null); setLocations([]); setMyLocations([]); setLoading(false); return; }
-    const [{ data: p }, { data: locs }, { data: mine }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle(),
-      supabase.from('locations').select('*').order('sort'),
-      supabase.from('profile_locations').select('location_id').eq('profile_id', s.user.id)
-    ]);
+    let p: unknown = null; let locs: unknown = null; let mine: unknown = null; let failed = true;
+    for (let attempt = 0; attempt < 3 && failed; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, 800 * attempt));
+      const [a, b, c] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle(),
+        supabase.from('locations').select('*').order('sort'),
+        supabase.from('profile_locations').select('location_id').eq('profile_id', s.user.id)
+      ]);
+      p = a.data; locs = b.data; mine = c.data; failed = !!(a.error || b.error || c.error);
+    }
+    setLoadError(failed);
+    if (failed) { setLoading(false); return; }
     setProfile((p as Profile) ?? null);
     const all = (locs as Location[]) ?? [];
     setLocations(all);
@@ -46,7 +54,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [session?.user.id]);
 
   return (
-    <SessionCtx.Provider value={{ session, profile, locations, myLocations, loading, recovery, clearRecovery: () => setRecovery(false), reload: () => load(session), signOut: async () => { await supabase.auth.signOut(); } }}>
+    <SessionCtx.Provider value={{ loadError, session, profile, locations, myLocations, loading, recovery, clearRecovery: () => setRecovery(false), reload: () => load(session), signOut: async () => { await supabase.auth.signOut(); } }}>
       {children}
     </SessionCtx.Provider>
   );
