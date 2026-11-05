@@ -54,7 +54,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [session?.user.id]);
 
   return (
-    <SessionCtx.Provider value={{ loadError, session, profile, locations, myLocations, loading, recovery, clearRecovery: () => setRecovery(false), reload: () => load(session), signOut: async () => { await supabase.auth.signOut(); } }}>
+    <SessionCtx.Provider value={{ loadError, session, profile, locations, myLocations, loading, recovery, clearRecovery: () => setRecovery(false), reload: () => load(session), signOut: async () => {
+      // Always leaves, even when the saved sign in is stale and the server refuses the request.
+      try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
+      try { Object.keys(localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k)); } catch { /* ignore */ }
+      setSession(null); setProfile(null);
+      window.location.assign('/');
+    } }}>
       {children}
     </SessionCtx.Provider>
   );

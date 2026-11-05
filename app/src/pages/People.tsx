@@ -34,11 +34,23 @@ function inviteText(t: InviteTarget): string {
 const STAFF_ROLES: Role[] = ['department', 'store', 'closing', 'accounts', 'manager'];
 
 async function callAdmin(body: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke('staff-admin', { body });
+  async function once() {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    return supabase.functions.invoke('staff-admin', { body, headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+  }
+  let { data, error } = await once();
+  const status = (error as { context?: Response } | null)?.context?.status;
+  if (error && (status === 401 || status === 403)) {
+    // The saved sign in may just be old. Refresh it quietly and try once more.
+    const r = await supabase.auth.refreshSession();
+    if (!r.error && r.data.session) ({ data, error } = await once());
+  }
   if (error) {
     let msg = error.message;
     const ctx = (error as { context?: Response }).context;
     if (ctx && typeof ctx.json === 'function') { try { const j = await ctx.json(); if (j?.error) msg = j.error; } catch { /* keep message */ } }
+    if (ctx?.status === 401) msg = 'Your sign in has expired. Please tap Sign out, sign in again with your PIN, and try once more.';
     throw new Error(msg);
   }
   if (data?.error) throw new Error(data.error);
