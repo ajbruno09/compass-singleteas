@@ -51,9 +51,9 @@ function Home({ several }: { several: boolean }) {
 }
 
 // First time on this account: Welcome, then (on a phone) install to the home screen, then the profile setup.
-// On a phone the welcome shows every time in the browser, and is skipped only inside the installed app (it was agreed before installing).
+// The welcome shows to every new person. On a phone browser it always shows. Anywhere else it is skipped only if this person already agreed on this device.
 function FirstRun({ uid, owner }: { uid: string; owner: boolean }) {
-  const [agreed, setAgreed] = useState(() => (isPhone() ? isStandalone() : welcomed(uid)));
+  const [agreed, setAgreed] = useState(() => (isPhone() && !isStandalone() ? false : welcomed(uid)));
   if (!agreed && !owner) return <Welcome onAgree={() => setAgreed(true)} />;
   return needsInstall(owner) ? <InstallGate /> : <Setup />;
 }
