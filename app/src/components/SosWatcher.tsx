@@ -7,6 +7,8 @@ import { alarmUnlocked, keepAwake, startAlarm, stopAlarm, unlockAlarm } from '..
 import { SOS_AFTER_SECONDS, type SosAlert } from '../lib/types';
 import { useToast } from './Toast';
 
+const idsOf = (a: SosAlert): number[] => (a.item_ids && a.item_ids.length ? a.item_ids : a.item_id != null ? [a.item_id] : []);
+
 // Lives on the store phone and the owner's phone. The store rings at once; the owner rings if nobody answers.
 export function SosWatcher() {
   const { profile, locations } = useSession();
@@ -23,7 +25,7 @@ export function SosWatcher() {
     const { data } = await supabase.from('sos_alerts').select('*').is('resolved_at', null).order('created_at');
     const list = (data as SosAlert[]) ?? [];
     setAlerts(list);
-    const need = list.map((a) => a.item_id).filter((x): x is number => x != null);
+    const need = [...new Set(list.flatMap((a) => idsOf(a)))];
     if (need.length) {
       const { data: its } = await supabase.from('items').select('id, name').in('id', need);
       setNames(Object.fromEntries(((its as { id: number; name: string }[]) ?? []).map((i) => [i.id, i.name])));
@@ -63,6 +65,7 @@ export function SosWatcher() {
     return () => { document.title = t; };
   }, [ringing.length]);
 
+  const what = (a: SosAlert, fallback: string) => { const n = idsOf(a).map((id) => names[id]).filter(Boolean); return n.length ? n.join(', ') : fallback; };
   const where = (a: SosAlert) => locations.find((l) => l.id === a.location_id)?.name ?? 'A counter';
   async function ack(a: SosAlert, eta: number) {
     const { error } = await supabase.rpc('ack_sos', { p_id: a.id, p_eta: eta });
@@ -78,7 +81,7 @@ export function SosWatcher() {
     <>
       {alerts.filter((a) => a.acked_at).map((a) => (
         <div key={a.id} className="banner ok row" style={{ justifyContent: 'space-between' }}>
-          <span>{where(a)}: {names[a.item_id ?? -1] ?? 'request'}{a.note ? `, ${a.note}` : ''}{a.eta_minutes ? ` · about ${a.eta_minutes} min` : ''}</span>
+          <span>{where(a)}: {what(a, 'request')}{a.note ? `, ${a.note}` : ''}{a.eta_minutes ? ` · about ${a.eta_minutes} min` : ''}</span>
           <button className="btn secondary" style={{ minHeight: 36 }} onClick={() => void done(a)}>Done</button>
         </div>
       ))}
@@ -93,7 +96,7 @@ export function SosWatcher() {
             {ringing.slice(0, 3).map((a) => (
               <div key={a.id} className="stack" style={{ textAlign: 'left' }}>
                 <h1>{where(a)}</h1>
-                <p style={{ fontSize: 22, fontWeight: 800 }}>{names[a.item_id ?? -1] ?? 'Needs something right now'}</p>
+                <p style={{ fontSize: 22, fontWeight: 800 }}>{what(a, 'Needs something right now')}</p>
                 {a.note && <p style={{ fontSize: 18 }}>{a.note}</p>}
                 <p className="small">Waiting {Math.floor(age(a) / 60)}:{String(age(a) % 60).padStart(2, '0')} · sent {timeOf(a.created_at)}{role !== 'store' ? ' · the store did not answer' : ''}</p>
                 <div className="seg">

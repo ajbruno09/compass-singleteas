@@ -47,35 +47,47 @@ export function SosButton({ locations, defaultId }: { locations: Location[]; def
         <Sheet title={alert ? t('Your SOS') : t('Need something right now?')} onClose={() => setOpen(false)}>
           {alert
             ? <Status alert={alert} contacts={contacts} now={now} onDone={() => { setAlert(null); setOpen(false); }} />
-            : <Form locations={locations} defaultId={defaultId ?? ids[0]} onSent={(a) => { setAlert(a); toast(t('SOS sent to the store')); }} />}
+            : <Form contacts={contacts} locations={locations} defaultId={defaultId ?? ids[0]} onSent={(a) => { setAlert(a); toast(t('SOS sent to the store')); }} />}
         </Sheet>
       )}
     </>
   );
 }
 
-function Form({ locations, defaultId, onSent }: { locations: Location[]; defaultId: number; onSent: (a: SosAlert) => void }) {
+const MAX_ITEMS = 3;
+
+function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[]; locations: Location[]; defaultId: number; onSent: (a: SosAlert) => void }) {
   const toast = useToast();
   const { t, local } = useLang();
   const nm = (i: DeptItem) => (local && i.local_names?.hi) || i.name;
   const [locationId, setLocationId] = useState(defaultId);
   const [items, setItems] = useState<DeptItem[]>([]);
-  useEffect(() => { setItem(null); supabase.rpc('department_items', { p_location_id: locationId }).then(({ data }) => setItems((data as DeptItem[]) ?? [])); }, [locationId]);
+  useEffect(() => { setPicked([]); supabase.rpc('department_items', { p_location_id: locationId }).then(({ data }) => setItems((data as DeptItem[]) ?? [])); }, [locationId]);
   const [q, setQ] = useState('');
-  const [item, setItem] = useState<DeptItem | null>(null);
+  const [picked, setPicked] = useState<DeptItem[]>([]);
+  const [left, setLeft] = useState<number | null>(null);
+  useEffect(() => { setLeft(null); supabase.rpc('sos_left', { p_location_id: locationId }).then(({ data }) => setLeft(typeof data === 'number' ? data : null)); }, [locationId]);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const recentKey = `compass-sos-recent-${locationId}`;
   const recent = useMemo(() => { try { const ids: number[] = JSON.parse(localStorage.getItem(recentKey) ?? '[]'); return ids.map((id) => items.find((i) => i.id === id)).filter((x): x is DeptItem => !!x).slice(0, 6); } catch { return []; } }, [items, recentKey]);
   const found = useMemo(() => { const t = q.trim().toLowerCase(); return t ? items.filter((i) => i.name.toLowerCase().includes(t) || (i.local_names?.hi ?? '').includes(t)).slice(0, 8) : []; }, [q, items]);
-  function choose(i: DeptItem) { setItem(i); setQ(''); }
+  function choose(i: DeptItem) { setPicked((p) => (p.length >= MAX_ITEMS || p.some((x) => x.id === i.id) ? p : [...p, i])); setQ(''); }
   async function send() {
     setBusy(true);
-    const { data, error } = await supabase.rpc('raise_sos', { p_location_id: locationId, p_item_id: item?.id ?? null, p_note: note });
+    const { data, error } = await supabase.rpc('raise_sos', { p_location_id: locationId, p_item_ids: picked.map((i) => i.id), p_note: note });
     setBusy(false);
     if (error) { toast(errText(error)); return; }
-    try { const ids: number[] = JSON.parse(localStorage.getItem(recentKey) ?? '[]'); if (item) localStorage.setItem(recentKey, JSON.stringify([item.id, ...ids.filter((x) => x !== item.id)].slice(0, 8))); } catch { /* ignore */ }
+    try { const ids: number[] = JSON.parse(localStorage.getItem(recentKey) ?? '[]'); if (picked.length) localStorage.setItem(recentKey, JSON.stringify([...picked.map((i) => i.id), ...ids.filter((x) => !picked.some((i) => i.id === x))].slice(0, 8))); } catch { /* ignore */ }
     onSent(data as SosAlert);
+  }
+  if (left === 0) {
+    return (
+      <>
+        <p className="banner warn">{t('You have used all your SOS for today. Please call the store or Admin.')}</p>
+        <div className="stack">{contacts.map((c) => <a key={c.phone} className="btn secondary floor" href={`tel:+91${c.phone}`}><Icon name="phone" /> {t('Call {name}', { name: c.full_name })}</a>)}</div>
+      </>
+    );
   }
   return (
     <>
@@ -83,19 +95,23 @@ function Form({ locations, defaultId, onSent }: { locations: Location[]; default
       {locations.length > 1 && (
         <div className="seg" role="group" aria-label="Which counter">{locations.map((l) => <button key={l.id} aria-pressed={l.id === locationId} onClick={() => setLocationId(l.id)}>{l.name}</button>)}</div>
       )}
-      {item ? (
-        <div className="card row" style={{ justifyContent: 'space-between' }}><b>{nm(item)}</b><button className="btn quiet" onClick={() => setItem(null)}>{t('Change')}</button></div>
-      ) : (
-        <div className="stack">
-          <label className="field"><span>{t('Which item? (you can skip this)')}</span>
-            <div className="searchbox"><Icon name="search" size={18} /><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && found[0]) choose(found[0]); }} placeholder={t('Type a few letters')} /></div>
-          </label>
-          {!q && recent.length > 0 && <div className="chips" aria-label={t('Often needed')}>{recent.map((i) => <button key={i.id} className="btn secondary" onClick={() => choose(i)}>{nm(i)}</button>)}</div>}
-          {found.map((i) => <button key={i.id} className="btn secondary" style={{ justifyContent: 'flex-start' }} onClick={() => choose(i)}>{nm(i)}</button>)}
+      {picked.length > 0 && (
+        <div className="chips" aria-label={t('Chosen items')}>
+          {picked.map((i) => <button key={i.id} className="btn secondary" onClick={() => setPicked(picked.filter((x) => x.id !== i.id))} aria-label={`${t('Remove')} ${nm(i)}`}>{nm(i)} ✕</button>)}
         </div>
       )}
+      {picked.length < MAX_ITEMS ? (
+        <div className="stack">
+          <label className="field"><span>{picked.length ? t('Add another item (up to 3)') : t('Which items? (up to 3, you can skip this)')}</span>
+            <div className="searchbox"><Icon name="search" size={18} /><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && found[0]) choose(found[0]); }} placeholder={t('Type a few letters')} /></div>
+          </label>
+          {!q && recent.length > 0 && <div className="chips" aria-label={t('Often needed')}>{recent.filter((i) => !picked.some((x) => x.id === i.id)).map((i) => <button key={i.id} className="btn secondary" onClick={() => choose(i)}>{nm(i)}</button>)}</div>}
+          {found.filter((i) => !picked.some((x) => x.id === i.id)).map((i) => <button key={i.id} className="btn secondary" style={{ justifyContent: 'flex-start' }} onClick={() => choose(i)}>{nm(i)}</button>)}
+        </div>
+      ) : <p className="small muted">{t('That is 3 items, the most for one SOS.')}</p>}
       <div className="seg">{QUICK_NOTES.map((n) => <button key={n} aria-pressed={note === n} onClick={() => setNote(note === n ? '' : n)}>{t(n)}</button>)}</div>
       <label className="field"><span>{t('Anything else to tell the store?')}</span><input value={QUICK_NOTES.includes(note) ? '' : note} onChange={(e) => setNote(e.target.value)} placeholder={t('Optional')} /></label>
+      {left != null && left <= 2 && <p className="small muted">{left === 1 ? t('This is your last SOS for today.') : t('{n} SOS left today', { n: left })}</p>}
       <button className="btn floor sosgo" disabled={busy} onClick={() => void send()}>{busy ? t('Sending…') : t('Send SOS to the store')}</button>
     </>
   );
@@ -108,7 +124,8 @@ function Status({ alert, contacts, now, onDone }: { alert: SosAlert; contacts: C
   useEffect(() => { supabase.rpc('department_items', { p_location_id: alert.location_id }).then(({ data }) => setItems((data as DeptItem[]) ?? [])); }, [alert.location_id]);
   const waited = Math.floor((now - new Date(alert.created_at).getTime()) / 1000);
   const escalated = !alert.acked_at && waited >= SOS_AFTER_SECONDS;
-  const item = items.find((i) => i.id === alert.item_id);
+  const wanted = (alert.item_ids && alert.item_ids.length ? alert.item_ids : alert.item_id != null ? [alert.item_id] : []).map((id) => items.find((i) => i.id === id)).filter((x): x is DeptItem => !!x);
+  const label = wanted.map((i) => (local && i.local_names?.hi) || i.name).join(', ');
   async function done() {
     const { error } = await supabase.rpc('resolve_sos', { p_id: alert.id });
     if (error) { toast(errText(error)); return; }
@@ -117,7 +134,7 @@ function Status({ alert, contacts, now, onDone }: { alert: SosAlert; contacts: C
   return (
     <>
       <div className="card stack">
-        <p><b>{item ? ((local && item.local_names?.hi) || item.name) : t('Request')}</b>{alert.note ? <span className="muted"> · {alert.note}</span> : null}</p>
+        <p><b>{label || t('Request')}</b>{alert.note ? <span className="muted"> · {alert.note}</span> : null}</p>
         <p className="small muted">{t('Sent at {time}', { time: timeOf(alert.created_at) })}</p>
       </div>
       {alert.acked_at
