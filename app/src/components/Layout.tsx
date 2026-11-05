@@ -19,6 +19,7 @@ export const NAV: NavItem[] = [
   { to: '/indents', label: 'Indents', icon: 'clip', roles: ['owner', 'manager', 'store'] },
   { to: '/buying', label: 'Buying', icon: 'cart', roles: ['owner', 'store'] },
   { to: '/receive', label: 'Receive goods', icon: 'truck', roles: ['owner', 'store'] },
+  { to: '/sos', label: 'SOS requests', icon: 'bell', roles: ['owner', 'manager', 'store'] },
   { to: '/issue', label: 'Issue to counters', icon: 'box', roles: ['owner', 'store'] },
   { to: '/stockview', label: 'Stock in hand', icon: 'layers', roles: ['owner', 'manager', 'store'] },
   { to: '/counts', label: 'Closing counts', icon: 'moon', roles: ['owner', 'manager', 'store'] },

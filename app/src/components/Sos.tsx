@@ -132,6 +132,7 @@ function Status({ locationIds, alert, contacts, now, onDone }: { locationIds: nu
   }, [alert.location_id, locationIds.join(',')]);
   const waited = Math.floor((now - new Date(alert.created_at).getTime()) / 1000);
   const escalated = !alert.acked_at && waited >= SOS_AFTER_SECONDS;
+  const overdue = !!alert.acked_at && !alert.issued_at && !!alert.eta_minutes && now > new Date(alert.acked_at).getTime() + alert.eta_minutes * 60000;
   const wanted = (alert.item_ids && alert.item_ids.length ? alert.item_ids : alert.item_id != null ? [alert.item_id] : []).map((id) => items.find((i) => i.id === id)).filter((x): x is DeptItem => !!x);
   const label = wanted.map((i) => (local && i.local_names?.hi) || i.name).join(', ');
   async function done() {
@@ -145,17 +146,21 @@ function Status({ locationIds, alert, contacts, now, onDone }: { locationIds: nu
         <p><b>{label || t('Request')}</b>{alert.note ? <span className="muted"> · {alert.note}</span> : null}</p>
         <p className="small muted">{t('Sent at {time}', { time: timeOf(alert.created_at) })}</p>
       </div>
-      {alert.acked_at
+      {alert.issued_at
+        ? <p className="banner ok">{t('The store has sent the items. Please check them and close this.')}</p>
+        : overdue
+          ? <p className="banner bad">{t('The store is taking longer than promised. Admin is being alerted. You can also call.')}</p>
+          : alert.acked_at
         ? <p className="banner ok">{alert.eta_minutes ? t('The store is on it. About {n} minutes.', { n: alert.eta_minutes }) : t('The store is on it.')}</p>
         : escalated
           ? <p className="banner bad">{t('No answer from the store yet. Admin is being alerted too. You can also call.')}</p>
           : <p className="banner warn">{t('Waiting for the store to answer…')}</p>}
-      {!alert.acked_at && escalated && (
+      {((!alert.acked_at && escalated) || overdue) && (
         <div className="stack">
           {contacts.map((c) => <a key={c.phone} className="btn secondary floor" href={`tel:+91${c.phone}`}><Icon name="phone" /> {t('Call {name}', { name: c.full_name })}</a>)}
         </div>
       )}
-      <button className="btn secondary floor" onClick={() => void done()}>{alert.acked_at ? t('I got it, close this') : t('Cancel, no longer needed')}</button>
+      <button className="btn secondary floor" onClick={() => void done()}>{alert.acked_at || alert.issued_at ? t('I got it, close this') : t('Cancel, no longer needed')}</button>
     </>
   );
 }

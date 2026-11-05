@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText } from '../lib/format';
@@ -13,6 +14,7 @@ const idsOf = (a: SosAlert): number[] => (a.item_ids && a.item_ids.length ? a.it
 export function SosWatcher() {
   const { profile, locations } = useSession();
   const toast = useToast();
+  const nav = useNavigate();
   const [alerts, setAlerts] = useState<SosAlert[]>([]);
   const [names, setNames] = useState<Record<number, string>>({});
   const [now, setNow] = useState(Date.now());
@@ -22,6 +24,7 @@ export function SosWatcher() {
   const watching = role === 'store' || role === 'owner' || role === 'manager';
 
   const load = useCallback(async () => {
+    if (role === 'store' || role === 'owner') await supabase.rpc('sos_sweep');
     const { data } = await supabase.from('sos_alerts').select('*').is('resolved_at', null).order('created_at');
     const list = (data as SosAlert[]) ?? [];
     setAlerts(list);
@@ -30,7 +33,7 @@ export function SosWatcher() {
       const { data: its } = await supabase.from('items').select('id, name').in('id', need);
       setNames(Object.fromEntries(((its as { id: number; name: string }[]) ?? []).map((i) => [i.id, i.name])));
     }
-  }, []);
+  }, [role]);
 
   useEffect(() => {
     if (!watching) return;
@@ -43,14 +46,29 @@ export function SosWatcher() {
     return () => { void supabase.removeChannel(ch); window.clearInterval(poll); window.clearInterval(tick); document.removeEventListener('visibilitychange', vis); };
   }, [watching, load, armed]);
 
+  // The alarm is on by default: the first tap anywhere in Compass turns the sound on (phones only allow sound after a tap).
+  useEffect(() => {
+    if (!watching || armed) return;
+    const arm = () => { const ok = unlockAlarm(); setArmed(ok); if (ok) window.dispatchEvent(new Event('compass-armed')); };
+    const evs = ['pointerdown', 'keydown', 'touchstart'] as const;
+    evs.forEach((e) => window.addEventListener(e, arm, { once: true, passive: true }));
+    return () => evs.forEach((e) => window.removeEventListener(e, arm));
+  }, [watching, armed]);
+
   useEffect(() => { if (armed && watching) void keepAwake(true); return () => { void keepAwake(false); }; }, [armed, watching]);
 
   const age = (a: SosAlert) => Math.floor((now - new Date(a.created_at).getTime()) / 1000);
   const unanswered = useMemo(() => alerts.filter((a) => !a.acked_at), [alerts]);
-  const ringing = useMemo(
-    () => unanswered.filter((a) => role === 'store' || age(a) >= SOS_AFTER_SECONDS),
+  const overdue = (a: SosAlert) => !!a.acked_at && !a.issued_at && !!a.eta_minutes && now > new Date(a.acked_at).getTime() + a.eta_minutes * 60000;
+  const late = useMemo(
+    () => alerts.filter((a) => a.acked_at && overdue(a)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [unanswered, role, now]
+    [alerts, now]
+  );
+  const ringing = useMemo(
+    () => [...unanswered.filter((a) => role === 'store' || age(a) >= SOS_AFTER_SECONDS), ...late],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [unanswered, late, role, now]
   );
 
   useEffect(() => {
@@ -79,10 +97,14 @@ export function SosWatcher() {
   if (!watching) return null;
   return (
     <>
+      {role === 'store' && !armed && <button className="banner warn" style={{ width: '100%', textAlign: 'left' }} onClick={() => setArmed(unlockAlarm())}>The SOS alarm sound is off until you tap the screen once. Tap here to turn it on.</button>}
       {alerts.filter((a) => a.acked_at).map((a) => (
         <div key={a.id} className="banner ok row" style={{ justifyContent: 'space-between' }}>
           <span>{where(a)}: {what(a, 'request')}{a.note ? `, ${a.note}` : ''}{a.eta_minutes ? ` · about ${a.eta_minutes} min` : ''}</span>
-          <button className="btn secondary" style={{ minHeight: 36 }} onClick={() => void done(a)}>Done</button>
+          <span className="row" style={{ gap: 6 }}>
+            {role !== 'manager' && <button className="btn primary" style={{ minHeight: 36 }} onClick={() => nav('/sos')}>{a.issued_at ? 'View' : 'Issue now'}</button>}
+            <button className="btn secondary" style={{ minHeight: 36 }} onClick={() => void done(a)}>Done</button>
+          </span>
         </div>
       ))}
       {role !== 'store' && unanswered.filter((a) => age(a) < SOS_AFTER_SECONDS).map((a) => (
@@ -99,9 +121,10 @@ export function SosWatcher() {
                 <p style={{ fontSize: 22, fontWeight: 800 }}>{what(a, 'Needs something right now')}</p>
                 {a.note && <p style={{ fontSize: 18 }}>{a.note}</p>}
                 <p className="small">Waiting {Math.floor(age(a) / 60)}:{String(age(a) % 60).padStart(2, '0')} · sent {timeOf(a.created_at)}{role !== 'store' ? ' · the store did not answer' : ''}</p>
-                <div className="seg">
-                  {[10, 20, 30, 60].map((m) => <button key={m} className="sosbtn" onClick={() => void ack(a, m)}>On it, {m} min</button>)}
-                </div>
+                {a.acked_at
+                  ? <p style={{ fontWeight: 800 }}>Overdue. You said {a.eta_minutes} min. Please issue now.</p>
+                  : <div className="seg">{[10, 20, 30, 60].map((m) => <button key={m} className="sosbtn" onClick={() => void ack(a, m)}>On it, {m} min</button>)}</div>}
+                {role !== 'manager' && <button className="btn floor" onClick={() => nav('/sos')}>Open SOS page and issue</button>}
               </div>
             ))}
             {!armed && <button className="btn floor" onClick={() => setArmed(unlockAlarm())}>Turn on sound</button>}

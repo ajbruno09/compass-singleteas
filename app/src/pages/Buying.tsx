@@ -1,3 +1,4 @@
+import { PoCancelBox, PoCancelInbox } from '../components/PoCancel';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
@@ -181,6 +182,8 @@ export function Buying() {
           <p className="muted small" style={{ marginTop: 2 }}>Built from what the counters asked for, less what is already in the store.</p></div>
         <div className="row"><DatePicker value={date} onChange={setDate} tomorrow={target} label="Buying date" /></div>
       </div>
+
+      <PoCancelInbox onChanged={() => { void load(); }} />
 
       <div className="kpis">
         <div className="card kp"><div className="label">Counters sent</div><div className="num kpn">{sentInd.length} of {counters.length}</div></div>
@@ -402,6 +405,7 @@ function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, onClose, onDone 
         <>
           {saved && <p className="banner ok">{kind === 'wa' ? 'Copied. Open the WhatsApp group, paste and send.' : 'Saved.'}</p>}
           <pre className="wa">{shown}</pre>
+          {po && (po.status === 'sent' || po.status === 'draft') && <PoCancelBox poId={po.id} onDone={() => { void onDone(false); }} />}
         </>
       )}
     </Sheet>
