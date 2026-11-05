@@ -4,6 +4,14 @@ import { Brand } from '../components/Brand';
 
 interface InstallEvent extends Event { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
 
+// Chrome offers the install prompt once, early, while the page loads. Catch it here at start up so the install screen can use it later.
+let saved: InstallEvent | null = null;
+const listeners = new Set<() => void>();
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); saved = e as InstallEvent; listeners.forEach((f) => f()); });
+  window.addEventListener('appinstalled', () => { saved = null; listeners.forEach((f) => f()); });
+}
+
 export const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
 const ua = () => navigator.userAgent;
 const iPadAsMac = () => navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
@@ -15,14 +23,14 @@ export function needsInstall(isOwner: boolean) { return isPhone() && !isStandalo
 
 export function InstallGate() {
   const { profile, signOut } = useSession();
-  const [ev, setEv] = useState<InstallEvent | null>(null);
+  const [ev, setEv] = useState<InstallEvent | null>(saved);
   const [state, setState] = useState<'ask' | 'done'>('ask');
   useEffect(() => {
-    const h = (e: Event) => { e.preventDefault(); setEv(e as InstallEvent); };
-    window.addEventListener('beforeinstallprompt', h);
+    const f = () => setEv(saved);
+    listeners.add(f); f();
     const ok = () => setState('done');
     window.addEventListener('appinstalled', ok);
-    return () => { window.removeEventListener('beforeinstallprompt', h); window.removeEventListener('appinstalled', ok); };
+    return () => { listeners.delete(f); window.removeEventListener('appinstalled', ok); };
   }, []);
   async function install() {
     if (!ev) return;
