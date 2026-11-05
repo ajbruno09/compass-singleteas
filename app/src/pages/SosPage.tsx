@@ -63,6 +63,11 @@ export function SosPage() {
     const { error } = await supabase.rpc('ack_sos', { p_id: a.id, p_eta: m });
     if (error) toast(errText(error)); else void load();
   }
+  async function extend(a: SosAlert, m: number) {
+    const { error } = await supabase.rpc('extend_sos', { p_id: a.id, p_extra: m });
+    if (error) { toast(errText(error)); return; }
+    toast(`Counter told: ${m} more minutes`); void load();
+  }
   async function issue(a: SosAlert) {
     const v = vals[a.id] ?? {};
     const lines = rows(a).map((i) => ({ item_id: i, qty: Number(v[i] ?? 1) })).filter((l) => l.qty > 0);
@@ -99,7 +104,10 @@ export function SosPage() {
                 {!a.issued_at && !a.acked_at && canIssue && (
                   <div className="row" style={{ gap: 6 }}><span className="muted small">I will bring it in:</span>{[10, 20, 30, 60].map((m) => <button key={m} className="btn" onClick={() => void ack(a, m)}>On it, {m} min</button>)}</div>
                 )}
-                {a.acked_at && !a.issued_at && <p className="small muted">Store said on it{a.eta_minutes ? `, about ${a.eta_minutes} min` : ''}.</p>}
+                {a.acked_at && !a.issued_at && <p className="small muted">Store said on it{a.eta_minutes ? `, about ${a.eta_minutes} min` : ''}{a.extended_minutes ? ` (includes ${a.extended_minutes} extra)` : ''}.</p>}
+                {a.acked_at && !a.issued_at && canIssue && (
+                  <div className="row" style={{ gap: 6 }}><span className="muted small">Need more time? Tell the counter:</span>{[10, 15, 30, 60].map((m) => <button key={m} className="btn" onClick={() => void extend(a, m)}>+{m} min</button>)}</div>
+                )}
                 {list.length === 0 && !a.issued_at && <p className="muted small">The counter did not choose an item. Add what you are sending below.</p>}
                 {list.length > 0 && (
                   <div className="tablewrap"><table style={{ tableLayout: 'fixed', width: '100%' }}>

@@ -44,7 +44,7 @@ const HI: Record<string, string> = {
   'Finished': 'ख़त्म हो गया', 'Almost over': 'लगभग ख़त्म', 'Need it now': 'अभी चाहिए', 'Wrong item came': 'ग़लत सामान आया',
   'Anything else to tell the store?': 'स्टोर को और कुछ बताना है?', 'Optional': 'ज़रूरी नहीं', 'Send SOS to the store': 'स्टोर को SOS भेजें',
   'SOS sent to the store': 'स्टोर को SOS भेज दिया', 'Request': 'अनुरोध', 'Sent at {time}': '{time} पर भेजा',
-  'The store is on it.': 'स्टोर इस पर काम कर रहा है।', 'The store is on it. About {n} minutes.': 'स्टोर इस पर काम कर रहा है। लगभग {n} मिनट।',
+  'The store is on it.': 'स्टोर इस पर काम कर रहा है।', 'The store needs more time. About {n} minutes in all.': 'स्टोर को थोड़ा और समय चाहिए। कुल लगभग {n} मिनट।', 'The store has sent the items. Please check them and close this.': 'स्टोर ने सामान भेज दिया है। कृपया जाँचें और इसे बंद करें।', 'The store is taking longer than promised. Admin is being alerted. You can also call.': 'स्टोर को वादे से ज़्यादा समय लग रहा है। एडमिन को बताया जा रहा है। आप कॉल भी कर सकते हैं।', 'You have used all your SOS for today. Please call the store or Admin.': 'आज के सारे SOS इस्तेमाल हो चुके हैं। कृपया स्टोर या एडमिन को कॉल करें।', 'This is your last SOS for today.': 'यह आज का आपका आखिरी SOS है।', '{n} SOS left today': 'आज {n} SOS बचे हैं', 'The store is on it. About {n} minutes.': 'स्टोर इस पर काम कर रहा है। लगभग {n} मिनट।',
   'No answer from the store yet. Admin is being alerted too. You can also call.': 'स्टोर से अभी जवाब नहीं आया। एडमिन को भी बताया जा रहा है। आप फ़ोन भी कर सकते हैं।',
   'Waiting for the store to answer…': 'स्टोर के जवाब का इंतज़ार…', 'Call {name}': '{name} को फ़ोन करें',
   'I got it, close this': 'मिल गया, इसे बंद करें', 'Cancel, no longer needed': 'रद्द करें, अब ज़रूरत नहीं',

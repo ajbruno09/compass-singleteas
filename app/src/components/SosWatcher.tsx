@@ -18,6 +18,7 @@ export function SosWatcher() {
   const [alerts, setAlerts] = useState<SosAlert[]>([]);
   const [names, setNames] = useState<Record<number, string>>({});
   const [now, setNow] = useState(Date.now());
+  const [muted, setMuted] = useState<string[]>([]);
   const [armed, setArmed] = useState(alarmUnlocked());
   useEffect(() => { const f = () => setArmed(alarmUnlocked()); window.addEventListener('compass-armed', f); return () => window.removeEventListener('compass-armed', f); }, []);
   const role = profile?.role;
@@ -72,9 +73,10 @@ export function SosWatcher() {
   );
 
   useEffect(() => {
-    if (ringing.length > 0 && armed) startAlarm(); else stopAlarm();
+    const loud = ringing.filter((a) => !muted.includes(a.id));
+    if (loud.length > 0 && armed) startAlarm(); else stopAlarm();
     return () => stopAlarm();
-  }, [ringing.length, armed]);
+  }, [ringing, muted, armed]);
 
   useEffect(() => {
     if (ringing.length === 0) return;
@@ -127,6 +129,8 @@ export function SosWatcher() {
                 {role !== 'manager' && <button className="btn floor" onClick={() => nav('/sos')}>Open SOS page and issue</button>}
               </div>
             ))}
+            {ringing.some((a) => !muted.includes(a.id)) && armed && <button className="btn floor" onClick={() => setMuted(ringing.map((a) => a.id))}>🔇 Mute the sound while I decide</button>}
+            {ringing.length > 0 && ringing.every((a) => muted.includes(a.id)) && <p className="small">Sound is off for these. It rings again for any new SOS.</p>}
             {!armed && <button className="btn floor" onClick={() => setArmed(unlockAlarm())}>Turn on sound</button>}
           </div>
         </div>

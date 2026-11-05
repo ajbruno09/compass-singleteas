@@ -151,7 +151,7 @@ function Status({ locationIds, alert, contacts, now, onDone }: { locationIds: nu
         : overdue
           ? <p className="banner bad">{t('The store is taking longer than promised. Admin is being alerted. You can also call.')}</p>
           : alert.acked_at
-        ? <p className="banner ok">{alert.eta_minutes ? t('The store is on it. About {n} minutes.', { n: alert.eta_minutes }) : t('The store is on it.')}</p>
+        ? <p className="banner ok">{alert.extended_minutes ? t('The store needs more time. About {n} minutes in all.', { n: alert.eta_minutes ?? 0 }) : alert.eta_minutes ? t('The store is on it. About {n} minutes.', { n: alert.eta_minutes }) : t('The store is on it.')}</p>
         : escalated
           ? <p className="banner bad">{t('No answer from the store yet. Admin is being alerted too. You can also call.')}</p>
           : <p className="banner warn">{t('Waiting for the store to answer…')}</p>}
