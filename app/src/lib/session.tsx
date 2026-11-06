@@ -3,13 +3,14 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { Location, Profile } from './types';
 
-interface Ctx { loadError: boolean; session: Session | null; profile: Profile | null; locations: Location[]; myLocations: Location[]; loading: boolean; recovery: boolean; clearRecovery: () => void; reload: () => Promise<void>; signOut: () => Promise<void>; }
+interface Ctx { loadError: boolean; session: Session | null; profile: Profile | null; locations: Location[]; allLocations: Location[]; myLocations: Location[]; loading: boolean; recovery: boolean; clearRecovery: () => void; reload: () => Promise<void>; signOut: () => Promise<void>; }
 const SessionCtx = createContext<Ctx | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [allLocations, setAllLocations] = useState<Location[]>([]);
   const [myLocations, setMyLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [recovery, setRecovery] = useState(false);
@@ -17,7 +18,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   async function load(s: Session | null) {
     setSession(s);
-    if (!s) { setProfile(null); setLocations([]); setMyLocations([]); setLoading(false); return; }
+    if (!s) { setProfile(null); setLocations([]); setAllLocations([]); setMyLocations([]); setLoading(false); return; }
     let p: unknown = null; let locs: unknown = null; let mine: unknown = null; let failed = true;
     for (let attempt = 0; attempt < 3 && failed; attempt++) {
       if (attempt) await new Promise((r) => setTimeout(r, 800 * attempt));
@@ -32,9 +33,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (failed) { setLoading(false); return; }
     setProfile((p as Profile) ?? null);
     const all = (locs as Location[]) ?? [];
-    setLocations(all);
+    setAllLocations(all);
+    setLocations(all.filter((l) => l.active)); // hidden counters disappear everywhere except the Counters screen
     const ids = new Set(((mine as { location_id: number }[]) ?? []).map((m) => m.location_id));
-    setMyLocations(all.filter((l) => ids.has(l.id)));
+    setMyLocations(all.filter((l) => ids.has(l.id) && l.active));
     setLoading(false);
   }
 
@@ -54,7 +56,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [session?.user.id]);
 
   return (
-    <SessionCtx.Provider value={{ loadError, session, profile, locations, myLocations, loading, recovery, clearRecovery: () => setRecovery(false), reload: () => load(session), signOut: async () => {
+    <SessionCtx.Provider value={{ loadError, session, profile, locations, allLocations, myLocations, loading, recovery, clearRecovery: () => setRecovery(false), reload: () => load(session), signOut: async () => {
       // Always leaves, even when the saved sign in is stale and the server refuses the request.
       try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
       try { Object.keys(localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k)); } catch { /* ignore */ }
