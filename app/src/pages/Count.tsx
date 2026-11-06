@@ -13,6 +13,7 @@ interface It { id: number; name: string; local_names: Record<string, string> | n
 export function CountPage() {
   const [sp] = useSearchParams();
   const loc = Number(sp.get('loc'));
+  const freq = sp.get('freq') === 'weekly' ? 'weekly' : 'daily';
   const { locations, profile } = useSession();
   const nav = useNavigate();
   const toast = useToast();
@@ -39,9 +40,9 @@ export function CountPage() {
         const { data } = await supabase.rpc('department_items', { p_location_id: loc });
         list = ((data as It[]) ?? []);
       }
-      const daily = list.filter((i) => i.count_frequency === 'daily');
+      const daily = list.filter((i) => i.count_frequency === freq);
       setItems(loc === 1 && !daily.length ? list : daily);
-      const { data: id, error } = await supabase.rpc('open_count', { p_location_id: loc, p_freq: 'daily' });
+      const { data: id, error } = await supabase.rpc('open_count', { p_location_id: loc, p_freq: freq });
       if (error) { setErr(errText(error)); return; }
       setCountId(String(id));
       const { data: st } = await supabase.from('stock_counts').select('status').eq('id', String(id)).maybeSingle();
@@ -51,7 +52,7 @@ export function CountPage() {
       setVals(Object.fromEntries(rows.map((r) => [r.item_id, String(Number(r.qty))])));
       setSaved(Object.fromEntries(rows.map((r) => [r.item_id, true])));
     })();
-  }, [loc]);
+  }, [loc, freq]);
 
   const step = (i: It) => { const a = (i.quick_amounts ?? []).filter((n) => n > 0); return a.length ? Math.min(...a) : 1; };
   const nameOf = (i: It) => (hi && i.local_names?.hi) || i.name;
@@ -69,13 +70,13 @@ export function CountPage() {
     const { data, error } = await supabase.rpc('submit_count', { p_count_id: countId });
     setBusy(false);
     if (error) return setErr(errText(error));
-    toast(t('Count sent')); void data; nav(office ? '/counts' : '/');
+    toast(t('Count sent')); void data; nav(office ? '/counts' : '/closing');
   }
 
   if (!loc) return <div className="phone"><p>Choose a counter first.</p></div>;
   return (
     <div className="phone">
-      <div className="phone-head"><button className="btn quiet" onClick={() => nav(office ? '/counts' : '/')}><Icon name="back" /> {t('Back')}</button><b>{t('Closing stock')} · {place}</b><AvatarButton /></div>
+      <div className="phone-head"><button className="btn quiet" onClick={() => nav(office ? '/counts' : '/closing')}><Icon name="back" /> {t('Back')}</button><b>{freq === 'weekly' ? 'Weekly closing' : t('Closing stock')} · {place}</b><AvatarButton /></div>
       {sentAlready ? <p className="banner">{t('Today\'s count is already sent. Thank you.')}</p> : <>
         <p className="muted small">{t('Count what is left. Every item must be counted. If you have none, enter 0.')}</p>
         <div style={{ height: 8, borderRadius: 8, background: 'var(--line, #E3E8E5)', overflow: 'hidden' }}><div style={{ width: `${items.length ? (done / items.length) * 100 : 0}%`, height: '100%', background: 'var(--green, #1F6B4A)' }} /></div>

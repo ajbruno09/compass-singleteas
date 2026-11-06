@@ -11,7 +11,7 @@ import { useLang } from '../lib/i18n';
 const QUICK_NOTES = ['Finished', 'Almost over', 'Need it now', 'Wrong item came'];
 
 // The red SOS button on a counter's phone: "I need something right now".
-export function SosButton({ locations, defaultId }: { locations: Location[]; defaultId?: number }) {
+export function SosButton({ locations, defaultId, hideFab }: { locations: Location[]; defaultId?: number; hideFab?: boolean }) {
   const toast = useToast();
   const { t } = useLang();
   const [open, setOpen] = useState(false);
@@ -36,13 +36,14 @@ export function SosButton({ locations, defaultId }: { locations: Location[]; def
     return () => { void supabase.removeChannel(ch); window.clearInterval(poll); window.clearInterval(tick); };
   }, [key, refresh]);
 
+  useEffect(() => { const o = () => setOpen(true); window.addEventListener('compass:sos', o); return () => window.removeEventListener('compass:sos', o); }, []);
   useEffect(() => { if (open) supabase.rpc('sos_contacts').then(({ data }) => setContacts((data as Contact[]) ?? [])); }, [open]);
 
   return (
     <>
-      <button className={'sosfab' + (alert ? ' live' : '')} onClick={() => setOpen(true)} aria-label="SOS, I need something right now">
+      {!hideFab && <button className={'sosfab' + (alert ? ' live' : '')} onClick={() => setOpen(true)} aria-label="SOS, I need something right now">
         <Icon name="bell" size={22} /> {t('SOS')}
-      </button>
+      </button>}
       {open && (
         <Sheet title={alert ? t('Your SOS') : t('Need something right now?')} onClose={() => setOpen(false)}>
           {alert

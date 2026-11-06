@@ -9,7 +9,6 @@ import { useToast } from '../components/Toast';
 import { AvatarButton } from '../components/AvatarButton';
 import { Icon } from '../components/Icon';
 import { Sheet } from '../components/Sheet';
-import { SosButton } from '../components/Sos';
 import { useLang } from '../lib/i18n';
 import { VoiceOrder, voiceSupported } from '../components/VoiceOrder';
 
@@ -282,7 +281,6 @@ export function IndentPage() {
       {voice && <VoiceOrder items={items} label={label} onClose={() => setVoice(false)}
         onAdd={(ls) => { ls.forEach((l) => setQty(l.item, l.qty)); toast(t('Added {n} items by voice', { n: ls.length })); }} />}
 
-      <SosButton locations={myLocations} defaultId={locId} />
     </div>
   );
 }

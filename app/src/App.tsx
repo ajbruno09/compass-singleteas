@@ -13,6 +13,9 @@ import { Bills } from './pages/Bills';
 import { People } from './pages/People';
 import { OpeningStock } from './pages/OpeningStock';
 import { StaffHome } from './pages/StaffHome';
+import { StaffShell } from './components/StaffNav';
+import { ClosingHub } from './pages/ClosingHub';
+import { MessagesPage } from './pages/Messages';
 import { IndentPage } from './pages/Indent';
 import { Indents } from './pages/Indents';
 import { Buying } from './pages/Buying';
@@ -96,15 +99,17 @@ function Gate() {
   if (!profile.setup_done_at) return <FirstRun uid={profile.id} owner={profile.role === 'owner'} />;
   if (profile.role === 'department' || profile.role === 'closing') {
     return (
-      <LockGate><Routes>
+      <LockGate><Routes><Route element={<StaffShell />}>
         <Route path="/" element={<StaffHome />} />
         <Route path="/indent" element={<IndentPage />} />
+        <Route path="/closing" element={<ClosingHub />} />
+        <Route path="/messages" element={<MessagesPage />} />
         <Route path="/count" element={<CountPage />} />
         <Route path="/received" element={<ReceivedPage />} />
         <Route path="/mine" element={<MyCompass />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes></LockGate>
+      </Route></Routes></LockGate>
     );
   }
   const allowed = NAV.filter((n) => n.roles.includes(profile.role));
