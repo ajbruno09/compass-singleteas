@@ -36,7 +36,7 @@ export function StockView() {
       <div className="seg" role="group" aria-label="Place"><button aria-pressed={loc === 0} onClick={() => setLoc(0)}>All places</button>{locations.filter((l) => l.active).map((l) => <button key={l.id} aria-pressed={loc === l.id} onClick={() => setLoc(l.id)}>{l.name}</button>)}</div>
       <div className="row"><input placeholder="Find an item" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 280 }} />
         <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={onlyStock} onChange={(e) => setOnlyStock(e.target.checked)} /> Only items with stock</label></div>
-      {[...groups, { id: null as unknown as number, name: 'No category yet', icon: '📦' } as Group].map((g) => { const list = rows.filter((i) => (g.id == null ? !groups.some((x) => x.id === i.group_id) : i.group_id === g.id)); if (!list.length) return null; return (
+      {[...groups, { id: null as unknown as number, name: 'No shelf group yet', icon: '📦' } as Group].map((g) => { const list = rows.filter((i) => (g.id == null ? !groups.some((x) => x.id === i.group_id) : i.group_id === g.id)); if (!list.length) return null; return (
         <div key={g.id ?? 'none'}><h2 style={{ marginBottom: 8 }}>{g.icon} {g.name}</h2>
           <div className="tablewrap"><table><thead><tr><th>Item</th><th className="r">In hand</th></tr></thead>
             <tbody>{list.map((i) => { const v = qtyOf.get(i.id) ?? 0; return <tr key={i.id}><td>{i.name}</td><td className="r num" style={{ color: v < 0 ? '#B42335' : undefined, fontWeight: v < 0 ? 700 : 400 }}>{fmtQty(v, i.unit)}</td></tr>; })}</tbody></table></div></div>); })}
