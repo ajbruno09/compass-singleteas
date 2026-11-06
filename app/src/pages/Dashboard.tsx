@@ -16,6 +16,7 @@ export function Dashboard() {
   const [dues, setDues] = useState<VendorDue[]>([]);
   const [unpaid, setUnpaid] = useState(0);
   const [flagged, setFlagged] = useState(0);
+  const [todo, setTodo] = useState({ reopen: 0, sosAsk: 0, missed: 0, late: 0 });
   const [flow, setFlow] = useState({ pos_waiting: 0, issues_unconfirmed: 0, counts_done: 0, counters: 0 });
   const seesMoney = profile?.role !== 'store';
   const hour = new Date().getHours();
@@ -29,6 +30,15 @@ export function Dashboard() {
         setIndentDate(String(d.data));
         const r = await supabase.from('indents').select('location_id, status').eq('for_date', String(d.data));
         setIndents(Object.fromEntries(((r.data as { location_id: number; status: string }[]) ?? []).map((x) => [x.location_id, x.status])));
+      }
+      if (d.data) {
+        const [ro, sa, mi, la] = await Promise.all([
+          supabase.from('indent_reopen_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('sos_extra_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('indents').select('id', { count: 'exact', head: true }).eq('for_date', String(d.data)).eq('outcome', 'missed'),
+          supabase.from('indents').select('id', { count: 'exact', head: true }).eq('for_date', String(d.data)).eq('late', true)
+        ]);
+        setTodo({ reopen: ro.count ?? 0, sosAsk: sa.count ?? 0, missed: mi.count ?? 0, late: la.count ?? 0 });
       }
       const [items, vendors, people] = await Promise.all([
         supabase.from('items').select('id, photo_path', { count: 'exact' }).eq('active', true),
@@ -60,6 +70,10 @@ export function Dashboard() {
   const state = (id: number) => indents[id];
   const sentN = counters.filter((c) => ['submitted', 'locked'].includes(state(c.id) ?? '')).length;
   const tile = { textDecoration: 'none', color: 'inherit' } as const;
+  const rowLink = { justifyContent: 'space-between', color: 'inherit', textDecoration: 'none', padding: '8px 10px', margin: '0 -10px', borderRadius: 10, cursor: 'pointer' } as const;
+  const Row = ({ to, label, n, chip }: { to: string; label: string; n: string | number; chip: string }) => (
+    <Link to={to} className="row needrow" style={rowLink}><span>{label}</span><span className="row" style={{ gap: 6 }}><span className={'chip ' + chip}>{n}</span><span aria-hidden style={{ color: 'var(--muted, #7A867F)' }}>›</span></span></Link>
+  );
 
   return (
     <>
@@ -91,11 +105,16 @@ export function Dashboard() {
         <div className="stack" style={{ flex: '2 1 320px', minWidth: 0 }}>
           <section className="card" style={{ display: 'grid', gap: 10 }}>
             <h2>Needs a look</h2>
-            {seesMoney && <Link to="/bills" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Bills waiting for a check</span><span className={'chip ' + (flagged ? 'late' : 'done')}>{flagged}</span></Link>}
-            <Link to="/receive" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Orders waiting to be received</span><span className={'chip ' + (flow.pos_waiting ? 'late' : 'done')}>{flow.pos_waiting}</span></Link>
-            <Link to="/issue" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Issues not yet confirmed by counters</span><span className={'chip ' + (flow.issues_unconfirmed ? 'late' : 'done')}>{flow.issues_unconfirmed}</span></Link>
-            <Link to="/counts" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Closing counts done today</span><span className={'chip ' + (flow.counts_done >= flow.counters && flow.counters > 0 ? 'done' : 'due')}>{flow.counts_done} of {flow.counters}</span></Link>
-            <Link to="/vendors" className="row" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}><span>Vendors with no WhatsApp group yet</span><span className={'chip ' + (counts.noPhone ? 'late' : 'done')}>{counts.noPhone}</span></Link>
+            <p className="small muted" style={{ margin: '-4px 0 2px' }}>Tap a line to open it and fix it.</p>
+            {(profile?.role === 'owner') && <Row to="/indents" label="Indents waiting for you to open" n={todo.reopen} chip={todo.reopen ? 'late' : 'done'} />}
+            {(profile?.role === 'owner') && <Row to="/sos" label="Counters asking for one more SOS" n={todo.sosAsk} chip={todo.sosAsk ? 'late' : 'done'} />}
+            <Row to="/indents" label="Indents missed (closed without sending)" n={todo.missed} chip={todo.missed ? 'late' : 'done'} />
+            <Row to="/indents" label="Indents sent late" n={todo.late} chip={todo.late ? 'due' : 'done'} />
+            {seesMoney && <Row to="/bills" label="Bills waiting for a check" n={flagged} chip={flagged ? 'late' : 'done'} />}
+            <Row to="/receive" label="Orders waiting to be received" n={flow.pos_waiting} chip={flow.pos_waiting ? 'late' : 'done'} />
+            <Row to="/issue" label="Issues not yet confirmed by counters" n={flow.issues_unconfirmed} chip={flow.issues_unconfirmed ? 'late' : 'done'} />
+            <Row to="/counts" label="Closing counts done today" n={`${flow.counts_done} of ${flow.counters}`} chip={flow.counts_done >= flow.counters && flow.counters > 0 ? 'done' : 'due'} />
+            <Row to="/vendors" label="Vendors with no WhatsApp group yet" n={counts.noPhone} chip={counts.noPhone ? 'late' : 'done'} />
           </section>
           {counters.length > 0 && (
             <section className="card" style={{ display: 'grid', gap: 10 }}>
@@ -103,8 +122,8 @@ export function Dashboard() {
               {counters.map((c) => {
                 const st = state(c.id);
                 const sent = st === 'submitted' || st === 'locked';
-                return <div key={c.id} className="row" style={{ justifyContent: 'space-between' }}><span>{c.name}</span>
-                  <span className={'chip ' + (sent ? 'done' : st ? 'late' : 'off')}>{sent ? 'Sent' : st ? 'Open' : 'Not started'}</span></div>;
+                return <Link key={c.id} to="/indents" className="row needrow" style={rowLink}><span>{c.name}</span>
+                  <span className="row" style={{ gap: 6 }}><span className={'chip ' + (sent ? 'done' : st ? 'late' : 'off')}>{sent ? 'Sent' : st ? 'Open' : 'Not started'}</span><span aria-hidden style={{ color: 'var(--muted, #7A867F)' }}>›</span></span></Link>;
               })}
             </section>
           )}

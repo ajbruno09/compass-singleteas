@@ -378,3 +378,5 @@ tr.click { cursor: pointer; }
 
 /* Brand and version at the foot of every staff phone screen */
 .phone::after { content: var(--brand-foot, ''); display: block; width: fit-content; margin: 8px auto 0; padding: 3px 0 3px 24px; background: url('/logo-mark.png') no-repeat left center / 18px 18px; font-size: 11px; line-height: 14px; color: var(--ink-3); letter-spacing: .02em; }
+
+.needrow:hover{background:var(--sunken,#EEF1EF)}

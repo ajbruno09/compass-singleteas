@@ -17,6 +17,17 @@ export function PoCancelInbox({ onChanged }: { onChanged: () => void }) {
     setList((data as unknown as Req[]) ?? []);
   }, []);
   useEffect(() => { if (profile?.role !== 'owner') return; void load(); const t = window.setInterval(() => { void load(); }, 20000); return () => window.clearInterval(t); }, [profile?.role, load]);
+  const [open, setOpen] = useState<string | null>(null);
+  const [detail, setDetail] = useState<Record<string, { vendor: string; status: string; order_date: string; notes: string; lines: { qty: number; unit_rate: number | null; name: string }[] } | 'err'>>({});
+  async function view(r: Req) {
+    if (open === r.id) { setOpen(null); return; }
+    setOpen(r.id);
+    if (detail[r.id]) return;
+    const { data } = await supabase.from('purchase_orders').select('status, order_date, notes, vendors(name), po_lines(qty, unit_rate, items(name))').eq('id', r.po_id).maybeSingle();
+    if (!data) { setDetail((d) => ({ ...d, [r.id]: 'err' })); return; }
+    const x = data as unknown as { status: string; order_date: string; notes: string; vendors: { name: string } | null; po_lines: { qty: number; unit_rate: number | null; items: { name: string } | null }[] };
+    setDetail((d) => ({ ...d, [r.id]: { vendor: x.vendors?.name ?? 'Vendor', status: x.status, order_date: x.order_date, notes: x.notes, lines: x.po_lines.map((l) => ({ qty: l.qty, unit_rate: l.unit_rate, name: l.items?.name ?? 'Item' })) } }));
+  }
   async function decide(r: Req, approve: boolean) {
     const { error } = await supabase.rpc('decide_po_cancel', { p_request_id: r.id, p_approve: approve, p_note: '' });
     if (error) { toast(errText(error)); return; }
@@ -26,15 +37,32 @@ export function PoCancelInbox({ onChanged }: { onChanged: () => void }) {
   return (
     <div className="banner warn stack">
       <b>{list.length === 1 ? 'The store wants to cancel an order' : `The store wants to cancel ${list.length} orders`}</b>
-      {list.map((r) => (
-        <div key={r.id} className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
-          <span><b>{r.purchase_orders?.po_number ?? 'Order'}</b> · asked at {timeOf(r.requested_at)} · {r.reason}</span>
-          <span className="row" style={{ gap: 6 }}>
-            <button className="btn" onClick={() => void decide(r, false)}>Keep order</button>
-            <button className="btn primary" onClick={() => void decide(r, true)}>Approve cancel</button>
-          </span>
-        </div>
-      ))}
+      {list.map((r) => {
+        const d = detail[r.id];
+        return (
+          <div key={r.id} className="stack" style={{ gap: 6 }}>
+            <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
+              <span><button className="linkbtn" style={{ font: 'inherit', fontWeight: 700, textDecoration: 'underline', background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'inherit' }} onClick={() => void view(r)}>{r.purchase_orders?.po_number ?? 'Order'} {open === r.id ? '▲' : '▼'}</button> · asked at {timeOf(r.requested_at)} · {r.reason}</span>
+              <span className="row" style={{ gap: 6 }}>
+                <button className="btn" onClick={() => void view(r)}>{open === r.id ? 'Hide order' : 'See order'}</button>
+                <button className="btn" onClick={() => void decide(r, false)}>Keep order</button>
+                <button className="btn primary" onClick={() => void decide(r, true)}>Approve cancel</button>
+              </span>
+            </div>
+            {open === r.id && (
+              <div className="card" style={{ background: '#fff' }}>
+                {!d ? <p className="muted small">Loading order…</p> : d === 'err' ? <p className="muted small">Could not load this order.</p> : (
+                  <>
+                    <p className="small"><b>{d.vendor}</b> · ordered {d.order_date} · {d.status.replace('_', ' ')}</p>
+                    {d.lines.map((l, i) => <div key={i} className="row small" style={{ justifyContent: 'space-between' }}><span>{l.name}</span><span>{l.qty}{l.unit_rate ? ` × ₹${l.unit_rate}` : ''}</span></div>)}
+                    {d.notes && <p className="small muted">Note: {d.notes}</p>}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
