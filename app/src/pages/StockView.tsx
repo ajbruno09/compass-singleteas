@@ -14,7 +14,6 @@ export function StockView() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loc, setLoc] = useState<number | 0>(1);
   const [links, setLinks] = useState<Set<string>>(new Set());
-  const [grp, setGrp] = useState(0);
   const [q, setQ] = useState('');
   const [onlyStock, setOnlyStock] = useState(true);
   useEffect(() => {
@@ -30,13 +29,12 @@ export function StockView() {
   }, [oh, loc]);
   // A counter lists only the items it uses (or anything it holds). The Store and All places list everything.
   const belongs = (i: Item) => loc === 0 || loc === 1 || links.has(`${loc}:${i.id}`) || Math.abs(qtyOf.get(i.id) ?? 0) > 0.0004;
-  const rows = items.filter((i) => i.name.toLowerCase().includes(q.toLowerCase()) && belongs(i) && (grp === 0 || i.group_id === grp) && (!onlyStock || Math.abs(qtyOf.get(i.id) ?? 0) > 0.0004));
+  const rows = items.filter((i) => i.name.toLowerCase().includes(q.toLowerCase()) && belongs(i) && (!onlyStock || Math.abs(qtyOf.get(i.id) ?? 0) > 0.0004));
   return (
     <>
       <div className="pagehead"><div><p className="label">Store</p><h1>Stock in hand</h1><p className="muted small" style={{ marginTop: 2 }}>What the system believes is at each place right now.</p></div></div>
       <div className="seg" role="group" aria-label="Place"><button aria-pressed={loc === 0} onClick={() => setLoc(0)}>All places</button>{locations.filter((l) => l.active).map((l) => <button key={l.id} aria-pressed={loc === l.id} onClick={() => setLoc(l.id)}>{l.name}</button>)}</div>
       <div className="row"><input placeholder="Find an item" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 280 }} />
-        <select value={grp} onChange={(e) => setGrp(Number(e.target.value))} aria-label="Category" style={{ maxWidth: 220 }}><option value={0}>All categories</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
         <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={onlyStock} onChange={(e) => setOnlyStock(e.target.checked)} /> Only items with stock</label></div>
       {groups.map((g) => { const list = rows.filter((i) => i.group_id === g.id); if (!list.length) return null; return (
         <div key={g.id}><h2 style={{ marginBottom: 8 }}>{g.icon} {g.name}</h2>
