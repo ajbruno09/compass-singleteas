@@ -16,7 +16,7 @@ export function Dashboard() {
   const [dues, setDues] = useState<VendorDue[]>([]);
   const [unpaid, setUnpaid] = useState(0);
   const [flagged, setFlagged] = useState(0);
-  const [todo, setTodo] = useState({ reopen: 0, sosAsk: 0, missed: 0, late: 0 });
+  const [todo, setTodo] = useState({ reopen: 0, sosAsk: 0, missed: 0, late: 0, noClose: 0 });
   const [flow, setFlow] = useState({ pos_waiting: 0, issues_unconfirmed: 0, counts_done: 0, counters: 0 });
   const seesMoney = profile?.role !== 'store';
   const hour = new Date().getHours();
@@ -32,13 +32,14 @@ export function Dashboard() {
         setIndents(Object.fromEntries(((r.data as { location_id: number; status: string }[]) ?? []).map((x) => [x.location_id, x.status])));
       }
       if (d.data) {
-        const [ro, sa, mi, la] = await Promise.all([
+        const [ro, sa, mi, la, nc] = await Promise.all([
           supabase.from('indent_reopen_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
           supabase.from('sos_extra_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
           supabase.from('indents').select('id', { count: 'exact', head: true }).eq('for_date', String(d.data)).eq('outcome', 'missed'),
-          supabase.from('indents').select('id', { count: 'exact', head: true }).eq('for_date', String(d.data)).eq('late', true)
+          supabase.from('indents').select('id', { count: 'exact', head: true }).eq('for_date', String(d.data)).eq('late', true),
+          supabase.rpc('closing_missing_last_night')
         ]);
-        setTodo({ reopen: ro.count ?? 0, sosAsk: sa.count ?? 0, missed: mi.count ?? 0, late: la.count ?? 0 });
+        setTodo({ reopen: ro.count ?? 0, sosAsk: sa.count ?? 0, missed: mi.count ?? 0, late: la.count ?? 0, noClose: ((nc.data as unknown[] | null) ?? []).length });
       }
       const [items, vendors, people] = await Promise.all([
         supabase.from('items').select('id, photo_path', { count: 'exact' }).eq('active', true),
@@ -108,6 +109,7 @@ export function Dashboard() {
             <p className="small muted" style={{ margin: '-4px 0 2px' }}>Tap a line to open it and fix it.</p>
             {(profile?.role === 'owner') && <Row to="/indents" label="Indents waiting for you to open" n={todo.reopen} chip={todo.reopen ? 'late' : 'done'} />}
             {(profile?.role === 'owner') && <Row to="/sos" label="Counters asking for one more SOS" n={todo.sosAsk} chip={todo.sosAsk ? 'late' : 'done'} />}
+            {(profile?.role === 'owner' || profile?.role === 'manager' || profile?.role === 'store') && <Row to="/counts" label="Counters with no closing count last night" n={todo.noClose} chip={todo.noClose ? 'late' : 'done'} />}
             <Row to="/indents" label="Indents missed (closed without sending)" n={todo.missed} chip={todo.missed ? 'late' : 'done'} />
             <Row to="/indents" label="Indents sent late" n={todo.late} chip={todo.late ? 'due' : 'done'} />
             {seesMoney && <Row to="/bills" label="Bills waiting for a check" n={flagged} chip={flagged ? 'late' : 'done'} />}

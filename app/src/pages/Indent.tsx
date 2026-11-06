@@ -50,6 +50,8 @@ export function IndentPage() {
   const [now, setNow] = useState(Date.now());
   const [accepted, setAccepted] = useState<Record<number, boolean>>({});
   const [ask, setAsk] = useState(false);
+  const [lastNight, setLastNight] = useState<Record<number, { qty: number; issued: number }> | null>(null);
+  const [closedAt, setClosedAt] = useState<string | null>(null);
   const { t, hi, local, extra: lang, toggle, canSwitch, unit: u, group: gname } = useLang();
   const [voice, setVoice] = useState(false);
   const timers = useRef<Record<number, number>>({});
@@ -79,6 +81,10 @@ export function IndentPage() {
     setRem((win.data as Reminders) ?? {});
     const rec = ind.data as IndentRec;
     setIndent(rec);
+    const lc = await supabase.rpc('last_closing', { p_location_id: locId });
+    const lrows = (lc.data as { item_id: number; qty: number; counted_at: string; issued_since: number }[] | null) ?? [];
+    setLastNight(Object.fromEntries(lrows.map((r) => [r.item_id, { qty: Number(r.qty), issued: Number(r.issued_since) }])));
+    setClosedAt(lrows[0]?.counted_at ?? null);
     const [rs, rq] = await Promise.all([
       supabase.from('indent_reasons').select('*').eq('active', true).order('sort'),
       supabase.from('indent_reopen_requests').select('status, reason, decision_note').eq('indent_id', rec.id).order('created_at', { ascending: false }).limit(1)
@@ -199,6 +205,13 @@ export function IndentPage() {
           {voiceSupported() && editable && <button className="micbtn" aria-label={t('Speak your order')} onClick={() => setVoice(true)}><Icon name="mic" size={22} /></button>}
           </div>
 
+          {editable && lastNight && (
+            <p className={'banner ' + (closedAt ? 'warn' : 'bad')}>
+              {t('Please check your stock before you order. Do not over order, and do not run short.')}
+              {closedAt ? ` ${t('Lunch has used some since last night. Your last closing count was')} ${timeOf(closedAt)}.` : ` ${t('No closing count was sent last night, so we cannot show what you had.')}`}
+            </p>
+          )}
+
           {view.kind === 'groups' && (
             <>
               <button className="usualbar" onClick={() => openView({ kind: 'usual' })} disabled={Object.keys(usual).length === 0}>
@@ -223,7 +236,7 @@ export function IndentPage() {
               {visible.length === 0 ? <p className="empty card">{view.kind === 'search' ? t('No item with that name on your counter.') : t('Nothing here yet.')}</p> : (
                 <div className="stack">
                   {visible.map((i) => (
-                    <ItemRow key={i.id} item={i} name={label(i)} line={lines[i.id]} usual={usual[i.id]} flag={flagged(i, lines[i.id])}
+                    <ItemRow key={i.id} item={i} name={label(i)} line={lines[i.id]} usual={usual[i.id]} flag={flagged(i, lines[i.id])} night={lastNight?.[i.id]}
                       onQty={(n) => setQty(i, n)} onReason={(r) => lines[i.id] && save(i, { qty: lines[i.id].qty, reason: r })} reasonList={moreReasons} />
                   ))}
                 </div>
@@ -274,8 +287,8 @@ export function IndentPage() {
   );
 }
 
-function ItemRow({ item, name, line, usual, flag, onQty, onReason, reasonList }: {
-  item: DeptItem; name: string; line?: Line; usual?: Usual; flag: boolean; onQty: (n: number) => void; onReason: (r: string) => void; reasonList: string[];
+function ItemRow({ item, name, line, usual, flag, night, onQty, onReason, reasonList }: {
+  item: DeptItem; name: string; line?: Line; usual?: Usual; flag: boolean; night?: { qty: number; issued: number }; onQty: (n: number) => void; onReason: (r: string) => void; reasonList: string[];
 }) {
   const { t, unit: u } = useLang();
   const step = stepOf(item);
@@ -306,6 +319,7 @@ function ItemRow({ item, name, line, usual, flag, onQty, onReason, reasonList }:
         {usual && <button className="qchip usualchip" onClick={() => onQty(usual.runs >= 2 ? usual.usual : usual.last_qty)}>
           {usual.runs >= 2 ? t('Usual {q}', { q: fmtQty(usual.usual, item.unit).replace(item.unit, u(item.unit)) }) : t('Last {q}', { q: fmtQty(usual.last_qty, item.unit).replace(item.unit, u(item.unit)) })}</button>}
       </div>
+      {night && <p className="small" style={{ margin: '6px 0 0', color: 'var(--muted, #5C6B63)' }}>{t('Last night you counted')} <b>{fmtQty(night.qty, item.unit).replace(item.unit, u(item.unit))}</b>{night.issued > 0 ? ` · ${t('store issued')} ${fmtQty(night.issued, item.unit).replace(item.unit, u(item.unit))}` : ''}.{night.qty > 0 && (line?.qty ?? 0) > 0 && usual && usual.usual > 0 && night.qty + night.issued >= usual.usual ? <b style={{ color: '#B3541E' }}> {t('That may already be enough. Check before you order.')}</b> : null}</p>}
       {flag && <Reasons value={line?.reason ?? ''} onPick={onReason} list={reasonList} />}
     </div>
   );

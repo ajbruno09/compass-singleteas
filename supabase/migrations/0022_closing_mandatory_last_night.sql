@@ -1,0 +1,3 @@
+-- Applied live. Pointer: submit_count now requires every daily item of a counter to be counted (0 allowed);
+-- last_closing(location) returns last night's count plus store issues since; closing_missing_last_night() lists counters with no daily count for the previous business day.
+-- Also 0021: moved dals, flours, packaging, sugar sachet, vegetables and fruit from daily to weekly (backup table items_freq_backup_0021).

@@ -40,7 +40,7 @@ export function CountPage() {
         list = ((data as It[]) ?? []);
       }
       const daily = list.filter((i) => i.count_frequency === 'daily');
-      setItems(daily.length ? daily : list);
+      setItems(loc === 1 && !daily.length ? list : daily);
       const { data: id, error } = await supabase.rpc('open_count', { p_location_id: loc, p_freq: 'daily' });
       if (error) { setErr(errText(error)); return; }
       setCountId(String(id));
@@ -56,7 +56,8 @@ export function CountPage() {
   const step = (i: It) => { const a = (i.quick_amounts ?? []).filter((n) => n > 0); return a.length ? Math.min(...a) : 1; };
   const nameOf = (i: It) => (hi && i.local_names?.hi) || i.name;
   const shown = useMemo(() => items.filter((i) => i.name.toLowerCase().includes(q.toLowerCase())), [items, q]);
-  const done = Object.keys(saved).length;
+  const done = items.filter((i) => saved[i.id]).length;
+  const left = items.length - done;
 
   async function save(i: It, v: string) {
     if (!countId || v.trim() === '' || Number.isNaN(Number(v))) return;
@@ -76,11 +77,13 @@ export function CountPage() {
     <div className="phone">
       <div className="phone-head"><button className="btn quiet" onClick={() => nav(office ? '/counts' : '/')}><Icon name="back" /> {t('Back')}</button><b>{t('Closing stock')} · {place}</b><AvatarButton /></div>
       {sentAlready ? <p className="banner">{t('Today\'s count is already sent. Thank you.')}</p> : <>
-        <p className="muted small">{t('Count what is left. Type the number for each item. Leave out only what you do not have.')}</p>
+        <p className="muted small">{t('Count what is left. Every item must be counted. If you have none, enter 0.')}</p>
+        <div style={{ height: 8, borderRadius: 8, background: 'var(--line, #E3E8E5)', overflow: 'hidden' }}><div style={{ width: `${items.length ? (done / items.length) * 100 : 0}%`, height: '100%', background: 'var(--green, #1F6B4A)' }} /></div>
+        <p className="small"><b>{done} of {items.length}</b> {t('counted')}{left > 0 ? ` · ${left} ${t('still to count')}` : ''}</p>
         <input placeholder={t('Find an item')} value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="stack">{shown.map((i) => (
           <div key={i.id} className="card row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-            <div style={{ minWidth: 0, flex: 1 }}><b>{nameOf(i)}</b><div className="small muted">{i.unit}{saved[i.id] ? ' · saved' : ''}</div></div>
+            <div style={{ minWidth: 0, flex: 1 }}><b>{nameOf(i)}</b><div className={'small ' + (saved[i.id] ? 'muted' : '')} style={saved[i.id] ? undefined : { color: '#B3541E' }}>{i.unit}{saved[i.id] ? ' · counted' : ' · not counted yet'}</div></div>
             <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
               <button className="qchip" aria-label="Less" onClick={() => { const n = Math.max(0, Number(vals[i.id] || 0) - step(i)); const s = String(Math.round(n * 1000) / 1000); setVals((p) => ({ ...p, [i.id]: s })); void save(i, s); }}>−</button>
               <input inputMode="decimal" className="num" style={{ width: 84, textAlign: 'center' }} aria-label={nameOf(i)} value={vals[i.id] ?? ''} onChange={(e) => { setVals((p) => ({ ...p, [i.id]: e.target.value })); setSaved((p) => { const c = { ...p }; delete c[i.id]; return c; }); }} onBlur={(e) => void save(i, e.target.value)} />
@@ -89,7 +92,7 @@ export function CountPage() {
           </div>))}</div>
         {err && <p className="banner bad" role="alert">{err}</p>}
         <div style={{ position: 'sticky', bottom: 0, background: 'var(--bg)', paddingBottom: 8 }}>
-          <button className="btn primary" style={{ width: '100%', minHeight: 52 }} disabled={busy || done === 0} onClick={send}>{busy ? t('Sending…') : `${t('Send count')} (${done}/${items.length})`}</button>
+          <button className="btn primary" style={{ width: '100%', minHeight: 52 }} disabled={busy || left > 0 || items.length === 0} onClick={send}>{busy ? t('Sending…') : left > 0 ? `${left} ${t('still to count')}` : `${t('Send count')} (${done}/${items.length})`}</button>
         </div></>}
     </div>
   );
