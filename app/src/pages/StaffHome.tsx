@@ -117,34 +117,56 @@ export function StaffHome() {
 
       <div className="hsec">To do</div>
       {myLocations.length === 0 && <p className="banner warn">No counter has been given to you yet. Please tell Admin, so they can set it up.</p>}
+      {myLocations.length > 1 ? (() => {
+        const n = myLocations.length;
+        const sentIds = myLocations.filter((l) => sentText(status[l.id]));
+        const dailyDone = myLocations.filter((l) => daily[l.id] === 'submitted');
+        const weeklyDone = myLocations.filter((l) => weekly[l.id] === 'submitted');
+        const toConfirm = myLocations.reduce((a, l) => a + (waiting[l.id] || 0), 0);
+        const names = (done: typeof myLocations) => myLocations.filter((l) => !done.includes(l)).map((l) => l.name).join(', ');
+        const Line = ({ e, label, done, all, chip, left, go }: { e: string; label: string; done: number; all: number; chip: string; left: string; go: () => void }) => (
+          <button style={{ background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left', display: 'grid', gap: 2 }} onClick={go}>
+            <span className="row" style={{ justifyContent: 'space-between' }}><span>{e} {label}</span><span className={'chip ' + chip}>{done} of {all}{done === all ? ' ✓' : ''}</span></span>
+            {done < all && left && <span className="small muted">Still to do: {left}</span>}
+          </button>
+        );
+        return (
+          <div className="card stack" style={{ gap: 12 }}>
+            <Line e="📝" label="Indents sent" done={sentIds.length} all={n} chip={sentIds.length === n ? 'done' : win === 'late' ? 'late' : 'due'} left={names(sentIds)} go={() => nav(`/indent?loc=${loc}`)} />
+            <Line e="🧮" label="Daily closing done" done={dailyDone.length} all={n} chip={dailyDone.length === n ? 'done' : 'late'} left={names(dailyDone)} go={() => nav('/closing')} />
+            <Line e="📦" label="Weekly closing done" done={weeklyDone.length} all={n} chip={weeklyDone.length === n ? 'done' : sun ? 'late' : 'due'} left={sun ? names(weeklyDone) : 'Due Sunday'} go={() => nav('/closing')} />
+            {toConfirm > 0 && <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }} onClick={() => nav(`/received?loc=${loc}`)}><span>📥 Items from the store</span><span className="chip late">{toConfirm} to confirm</span></button>}
+            <p className="small muted">Indent and Closing open the counter picked at the top ({myLocations.find((l) => l.id === loc)?.name}).</p>
+          </div>
+        );
+      })() : (
       <div className="card stack" style={{ gap: 10 }}>
         {myLocations.map((l) => {
           const s = sentText(status[l.id]);
-          const multi = '';
           return (
             <div key={l.id} className="stack" style={{ gap: 10 }}>
-              {myLocations.length > 1 && <b className="small" style={{ color: 'var(--ink-3)' }}>{l.name}</b>}
-              <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => { pick(l.id); nav(`/indent?loc=${l.id}`); }}>
-                <span>📝 {multi}Indent</span>
+              <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav(`/indent?loc=${l.id}`)}>
+                <span>📝 Indent</span>
                 <span className={'chip ' + (s ? 'done' : win === 'late' ? 'late' : 'due')}>{s ?? (win === 'early' ? `From ${clock12(rem.indent_open ?? '15:30')}` : win === 'late' ? 'Late, send now' : `Due ${clock12(rem.indent_due ?? '17:00')}`)}</span>
               </button>
-              <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => { pick(l.id); nav('/closing'); }}>
-                <span>🧮 {multi}Daily closing</span>
+              <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav('/closing')}>
+                <span>🧮 Daily closing</span>
                 <span className={'chip ' + (daily[l.id] === 'submitted' ? 'done' : 'late')}>{daily[l.id] === 'submitted' ? 'Done ✓' : daily[l.id] ? 'Started' : 'Due tonight'}</span>
               </button>
-              <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => { pick(l.id); nav('/closing'); }}>
-                <span>📦 {multi}Weekly closing</span>
+              <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav('/closing')}>
+                <span>📦 Weekly closing</span>
                 <span className={'chip ' + (weekly[l.id] === 'submitted' ? 'done' : sun ? 'late' : 'due')}>{weekly[l.id] === 'submitted' ? 'Done ✓' : sun ? 'Due today' : 'Due Sunday'}</span>
               </button>
               {waiting[l.id] > 0 && (
                 <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav(`/received?loc=${l.id}`)}>
-                  <span>📥 {multi}Items from the store</span><span className="chip late">{waiting[l.id]} to confirm</span>
+                  <span>📥 Items from the store</span><span className="chip late">{waiting[l.id]} to confirm</span>
                 </button>
               )}
             </div>
           );
         })}
       </div>
+      )}
 
       {myLocations.length > 0 && (
         <div className="card">
