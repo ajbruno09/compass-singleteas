@@ -404,3 +404,9 @@ tr.click { cursor: pointer; }
 .weekstrip .off { background: var(--bad-bg); color: var(--bad); }
 .weekstrip .today { outline: 2px solid var(--brand); }
 .staffshell .chip { white-space: nowrap; flex: none; }
+.staffnav button .ico { display: grid; place-items: center; width: 56px; height: 30px; border-radius: 15px; transition: background .15s; }
+.staffnav button.on .ico { background: var(--brand-soft); color: var(--brand); }
+.staffnav button span { font-size: inherit; line-height: 1; }
+.lbl { display: inline-flex; align-items: center; gap: 8px; }
+.lbl svg { color: var(--ink-2); flex: none; }
+.tile2 .i { color: var(--brand); }

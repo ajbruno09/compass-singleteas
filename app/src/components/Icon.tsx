@@ -31,6 +31,15 @@ const P: Record<string, string> = {
   alert: 'M12 3l10 18H2L12 3zM12 10v5M12 18h.01',
   finger: 'M12 11a3 3 0 0 0-3 3c0 2-.5 4-1.5 6M12 7a7 7 0 0 0-7 7M12 3a11 11 0 0 1 9 5M17 20c.5-2 .7-4 .7-6a5.7 5.7 0 0 0-1-3M12 14c0 3-.5 5.5-1.7 7.5',
   siren: 'M7 18v-6a5 5 0 0 1 10 0v6M5 21h14M12 3v2M4.5 6.5L6 8M19.5 6.5L18 8',
+  note: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8M8 8h6M8 12h4M8 16h2M20.5 10.5l-6 6-3 .8.8-3 6-6a1.4 1.4 0 0 1 2.2 2.2',
+  calbars: 'M4 6h16v15H4zM4 10h16M8 3v4M16 3v4M8 18v-3M12 18v-5M16 18v-7',
+  sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  chat: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',
+  target: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10M12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2',
+  coin: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M9 8h6M9 11h6M9 8c4 0 4 5 0 5l4 3',
+  trenddown: 'M3 7l6 6 4-4 8 8M21 11v6h-6',
+  inbox: 'M3 13l3-8h12l3 8v6H3zM3 13h5l1 3h6l1-3h5',
+  siren2: 'M6 19v-5a6 6 0 0 1 12 0v5M4 22h16M12 2v2M3.5 5.5l1.5 1.5M20.5 5.5L19 7M9 14a3 3 0 0 1 3-3',
   phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2'
 };
 export function Icon({ name, size = 16, stroke = 1.7 }: { name: keyof typeof P | string; size?: number; stroke?: number }) {

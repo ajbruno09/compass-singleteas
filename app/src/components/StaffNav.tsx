@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { SosButton } from './Sos';
+import { Icon } from './Icon';
 
 const KEY = 'compass.counter';
 export const getCounter = (ids: number[]) => { try { const v = Number(sessionStorage.getItem(KEY)); if (ids.includes(v)) return v; } catch { /* ignore */ } return ids[0] ?? 0; };
@@ -28,10 +29,10 @@ export function StaffShell() {
   }, [ids.join(','), here]);
   const tab = here === '/' ? 'home' : here.startsWith('/indent') ? 'indent' : here.startsWith('/count') || here.startsWith('/closing') ? 'closing' : '';
   const items: [string, string, string, number, () => void][] = [
-    ['home', '🏠', 'Home', 0, () => nav('/')],
-    ['indent', '📝', 'Indent', 0, () => nav(`/indent?loc=${loc}`)],
-    ['closing', '🧮', 'Closing', due, () => nav('/closing')],
-    ['sos', '🚨', 'SOS', 0, () => window.dispatchEvent(new Event('compass:sos'))]
+    ['home', 'home', 'Home', 0, () => nav('/')],
+    ['indent', 'note', 'Indent', 0, () => nav(`/indent?loc=${loc}`)],
+    ['closing', 'calbars', 'Closing', due, () => nav('/closing')],
+    ['sos', 'siren2', 'SOS', 0, () => window.dispatchEvent(new Event('compass:sos'))]
   ];
   return (
     <div className="staffshell">
@@ -39,7 +40,7 @@ export function StaffShell() {
       {myLocations.length > 0 && <SosButton locations={myLocations} defaultId={loc} hideFab />}
       <nav className="staffnav" aria-label="Main">
         {items.map(([k, e, l, n, go]) => (
-          <button key={k} className={tab === k ? 'on' : ''} onClick={go} aria-current={tab === k ? 'page' : undefined}><span aria-hidden>{e}</span>{l}{n > 0 && <i>{n}</i>}</button>
+          <button key={k} className={tab === k ? 'on' : ''} onClick={go} aria-current={tab === k ? 'page' : undefined}><span className="ico" aria-hidden><Icon name={e} size={24} stroke={1.7} /></span>{l}{n > 0 && <i>{n}</i>}</button>
         ))}
       </nav>
     </div>

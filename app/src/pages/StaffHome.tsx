@@ -126,16 +126,16 @@ export function StaffHome() {
         const names = (done: typeof myLocations) => myLocations.filter((l) => !done.includes(l)).map((l) => l.name).join(', ');
         const Line = ({ e, label, done, all, chip, left, go }: { e: string; label: string; done: number; all: number; chip: string; left: string; go: () => void }) => (
           <button style={{ background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left', display: 'grid', gap: 2 }} onClick={go}>
-            <span className="row" style={{ justifyContent: 'space-between' }}><span>{e} {label}</span><span className={'chip ' + chip}>{done} of {all}{done === all ? ' ✓' : ''}</span></span>
+            <span className="row" style={{ justifyContent: 'space-between' }}><span className="lbl"><Icon name={e} size={20} /> {label}</span><span className={'chip ' + chip}>{done} of {all}{done === all ? ' ✓' : ''}</span></span>
             {done < all && left && <span className="small muted">Still to do: {left}</span>}
           </button>
         );
         return (
           <div className="card stack" style={{ gap: 12 }}>
-            <Line e="📝" label="Indents sent" done={sentIds.length} all={n} chip={sentIds.length === n ? 'done' : win === 'late' ? 'late' : 'due'} left={names(sentIds)} go={() => nav(`/indent?loc=${loc}`)} />
-            <Line e="🧮" label="Daily closing done" done={dailyDone.length} all={n} chip={dailyDone.length === n ? 'done' : 'late'} left={names(dailyDone)} go={() => nav('/closing')} />
-            <Line e="📦" label="Weekly closing done" done={weeklyDone.length} all={n} chip={weeklyDone.length === n ? 'done' : sun ? 'late' : 'due'} left={sun ? names(weeklyDone) : 'Due Sunday'} go={() => nav('/closing')} />
-            {toConfirm > 0 && <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }} onClick={() => nav(`/received?loc=${loc}`)}><span>📥 Items from the store</span><span className="chip late">{toConfirm} to confirm</span></button>}
+            <Line e="note" label="Indents sent" done={sentIds.length} all={n} chip={sentIds.length === n ? 'done' : win === 'late' ? 'late' : 'due'} left={names(sentIds)} go={() => nav(`/indent?loc=${loc}`)} />
+            <Line e="calbars" label="Daily closing done" done={dailyDone.length} all={n} chip={dailyDone.length === n ? 'done' : 'late'} left={names(dailyDone)} go={() => nav('/closing')} />
+            <Line e="cal" label="Weekly closing done" done={weeklyDone.length} all={n} chip={weeklyDone.length === n ? 'done' : sun ? 'late' : 'due'} left={sun ? names(weeklyDone) : 'Due Sunday'} go={() => nav('/closing')} />
+            {toConfirm > 0 && <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }} onClick={() => nav(`/received?loc=${loc}`)}><span className="lbl"><Icon name="inbox" size={20} /> Items from the store</span><span className="chip late">{toConfirm} to confirm</span></button>}
             <p className="small muted">Indent and Closing open the counter picked at the top ({myLocations.find((l) => l.id === loc)?.name}).</p>
           </div>
         );
@@ -146,20 +146,20 @@ export function StaffHome() {
           return (
             <div key={l.id} className="stack" style={{ gap: 10 }}>
               <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav(`/indent?loc=${l.id}`)}>
-                <span>📝 Indent</span>
+                <span className="lbl"><Icon name="note" size={20} /> Indent</span>
                 <span className={'chip ' + (s ? 'done' : win === 'late' ? 'late' : 'due')}>{s ?? (win === 'early' ? `From ${clock12(rem.indent_open ?? '15:30')}` : win === 'late' ? 'Late, send now' : `Due ${clock12(rem.indent_due ?? '17:00')}`)}</span>
               </button>
               <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav('/closing')}>
-                <span>🧮 Daily closing</span>
+                <span className="lbl"><Icon name="calbars" size={20} /> Daily closing</span>
                 <span className={'chip ' + (daily[l.id] === 'submitted' ? 'done' : 'late')}>{daily[l.id] === 'submitted' ? 'Done ✓' : daily[l.id] ? 'Started' : 'Due tonight'}</span>
               </button>
               <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav('/closing')}>
-                <span>📦 Weekly closing</span>
+                <span className="lbl"><Icon name="cal" size={20} /> Weekly closing</span>
                 <span className={'chip ' + (weekly[l.id] === 'submitted' ? 'done' : sun ? 'late' : 'due')}>{weekly[l.id] === 'submitted' ? 'Done ✓' : sun ? 'Due today' : 'Due Sunday'}</span>
               </button>
               {waiting[l.id] > 0 && (
                 <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav(`/received?loc=${l.id}`)}>
-                  <span>📥 Items from the store</span><span className="chip late">{waiting[l.id]} to confirm</span>
+                  <span className="lbl"><Icon name="inbox" size={20} /> Items from the store</span><span className="chip late">{waiting[l.id]} to confirm</span>
                 </button>
               )}
             </div>
@@ -181,16 +181,16 @@ export function StaffHome() {
       )}
 
       <div className="hsec">Coming soon</div>
-      {[['🎯', 'Your targets', 'Coming soon. Look out for your targets here.'], ['💰', 'Your incentives', 'Coming soon. Look out for your incentives here.'], ['📉', 'Food cost control', 'Coming soon. See how we are doing on wastage and cost.']].map(([e, h, b]) => (
-        <div key={h} className="soonbox"><div style={{ fontSize: 22 }}>{e}</div><b>{h}</b><div className="small muted">{b}</div></div>
+      {[['target', 'Your targets', 'Coming soon. Look out for your targets here.'], ['coin', 'Your incentives', 'Coming soon. Look out for your incentives here.'], ['trenddown', 'Food cost control', 'Coming soon. See how we are doing on wastage and cost.']].map(([e, h, b]) => (
+        <div key={h} className="soonbox"><div style={{ color: 'var(--brand)', display: 'grid', placeItems: 'center', marginBottom: 2 }}><Icon name={e} size={26} stroke={1.6} /></div><b>{h}</b><div className="small muted">{b}</div></div>
       ))}
 
       <div className="hsec">Get to work</div>
       <div className="tiles2">
-        <button className="tile2" onClick={() => nav(`/indent?loc=${loc}`)}><span className="i">📝</span><b>Indent</b><span className="small muted">Order for tomorrow</span></button>
-        <button className="tile2" onClick={() => nav('/closing')}><span className="i">🧮</span><b>Closing stock</b><span className="small muted">Daily or weekly</span></button>
-        <button className="tile2" onClick={() => window.dispatchEvent(new Event('compass:sos'))}><span className="i">🚨</span><b>SOS</b><span className="small muted">Need something now</span></button>
-        <button className="tile2" onClick={() => nav('/messages')}><span className="i">💬</span><b>Messages</b><span className="small muted">Older notices</span></button>
+        <button className="tile2" onClick={() => nav(`/indent?loc=${loc}`)}><span className="i"><Icon name="note" size={26} /></span><b>Indent</b><span className="small muted">Order for tomorrow</span></button>
+        <button className="tile2" onClick={() => nav('/closing')}><span className="i"><Icon name="calbars" size={26} /></span><b>Closing stock</b><span className="small muted">Daily or weekly</span></button>
+        <button className="tile2" onClick={() => window.dispatchEvent(new Event('compass:sos'))}><span className="i"><Icon name="siren2" size={26} /></span><b>SOS</b><span className="small muted">Need something now</span></button>
+        <button className="tile2" onClick={() => nav('/messages')}><span className="i"><Icon name="chat" size={26} /></span><b>Messages</b><span className="small muted">Older notices</span></button>
       </div>
       <button className="countercard" onClick={() => nav('/mine')}>
         <Icon name="scale" size={34} stroke={1.6} />

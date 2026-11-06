@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
+import { Icon } from '../components/Icon';
 import { getCounter, setCounter } from '../components/StaffNav';
 
 interface It { id: number; count_frequency: string }
@@ -33,7 +34,7 @@ export function ClosingHub() {
   }, [loc]);
   const Big = ({ e, h, sub, ok, freq }: { e: string; h: string; sub: string; ok: boolean; freq: string }) => (
     <button className="countercard" onClick={() => nav(`/count?loc=${loc}&freq=${freq}`)}>
-      <span style={{ fontSize: 30 }}>{e}</span>
+      <span style={{ color: 'var(--brand)' }}><Icon name={e} size={32} stroke={1.6} /></span>
       <span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>{h}</span><span className="small muted">{sub}</span></span>
       <span className={'chip ' + (ok ? 'done' : 'due')}>{ok ? 'Done ✓' : 'Open'}</span>
     </button>
@@ -43,8 +44,8 @@ export function ClosingHub() {
       <div className="phone-head"><b style={{ font: '800 20px/24px var(--font-display)' }}>Closing stock</b></div>
       {myLocations.length > 1 && <div className="countersw" role="group" aria-label="Counter">{myLocations.map((l) => <button key={l.id} className={l.id === loc ? 'on' : ''} onClick={() => { setCounter(l.id); setLoc(l.id); }}>{l.name}</button>)}</div>}
       <p className="muted">What would you like to count{myLocations.length > 1 ? ` for ${myLocations.find((l) => l.id === loc)?.name ?? ''}` : ''}?</p>
-      <Big e="☀️" h="Daily" sub={`${n.daily} cost items · chicken, paneer, eggs, oil`} ok={done.daily} freq="daily" />
-      <Big e="📅" h="Weekly" sub={`${n.weekly} items · spices, masalas, non food`} ok={done.weekly} freq="weekly" />
+      <Big e="sun" h="Daily" sub={`${n.daily} cost items · chicken, paneer, eggs, oil`} ok={done.daily} freq="daily" />
+      <Big e="cal" h="Weekly" sub={`${n.weekly} items · spices, masalas, non food`} ok={done.weekly} freq="weekly" />
       <div className="card small muted">Items you count daily are not repeated in the weekly list. Every item must be counted. Enter 0 if you have none.</div>
     </div>
   );
