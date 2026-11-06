@@ -81,6 +81,9 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
   const toast = useToast();
   const [name, setName] = useState(item?.name ?? '');
   const [categoryId, setCategoryId] = useState<number>(item?.category_id ?? 1);
+  const [groupId, setGroupId] = useState<number>((item as { group_id?: number | null } | null)?.group_id ?? 0);
+  const [groupList, setGroupList] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => { supabase.from('item_groups').select('id, name').order('sort').then(({ data }) => setGroupList((data as { id: number; name: string }[]) ?? [])); }, []);
   const [unit, setUnit] = useState(item?.unit ?? 'kg');
   const [purchaseUnit, setPurchaseUnit] = useState(item?.purchase_unit ?? '');
   const [factor, setFactor] = useState(item?.purchase_factor?.toString() ?? '');
@@ -126,7 +129,7 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
     setBusy(true);
     try {
       const body = {
-        name: name.trim(), category_id: categoryId, unit, purchase_unit: purchaseUnit || null,
+        name: name.trim(), category_id: categoryId, group_id: groupId || null, unit, purchase_unit: purchaseUnit || null,
         purchase_factor: purchaseUnit ? Number(factor) : null, quick_amounts: quickVals, count_frequency: freq,
         tolerance_pct: Number(tol) || 0, last_cost: cost === '' ? null : Number(cost), active,
         base_unit: baseUnit || null, counts_as: countsAs || null, pack_name: packName || null,
@@ -175,6 +178,8 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
       <div className="form-grid">
         <label className="field"><span>Category</span>
           <select id="item-cat" value={categoryId} onChange={(e) => setCategoryId(Number(e.target.value))}>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+        <label className="field"><span>Shelf group (where it shows in Stock in hand)</span>
+          <select id="item-group" value={groupId} onChange={(e) => setGroupId(Number(e.target.value))}><option value={0}>No group yet</option>{groupList.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
         <label className="field"><span>Counted in</span>
           <select id="item-unit" value={unit} onChange={(e) => setUnit(e.target.value)}>{units.map((u) => <option key={u.code} value={u.code}>{u.name} ({u.code})</option>)}</select></label>
         <label className="field"><span>Bought in (if different)</span>
