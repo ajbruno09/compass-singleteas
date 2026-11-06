@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText, qty as fmtQty } from '../lib/format';
-import { clock12, dayLabel, timeOf, windowState, type Reminders } from '../lib/ist';
-import { REASONS, type DeptItem, type Group, type IndentRec, type Usual } from '../lib/types';
+import { clock12, dayLabel, isSealed, sealTime, timeOf, windowState, type Reminders } from '../lib/ist';
+import { REASONS, type DeptItem, type Group, type IndentReason, type IndentRec, type Usual } from '../lib/types';
 import { useToast } from '../components/Toast';
 import { AvatarButton } from '../components/AvatarButton';
 import { Icon } from '../components/Icon';
@@ -45,12 +45,18 @@ export function IndentPage() {
   const [review, setReview] = useState(false);
   const [busy, setBusy] = useState(false);
   const [rem, setRem] = useState<Reminders>({});
+  const [reasons, setReasons] = useState<IndentReason[]>([]);
+  const [req, setReq] = useState<{ status: string; reason: string; decision_note: string } | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const [accepted, setAccepted] = useState<Record<number, boolean>>({});
+  const [ask, setAsk] = useState(false);
   const { t, hi, local, extra: lang, toggle, canSwitch, unit: u, group: gname } = useLang();
   const [voice, setVoice] = useState(false);
   const timers = useRef<Record<number, number>>({});
   // Opening a category adds a history step, so the phone's own back button returns to the category grid first.
   const openView = (v: View) => { try { window.history.pushState({ ...(window.history.state || {}), cv: 1 }, ''); } catch { /* ignore */ } setView(v); };
   const toGroups = () => { setQ(''); let pushed = false; try { pushed = !!window.history.state?.cv; } catch { /* ignore */ } if (pushed) window.history.back(); else setView({ kind: 'groups' }); };
+  useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 20000); return () => window.clearInterval(id); }, []);
   useEffect(() => { const pop = () => { setView({ kind: 'groups' }); setQ(''); }; window.addEventListener('popstate', pop); return () => window.removeEventListener('popstate', pop); }, []);
 
   const label = useCallback((i: DeptItem) => (local && lang && i.local_names?.[lang]) || i.name, [local, lang]);
@@ -73,13 +79,22 @@ export function IndentPage() {
     setRem((win.data as Reminders) ?? {});
     const rec = ind.data as IndentRec;
     setIndent(rec);
+    const [rs, rq] = await Promise.all([
+      supabase.from('indent_reasons').select('*').eq('active', true).order('sort'),
+      supabase.from('indent_reopen_requests').select('status, reason, decision_note').eq('indent_id', rec.id).order('created_at', { ascending: false }).limit(1)
+    ]);
+    setReasons((rs.data as IndentReason[]) ?? []);
+    setReq(((rq.data as { status: string; reason: string; decision_note: string }[]) ?? [])[0] ?? null);
     const ln = await supabase.from('indent_lines').select('item_id, qty, reason').eq('indent_id', rec.id);
     setLines(Object.fromEntries(((ln.data as { item_id: number; qty: number; reason: string | null }[]) ?? []).map((l) => [l.item_id, { qty: Number(l.qty), reason: l.reason ?? '' }])));
     setLoading(false);
   }, [locId, toast]);
   useEffect(() => { setView({ kind: 'groups' }); setQ(''); void load(); }, [load]);
 
-  const editable = indent?.status === 'draft';
+  const sealed = indent ? isSealed(indent, rem, now) : false;
+  const editable = indent?.status === 'draft' && !sealed;
+  const moreReasons = reasons.filter((r) => r.kind === 'more').map((r) => r.label);
+  const missedReasons = reasons.filter((r) => r.kind === 'missed').map((r) => r.label);
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
   function flagged(i: DeptItem, l: Line | undefined) {
@@ -104,7 +119,7 @@ export function IndentPage() {
   };
 
   const chosen = Object.keys(lines).length;
-  const missingReason = items.filter((i) => flagged(i, lines[i.id]) && !lines[i.id].reason);
+  const missingReason = items.filter((i) => flagged(i, lines[i.id]) && (!lines[i.id].reason || !accepted[i.id]));
 
   async function send(nothing = false) {
     if (!indent) return;
@@ -129,7 +144,8 @@ export function IndentPage() {
   const win = windowState(rem);
   const winChip = win === 'open' ? <span className="chip done">{t('Open until {time}', { time: clock12(rem.indent_due ?? '17:00') })}</span>
     : win === 'early' ? <span className="chip due">{t('Opens {time}, you can start now', { time: clock12(rem.indent_open ?? '15:30') })}</span>
-    : <span className="chip late">{t('Past {time}, send as soon as you can', { time: clock12(rem.indent_due ?? '17:00') })}</span>;
+    : indent && sealed ? <span className="chip late">{t('Closed')}</span>
+    : <span className="chip late">{indent ? t('Late. Closes at {time}', { time: timeOf(new Date(sealTime(indent.for_date, rem)).toISOString()) }) : t('Past {time}, send as soon as you can', { time: clock12(rem.indent_due ?? '17:00') })}</span>;
 
   const visible = useMemo(() => {
     if (view.kind === 'search') {
@@ -172,7 +188,7 @@ export function IndentPage() {
       )}
 
       {loading ? <p className="muted">{t('Loading…')}</p> : !indent ? null : !editable ? (
-        <Sent indent={indent} lines={lines} itemById={itemById} label={label} onReopen={reopen} busy={busy} />
+        <Sent indent={indent} lines={lines} itemById={itemById} label={label} onReopen={reopen} busy={busy} sealed={sealed} req={req} onAsk={() => setAsk(true)} />
       ) : (
         <>
           <div className="searchrow"><label className="field"><span className="small muted" style={{ fontWeight: 400 }}>{t('Find an item')}</span>
@@ -208,7 +224,7 @@ export function IndentPage() {
                 <div className="stack">
                   {visible.map((i) => (
                     <ItemRow key={i.id} item={i} name={label(i)} line={lines[i.id]} usual={usual[i.id]} flag={flagged(i, lines[i.id])}
-                      onQty={(n) => setQty(i, n)} onReason={(r) => lines[i.id] && save(i, { qty: lines[i.id].qty, reason: r })} />
+                      onQty={(n) => setQty(i, n)} onReason={(r) => lines[i.id] && save(i, { qty: lines[i.id].qty, reason: r })} reasonList={moreReasons} />
                   ))}
                 </div>
               )}
@@ -227,7 +243,7 @@ export function IndentPage() {
       {review && indent && (
         <Sheet title={t('Check your indent')} onClose={() => setReview(false)}
           footer={<button className="btn primary floor" disabled={busy || missingReason.length > 0} onClick={() => void send(false)}>{busy ? t('Sending…') : t('Send to store')}</button>}>
-          {missingReason.length > 0 && <p className="banner warn">{missingReason.length === 1 ? t('One item is well above your usual. Tell the store why.') : t('{n} items are well above your usual. Tell the store why.', { n: missingReason.length })}</p>}
+          {missingReason.length > 0 && <p className="banner warn">{missingReason.length === 1 ? t('One item is well above your usual. Tick that you are sure, and tell the store why.') : t('{n} items are well above your usual. Tick that you are sure, and tell the store why.', { n: missingReason.length })}</p>}
           {items.filter((i) => lines[i.id]).map((i) => (
             <div key={i.id} className="card" style={{ padding: 12 }}>
               <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
@@ -237,11 +253,18 @@ export function IndentPage() {
                   <button className="btn quiet" onClick={() => setQty(i, 0)} aria-label={`${t('Remove')} ${i.name}`}><Icon name="trash" size={18} /></button>
                 </span>
               </div>
-              {flagged(i, lines[i.id]) && <Reasons value={lines[i.id].reason} onPick={(r) => save(i, { qty: lines[i.id].qty, reason: r })} />}
+              {flagged(i, lines[i.id]) && (<>
+                <Reasons value={lines[i.id].reason} onPick={(r) => save(i, { qty: lines[i.id].qty, reason: r })} list={moreReasons} />
+                <label className="row" style={{ gap: 8, marginTop: 8, fontWeight: 700 }}>
+                  <input type="checkbox" checked={!!accepted[i.id]} onChange={(e) => setAccepted((a) => ({ ...a, [i.id]: e.target.checked }))} />
+                  {t('Yes, I really need {q}. My usual is {u}.', { q: fmtQty(lines[i.id].qty, i.unit).replace(i.unit, u(i.unit)), u: fmtQty(usual[i.id]?.usual ?? 0, i.unit).replace(i.unit, u(i.unit)) })}
+                </label></>)}
             </div>
           ))}
         </Sheet>
       )}
+
+      {ask && indent && <AskOpen indentId={indent.id} reasons={missedReasons} onClose={() => setAsk(false)} onDone={() => { setAsk(false); void load(); }} />}
 
       {voice && <VoiceOrder items={items} label={label} onClose={() => setVoice(false)}
         onAdd={(ls) => { ls.forEach((l) => setQty(l.item, l.qty)); toast(t('Added {n} items by voice', { n: ls.length })); }} />}
@@ -251,8 +274,8 @@ export function IndentPage() {
   );
 }
 
-function ItemRow({ item, name, line, usual, flag, onQty, onReason }: {
-  item: DeptItem; name: string; line?: Line; usual?: Usual; flag: boolean; onQty: (n: number) => void; onReason: (r: string) => void;
+function ItemRow({ item, name, line, usual, flag, onQty, onReason, reasonList }: {
+  item: DeptItem; name: string; line?: Line; usual?: Usual; flag: boolean; onQty: (n: number) => void; onReason: (r: string) => void; reasonList: string[];
 }) {
   const { t, unit: u } = useLang();
   const step = stepOf(item);
@@ -283,31 +306,35 @@ function ItemRow({ item, name, line, usual, flag, onQty, onReason }: {
         {usual && <button className="qchip usualchip" onClick={() => onQty(usual.runs >= 2 ? usual.usual : usual.last_qty)}>
           {usual.runs >= 2 ? t('Usual {q}', { q: fmtQty(usual.usual, item.unit).replace(item.unit, u(item.unit)) }) : t('Last {q}', { q: fmtQty(usual.last_qty, item.unit).replace(item.unit, u(item.unit)) })}</button>}
       </div>
-      {flag && <Reasons value={line?.reason ?? ''} onPick={onReason} />}
+      {flag && <Reasons value={line?.reason ?? ''} onPick={onReason} list={reasonList} />}
     </div>
   );
 }
 
-function Reasons({ value, onPick }: { value: string; onPick: (r: string) => void }) {
+function Reasons({ value, onPick, list }: { value: string; onPick: (r: string) => void; list: string[] }) {
   const { t } = useLang();
   return (
     <div className="reasons" role="group" aria-label={t('Why more than usual')}>
       <span className="small" style={{ fontWeight: 700 }}>{t('More than your usual. Why?')}</span>
-      <div className="seg">{REASONS.map((r) => <button key={r} aria-pressed={value === r} onClick={() => onPick(r)}>{t(r)}</button>)}</div>
+      <div className="seg">{(list.length ? list : REASONS).map((r) => <button key={r} aria-pressed={value === r} onClick={() => onPick(r)}>{t(r)}</button>)}</div>
     </div>
   );
 }
 
-function Sent({ indent, lines, itemById, label, onReopen, busy }: {
-  indent: IndentRec; lines: Record<number, Line>; itemById: Map<number, DeptItem>; label: (i: DeptItem) => string; onReopen: () => void; busy: boolean;
+function Sent({ indent, lines, itemById, label, onReopen, busy, sealed, req, onAsk }: {
+  indent: IndentRec; lines: Record<number, Line>; itemById: Map<number, DeptItem>; label: (i: DeptItem) => string; onReopen: () => void; busy: boolean; sealed: boolean; req: { status: string; reason: string; decision_note: string } | null; onAsk: () => void;
 }) {
   const { t, unit: u } = useLang();
   const ids = Object.keys(lines).map(Number);
   return (
     <div className="stack">
-      <p className="banner ok">
+      {sealed && <p className="banner warn">{indent.outcome === 'missed' ? t('This indent was not sent in time and is now closed.') : t('This indent is closed. The store is working on it.')}</p>}
+      {sealed && req?.status === 'pending' && <p className="banner">{t('You asked Admin to open it. Please wait for the answer.')}</p>}
+      {sealed && req?.status === 'declined' && <p className="banner warn">{t('Admin did not open it.')} {req.decision_note}</p>}
+      {sealed && (!req || req.status !== 'pending') && <button className="btn primary floor" onClick={onAsk}>{t('Ask Admin to open it')}</button>}
+      {!sealed && <p className="banner ok">
         {indent.status === 'locked' ? t('The store is working on this indent.') : indent.nothing_needed ? t('You told the store you need nothing. Sent {time}.', { time: timeOf(indent.submitted_at) }) : t('Sent to the store at {time}.', { time: timeOf(indent.submitted_at) })}
-      </p>
+      </p>}
       {ids.length > 0 && (
         <div className="card stack">
           {ids.map((id) => { const i = itemById.get(id); return i ? (
@@ -316,7 +343,30 @@ function Sent({ indent, lines, itemById, label, onReopen, busy }: {
             </div>) : null; })}
         </div>
       )}
-      {indent.status === 'submitted' && <button className="btn secondary floor" disabled={busy} onClick={onReopen}>{t('Change something')}</button>}
+      {!sealed && indent.status === 'submitted' && <button className="btn secondary floor" disabled={busy} onClick={onReopen}>{t('Change something')}</button>}
     </div>
+  );
+}
+
+function AskOpen({ indentId, reasons, onClose, onDone }: { indentId: string; reasons: string[]; onClose: () => void; onDone: () => void }) {
+  const { t } = useLang();
+  const toast = useToast();
+  const [why, setWhy] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    setBusy(true);
+    const { error } = await supabase.rpc('request_indent_reopen', { p_indent_id: indentId, p_reason: why, p_note: note });
+    setBusy(false);
+    if (error) { toast(errText(error)); return; }
+    toast(t('Sent to Admin')); onDone();
+  }
+  return (
+    <Sheet title={t('Ask Admin to open the indent')} onClose={onClose}
+      footer={<button className="btn primary floor" disabled={busy || !why} onClick={() => void go()}>{busy ? t('Sending…') : t('Send to Admin')}</button>}>
+      <p className="muted">{t('Why was the indent not sent in time?')}</p>
+      <div className="stack">{reasons.map((r) => <button key={r} className="btn secondary floor" aria-pressed={why === r} onClick={() => setWhy(r)}>{t(r)}</button>)}</div>
+      <label className="field"><span>{t('Anything to add (optional)')}</span><input value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} /></label>
+    </Sheet>
   );
 }

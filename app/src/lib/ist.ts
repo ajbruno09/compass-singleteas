@@ -17,7 +17,7 @@ export const timeOf = (iso: string | null | undefined) =>
 export const dayLabel = (isoDate: string) =>
   new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(isoDate + 'T00:00:00'));
 
-export interface Reminders { indent_open?: string; indent_due?: string }
+export interface Reminders { indent_open?: string; indent_due?: string; indent_grace?: number }
 export type WindowState = 'early' | 'open' | 'late';
 export function windowState(r: Reminders, now: Date = new Date()): WindowState {
   const open = toMinutes(r.indent_open ?? '15:30');
@@ -26,4 +26,15 @@ export function windowState(r: Reminders, now: Date = new Date()): WindowState {
   if (t < open) return 'early';
   if (t <= due) return 'open';
   return 'late';
+}
+
+// The indent for a date is due at 17:00 the day before, has an hour of grace, then is sealed. Same rule as the server.
+export function dueTime(forDate: string, r: Reminders): number {
+  const [h, m] = (r.indent_due ?? '17:00').split(':').map(Number);
+  return Date.parse(`${forDate}T00:00:00+05:30`) - 86400000 + (h * 60 + (m || 0)) * 60000;
+}
+export const sealTime = (forDate: string, r: Reminders): number => dueTime(forDate, r) + (r.indent_grace ?? 60) * 60000;
+export function isSealed(i: { for_date: string; status: string; reopen_until?: string | null }, r: Reminders, now: number = Date.now()): boolean {
+  if (i.reopen_until && now < Date.parse(i.reopen_until)) return false;
+  return i.status === 'locked' || now >= sealTime(i.for_date, r);
 }

@@ -8,6 +8,7 @@ import { alarmUnlocked, keepAwake, startAlarm, stopAlarm, unlockAlarm } from '..
 import { SOS_AFTER_SECONDS, type SosAlert } from '../lib/types';
 import { useToast } from './Toast';
 
+const MUTE_MINUTES = 15;
 const idsOf = (a: SosAlert): number[] => (a.item_ids && a.item_ids.length ? a.item_ids : a.item_id != null ? [a.item_id] : []);
 
 // Lives on the store phone and the owner's phone. The store rings at once; the owner rings if nobody answers.
@@ -19,7 +20,7 @@ export function SosWatcher() {
   const [names, setNames] = useState<Record<number, string>>({});
   const [units, setUnits] = useState<Record<number, string>>({});
   const [now, setNow] = useState(Date.now());
-  const [muted, setMuted] = useState<string[]>([]);
+  const [mutedUntil, setMutedUntil] = useState(0);
   const [armed, setArmed] = useState(alarmUnlocked());
   useEffect(() => { const f = () => setArmed(alarmUnlocked()); window.addEventListener('compass-armed', f); return () => window.removeEventListener('compass-armed', f); }, []);
   const role = profile?.role;
@@ -75,10 +76,16 @@ export function SosWatcher() {
   );
 
   useEffect(() => {
-    const loud = ringing.filter((a) => !muted.includes(a.id));
-    if (loud.length > 0 && armed) startAlarm(); else stopAlarm();
+    // A mute is only for a short while. When the time is up the alarm comes back on by itself.
+    const loud = ringing.length > 0 && now >= mutedUntil;
+    if (loud && armed) startAlarm(); else stopAlarm();
     return () => stopAlarm();
-  }, [ringing, muted, armed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ringing, mutedUntil, armed, now >= mutedUntil]);
+  function muteFor15() {
+    setMutedUntil(Date.now() + MUTE_MINUTES * 60000);
+    void supabase.rpc('log_sos_mute', { p_minutes: MUTE_MINUTES });
+  }
 
   useEffect(() => {
     if (ringing.length === 0) return;
@@ -101,7 +108,17 @@ export function SosWatcher() {
   if (!watching) return null;
   return (
     <>
-      {role === 'store' && !armed && <button className="banner warn" style={{ width: '100%', textAlign: 'left' }} onClick={() => setArmed(unlockAlarm())}>The SOS alarm sound is off until you tap the screen once. Tap here to turn it on.</button>}
+      {role === 'store' && !armed && (
+        <div className="sosoverlay" role="dialog" aria-label="Start the SOS alarm" style={{ background: 'rgba(16,24,21,.92)' }}>
+          <div className="soscard">
+            <p className="sosbig">🔔</p>
+            <h1>SOS alarm</h1>
+            <p style={{ fontSize: 18 }}>The alarm is always on for the store. Tap once so this phone can make the sound.</p>
+            <button className="btn floor sosgo" onClick={() => { const ok = unlockAlarm(); setArmed(ok); if (ok) window.dispatchEvent(new Event('compass-armed')); }}>Start the alarm</button>
+          </div>
+        </div>
+      )}
+      {role === 'store' && armed && now < mutedUntil && <p className="banner warn">The SOS sound is muted for {Math.max(1, Math.ceil((mutedUntil - now) / 60000))} more minutes. It comes back on by itself.</p>}
       {alerts.filter((a) => a.acked_at).map((a) => (
         <div key={a.id} className="banner ok row" style={{ justifyContent: 'space-between' }}>
           <span>{where(a)}: {what(a, 'request')}{a.note ? `, ${a.note}` : ''}{a.eta_minutes ? ` · about ${a.eta_minutes} min` : ''}</span>
@@ -131,8 +148,8 @@ export function SosWatcher() {
                 {role !== 'manager' && <button className="btn floor" onClick={() => nav('/sos')}>Open SOS page and issue</button>}
               </div>
             ))}
-            {ringing.some((a) => !muted.includes(a.id)) && armed && <button className="btn floor" onClick={() => setMuted(ringing.map((a) => a.id))}>🔇 Mute the sound while I decide</button>}
-            {ringing.length > 0 && ringing.every((a) => muted.includes(a.id)) && <p className="small">Sound is off for these. It rings again for any new SOS.</p>}
+            {now >= mutedUntil && armed && <button className="btn floor" onClick={muteFor15}>🔇 Mute for {MUTE_MINUTES} minutes</button>}
+            {now < mutedUntil && <p className="small">Sound is off for {Math.max(1, Math.ceil((mutedUntil - now) / 60000))} more minutes, then it rings again by itself.</p>}
             {!armed && <button className="btn floor" onClick={() => setArmed(unlockAlarm())}>Turn on sound</button>}
           </div>
         </div>

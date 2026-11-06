@@ -1,3 +1,4 @@
+import { unlockAlarm } from '../lib/alarm';
 import { useEffect, useState, type FormEvent } from 'react';
 import { supabase, staffEmail } from '../lib/supabase';
 import { errText } from '../lib/format';
@@ -29,6 +30,7 @@ export function Login() {
     try {
       if (!/^[6-9][0-9]{9}$/.test(phone)) throw new Error('Enter your 10 digit mobile number.');
       if (!/^[0-9]{6}$/.test(pin)) throw new Error('Your PIN has 6 digits.');
+      try { unlockAlarm(); } catch { /* sound not available */ }
       const { error } = await supabase.auth.signInWithPassword({ email: staffEmail(phone), password: pin });
       if (error) throw new Error('Mobile number or PIN is wrong. Tap Forgot PIN or contact Admin.');
     } catch (err) {

@@ -14,6 +14,7 @@ const clock = (sec: number) => { const s = Math.abs(sec); return `${Math.floor(s
 export function SosPage() {
   const { locations, profile } = useSession();
   const toast = useToast();
+  const isOwner = profile?.role === 'owner';
   const canIssue = profile?.role === 'store' || profile?.role === 'owner';
   const [open, setOpen] = useState<SosAlert[]>([]);
   const [closed, setClosed] = useState<SosAlert[]>([]);
@@ -24,6 +25,8 @@ export function SosPage() {
   const [find, setFind] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [rep, setRep] = useState<Record<string, Record<number, { status: 'now' | 'wait' | 'none'; eta: number }>>>({});
+  const [asks, setAsks] = useState<{ id: string; location_id: number; created_at: string }[]>([]);
 
   const load = useCallback(async () => {
     await supabase.rpc('sos_sweep');
@@ -33,6 +36,8 @@ export function SosPage() {
       supabase.from('sos_alerts').select('*').not('resolved_at', 'is', null).gte('resolved_at', since).order('resolved_at', { ascending: false }).limit(20),
       supabase.from('stock_on_hand').select('item_id, qty').eq('location_id', 1)
     ]);
+    const ex = await supabase.from('sos_extra_requests').select('id, location_id, created_at').eq('status', 'pending').order('created_at');
+    setAsks((ex.data as { id: string; location_id: number; created_at: string }[]) ?? []);
     setOpen((o.data as SosAlert[]) ?? []); setClosed((c.data as SosAlert[]) ?? []);
     setStore(Object.fromEntries(((oh.data as { item_id: number; qty: number }[]) ?? []).map((r) => [r.item_id, Number(r.qty)])));
   }, []);
@@ -68,6 +73,19 @@ export function SosPage() {
     if (error) { toast(errText(error)); return; }
     toast(`Counter told: ${m} more minutes`); void load();
   }
+  async function decideAsk(id: string, approve: boolean) {
+    const { error } = await supabase.rpc('decide_sos_extra', { p_id: id, p_approve: approve });
+    if (error) { toast(errText(error)); return; }
+    toast(approve ? 'Allowed. The counter has been told.' : 'Declined. The counter has been told.'); void load();
+  }
+  async function sendReply(a: SosAlert) {
+    const mine = rep[a.id] ?? {};
+    if (!Object.keys(mine).length) { toast('Choose an answer for at least one item'); return; }
+    const payload = Object.fromEntries(Object.entries(mine).map(([k, v]) => [k, { status: v.status, eta: v.status === 'wait' ? v.eta : null }]));
+    const { error } = await supabase.rpc('reply_sos_items', { p_id: a.id, p_replies: payload });
+    if (error) { toast(errText(error)); return; }
+    toast('Sent to the counter'); setRep((p) => ({ ...p, [a.id]: {} })); void load();
+  }
   async function issue(a: SosAlert) {
     const v = vals[a.id] ?? {};
     const lines = rows(a).map((i) => ({ item_id: i, qty: Number(v[i] ?? a.item_qtys?.[String(i)] ?? 1) })).filter((l) => l.qty > 0);
@@ -90,6 +108,12 @@ export function SosPage() {
       <div className="pagehead"><div><p className="label">Store</p><h1>SOS requests</h1>
         <p className="muted small" style={{ marginTop: 2 }}>What counters need right now. Tap On it so the counter knows you have seen it, then issue from here.</p></div></div>
 
+      {asks.map((x) => (
+        <div key={x.id} className="banner warn row" style={{ justifyContent: 'space-between' }}>
+          <span><b>{locations.find((l) => l.id === x.location_id)?.name ?? 'A counter'}</b> used all its SOS today and asks for one more.</span>
+          {isOwner ? <span className="row" style={{ gap: 6 }}><button className="btn primary" onClick={() => void decideAsk(x.id, true)}>Allow one more</button><button className="btn secondary" onClick={() => void decideAsk(x.id, false)}>No</button></span> : <span className="small">Waiting for Admin</span>}
+        </div>
+      ))}
       {sorted.length === 0 ? <p className="empty card">No open SOS. This page updates by itself.</p> : (
         <div className="stack">
           {sorted.map((a) => {
@@ -114,7 +138,17 @@ export function SosPage() {
                     <colgroup><col /><col style={{ width: 110 }} /><col style={{ width: 130 }} /></colgroup>
                     <thead><tr><th>Item</th><th className="r">In store</th><th className="r">{a.issued_at ? 'Issued' : 'Issue now'}</th></tr></thead>
                     <tbody>{list.map((i) => { const it = items[i]; const have = store[i] ?? 0; const asked = a.item_qtys?.[String(i)]; const want = Number(vals[a.id]?.[i] ?? asked ?? 1); const short = want > have;
-                      return <tr key={i}><td><b>{it.name}</b> <span className="muted small">{asked ? `asked ${asked} ${it.unit}` : it.unit}</span></td>
+                      return <tr key={i}><td><b>{it.name}</b> <span className="muted small">{asked ? `asked ${asked} ${it.unit}` : it.unit}</span>
+                        {a.item_replies?.[String(i)] && <div className="small" style={{ marginTop: 2 }}>Told the counter: <b>{a.item_replies[String(i)].status === 'now' ? 'coming now' : a.item_replies[String(i)].status === 'wait' ? `in ${a.item_replies[String(i)].eta} min` : 'not available'}</b></div>}
+                        {!a.issued_at && canIssue && (
+                          <div className="row" style={{ gap: 4, marginTop: 6 }}>
+                            {([['now', 'Now', 0], ['wait', '10 min', 10], ['wait', '30 min', 30], ['none', 'Not available', 0]] as const).map(([st, lab, eta]) => {
+                              const cur = rep[a.id]?.[i];
+                              const on = cur?.status === st && (st !== 'wait' || cur.eta === eta);
+                              return <button key={lab} className={'qchip' + (st === 'none' ? ' usualchip' : '')} aria-pressed={on} style={on ? { background: st === 'none' ? 'var(--bad, #B42335)' : 'var(--primary, #1B6A4D)', color: '#fff' } : undefined}
+                                onClick={() => setRep((p) => ({ ...p, [a.id]: { ...(p[a.id] ?? {}), [i]: { status: st, eta } } }))}>{lab}</button>;
+                            })}
+                          </div>)}</td>
                         <td className="r num" style={{ color: short ? 'var(--bad, #B42335)' : undefined, fontWeight: short ? 700 : 400 }}>{fmtQty(have, it.unit)}</td>
                         <td className="r">{a.issued_at ? <span className="muted">done</span> : canIssue ? <input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 100 }} aria-label={`Issue ${it.name}`} value={vals[a.id]?.[i] ?? String(asked ?? 1)} onChange={(e) => setVals((p) => ({ ...p, [a.id]: { ...(p[a.id] ?? {}), [i]: e.target.value } }))} /> : null}</td></tr>; })}</tbody>
                   </table></div>
@@ -123,7 +157,9 @@ export function SosPage() {
                   <>
                     <label className="field"><span>Add another item</span><input value={find[a.id] ?? ''} onChange={(e) => setFind((p) => ({ ...p, [a.id]: e.target.value }))} placeholder="Type a few letters" /></label>
                     {matches(a).length > 0 && <div className="row">{matches(a).map((m) => <button key={m.id} className="qchip" onClick={() => { setExtra((p) => ({ ...p, [a.id]: [...(p[a.id] ?? []), m.id] })); setFind((p) => ({ ...p, [a.id]: '' })); }}>{m.name}</button>)}</div>}
-                    <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn primary" disabled={busy === a.id || list.length === 0} onClick={() => void issue(a)}>{busy === a.id ? 'Issuing…' : `Issue to ${where(a)}`}</button></div>
+                    <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+                      {Object.keys(rep[a.id] ?? {}).length > 0 && <button className="btn secondary" onClick={() => void sendReply(a)}>Tell the counter</button>}
+                      <button className="btn primary" disabled={busy === a.id || list.length === 0} onClick={() => void issue(a)}>{busy === a.id ? 'Issuing…' : `Issue to ${where(a)}`}</button></div>
                   </>
                 )}
                 {(a.issued_at || !canIssue) && <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn" onClick={() => void closeIt(a)}>{a.issued_at ? 'Close, counter confirmed by phone' : 'Close this SOS'}</button></div>}

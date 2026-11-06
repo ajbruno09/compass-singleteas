@@ -67,7 +67,22 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
   const [picked, setPicked] = useState<(DeptItem & { loc: number })[]>([]);
   const [qtys, setQtys] = useState<Record<number, string>>({});
   const [left, setLeft] = useState<number | null>(null);
-  useEffect(() => { setLeft(null); supabase.rpc('sos_left', { p_location_id: locationId }).then(({ data }) => setLeft(typeof data === 'number' ? data : null)); }, [locationId]);
+  const [extra, setExtra] = useState<{ status: string; used_at: string | null } | null>(null);
+  const loadLeft = useCallback(async () => {
+    setLeft(null);
+    const [l, e] = await Promise.all([
+      supabase.rpc('sos_left', { p_location_id: locationId }),
+      supabase.from('sos_extra_requests').select('status, used_at').eq('location_id', locationId).gte('created_at', new Date(Date.now() - 20 * 3600 * 1000).toISOString()).order('created_at', { ascending: false }).limit(1)
+    ]);
+    setLeft(typeof l.data === 'number' ? l.data : null);
+    setExtra(((e.data as { status: string; used_at: string | null }[]) ?? [])[0] ?? null);
+  }, [locationId]);
+  useEffect(() => { void loadLeft(); }, [loadLeft]);
+  async function askMore() {
+    const { error } = await supabase.rpc('request_sos_extra', { p_location_id: locationId, p_note: '' });
+    if (error) { toast(errText(error)); return; }
+    toast(t('Sent to Admin')); void loadLeft();
+  }
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const recentKey = `compass-sos-recent-${locationId}`;
@@ -82,10 +97,15 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
     try { const ids: number[] = JSON.parse(localStorage.getItem(recentKey) ?? '[]'); if (picked.length) localStorage.setItem(recentKey, JSON.stringify([...picked.map((i) => i.id), ...ids.filter((x) => !picked.some((i) => i.id === x))].slice(0, 8))); } catch { /* ignore */ }
     onSent(data as SosAlert);
   }
-  if (left === 0) {
+  const grant = extra?.status === 'approved' && !extra.used_at;
+  if (left === 0 && !grant) {
     return (
       <>
-        <p className="banner warn">{t('You have used all your SOS for today. Please call the store or Admin.')}</p>
+        <p className="banner warn">{t('You have used all your SOS for today.')}</p>
+        {extra?.status === 'pending'
+          ? <p className="banner">{t('You asked Admin for one more. Please wait for the answer.')}</p>
+          : <button className="btn primary floor" onClick={() => void askMore()}>{t('Ask Admin for one more SOS')}</button>}
+        <p className="small muted">{t('You can also call the store.')}</p>
         <div className="stack">{contacts.map((c) => <a key={c.phone} className="btn secondary floor" href={`tel:+91${c.phone}`}><Icon name="phone" /> {t('Call {name}', { name: c.full_name })}</a>)}</div>
       </>
     );
@@ -133,7 +153,8 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
       ) : <p className="small muted">{t('That is 3 items, the most for one SOS.')}</p>}
       <div className="seg">{QUICK_NOTES.map((n) => <button key={n} aria-pressed={note === n} onClick={() => setNote(note === n ? '' : n)}>{t(n)}</button>)}</div>
       <label className="field"><span>{t('Anything else to tell the store?')}</span><input value={QUICK_NOTES.includes(note) ? '' : note} onChange={(e) => setNote(e.target.value)} placeholder={t('Optional')} /></label>
-      {left != null && left <= 2 && <p className="small muted">{left === 1 ? t('This is your last SOS for today.') : t('{n} SOS left today', { n: left })}</p>}
+      {grant && left === 0 && <p className="banner ok">{t('Admin allowed one more SOS.')}</p>}
+      {left != null && left <= 2 && left > 0 && <p className="small muted">{left === 1 ? t('This is your last SOS for today.') : t('{n} SOS left today', { n: left })}</p>}
       <button className="btn floor sosgo" disabled={busy} onClick={() => void send()}>{busy ? t('Sending…') : t('Send SOS to the store')}</button>
     </>
   );
@@ -167,6 +188,17 @@ function Status({ locationIds, alert, contacts, now, onDone }: { locationIds: nu
       <div className="card stack">
         <p><b>{label || t('Request')}</b>{alert.note ? <span className="muted"> · {alert.note}</span> : null}</p>
         <p className="small muted">{t('Sent at {time}', { time: timeOf(alert.created_at) })}</p>
+        {wanted.length > 0 && Object.keys(alert.item_replies ?? {}).length > 0 && (
+          <div className="stack" style={{ gap: 4 }}>
+            {wanted.map((i) => { const r = alert.item_replies?.[String(i.id)]; if (!r) return null; return (
+              <p key={i.id} className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+                <span>{(local && i.local_names?.hi) || i.name}</span>
+                {r.status === 'now' ? <span className="chip done">{t('Coming now')}</span>
+                  : r.status === 'wait' ? <span className="chip due">{t('In {n} min', { n: r.eta ?? 0 })}</span>
+                  : <span className="chip late">{t('Not available. Please tell the customer.')}</span>}
+              </p>); })}
+          </div>
+        )}
       </div>
       {alert.issued_at
         ? <p className="banner ok">{t('The store has sent the items. Please check them and close this.')}</p>
