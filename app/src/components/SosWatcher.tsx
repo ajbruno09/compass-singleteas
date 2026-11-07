@@ -108,16 +108,7 @@ export function SosWatcher() {
   if (!watching) return null;
   return (
     <>
-      {role === 'store' && !armed && (
-        <div className="sosoverlay" role="dialog" aria-label="Start the SOS alarm" style={{ background: 'rgba(16,24,21,.92)' }}>
-          <div className="soscard">
-            <p className="sosbig">🔔</p>
-            <h1>SOS alarm</h1>
-            <p style={{ fontSize: 18 }}>The alarm is always on for the store. Tap once so this phone can make the sound.</p>
-            <button className="btn floor sosgo" onClick={() => { const ok = unlockAlarm(); setArmed(ok); if (ok) window.dispatchEvent(new Event('compass-armed')); }}>Start the alarm</button>
-          </div>
-        </div>
-      )}
+      {role === 'store' && !armed && <p className="banner warn">SOS sound switches on by itself with your first tap on this screen.</p>}
       {role === 'store' && armed && now < mutedUntil && <p className="banner warn">The SOS sound is muted for {Math.max(1, Math.ceil((mutedUntil - now) / 60000))} more minutes. It comes back on by itself.</p>}
       {alerts.filter((a) => a.acked_at).map((a) => (
         <div key={a.id} className="banner ok row" style={{ justifyContent: 'space-between' }}>
