@@ -1,0 +1,1 @@
+-- Applied live: notice_reads.seen_at, read_at nullable (acknowledged time); mark_notice_seen, mark_notice_read, notice_status(p_id) for Admin.

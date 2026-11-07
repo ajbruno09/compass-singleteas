@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText } from '../lib/format';
@@ -21,12 +21,21 @@ export function Notices() {
   const [days, setDays] = useState('7');
   const [pin, setPin] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
+  const [status, setStatus] = useState<Record<string, { profile_id: string; full_name: string; seen_at: string | null; read_at: string | null }[]>>({});
+  async function showStatus(id: string) {
+    if (open === id) { setOpen(null); return; }
+    setOpen(id);
+    const { data } = await supabase.rpc('notice_status', { p_id: id });
+    setStatus((s) => ({ ...s, [id]: (data as typeof status[string]) ?? [] }));
+  }
+  const stamp = (t: string | null) => (t ? `${dayLabel(t.slice(0, 10))} ${timeOf(t)}` : '');
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('notices').select('*').order('created_at', { ascending: false }).limit(30);
     const n = (data as Notice[]) ?? []; setRows(n);
     if (n.length) {
-      const r = await supabase.from('notice_reads').select('notice_id').in('notice_id', n.map((x) => x.id));
+      const r = await supabase.from('notice_reads').select('notice_id').not('read_at', 'is', null).in('notice_id', n.map((x) => x.id));
       const c: Record<string, number> = {}; for (const x of (r.data as { notice_id: string }[]) ?? []) c[x.notice_id] = (c[x.notice_id] ?? 0) + 1;
       setReads(c);
     }
@@ -78,9 +87,32 @@ export function Notices() {
       </section>
       <div className="tablewrap">
         <table>
-          <thead><tr><th>Notice</th><th>For</th><th>Read by</th><th style={{ width: 80 }}></th></tr></thead>
+          <thead><tr><th>Notice</th><th>For</th><th>Seen and acknowledged</th><th style={{ width: 80 }}></th></tr></thead>
           <tbody>
-            {rows.map((n) => <tr key={n.id}><td><strong>{n.title}</strong>{n.body && <div className="small muted">{n.body}</div>}<div className="small muted">{dayLabel(n.created_at.slice(0, 10))} {timeOf(n.created_at)}</div></td><td className="small">{who(n)}</td><td className="num">{reads[n.id] ?? 0}</td><td><button className="btn quiet" onClick={() => void remove(n.id)}>Remove</button></td></tr>)}
+            {rows.map((n) => {
+              const st = status[n.id];
+              return (
+                <Fragment key={n.id}>
+                  <tr><td><strong>{n.title}</strong>{n.body && <div className="small muted">{n.body}</div>}<div className="small muted">{dayLabel(n.created_at.slice(0, 10))} {timeOf(n.created_at)}</div></td><td className="small">{who(n)}</td>
+                    <td><button className="btn secondary" onClick={() => void showStatus(n.id)}>{reads[n.id] ?? 0} acknowledged {open === n.id ? '▲' : '▼'}</button></td>
+                    <td><button className="btn quiet" onClick={() => void remove(n.id)}>Remove</button></td></tr>
+                  {open === n.id && (
+                    <tr><td colSpan={4}>
+                      {!st ? <span className="muted small">Loading…</span> : st.length === 0 ? <span className="muted small">No one to show.</span> : (
+                        <div style={{ display: 'grid', gap: 6 }}>
+                          {st.map((x) => (
+                            <div key={x.profile_id} className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
+                              <b>{x.full_name}</b>
+                              <span className="row" style={{ gap: 6 }}>
+                                <span className={'chip ' + (x.seen_at ? 'info' : 'off')}>{x.seen_at ? 'Seen ' + stamp(x.seen_at) : 'Not seen yet'}</span>
+                                <span className={'chip ' + (x.read_at ? 'done' : x.seen_at ? 'late' : 'off')}>{x.read_at ? 'Acknowledged ' + stamp(x.read_at) : x.seen_at ? 'Not acknowledged' : 'Not acknowledged'}</span>
+                              </span>
+                            </div>))}
+                        </div>)}
+                    </td></tr>)}
+                </Fragment>
+              );
+            })}
             {!rows.length && <tr><td colSpan={4} className="muted">No notices yet.</td></tr>}
           </tbody>
         </table>
