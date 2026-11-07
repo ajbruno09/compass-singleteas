@@ -18,9 +18,10 @@ async function publicKey(): Promise<string> {
 
 async function save(profileId: string, sub: PushSubscription) {
   const j = sub.toJSON();
-  await supabase.from('push_subscriptions').upsert({
+  const { error } = await supabase.from('push_subscriptions').upsert({
     profile_id: profileId, endpoint: sub.endpoint, p256dh: j.keys?.p256dh ?? '', auth: j.keys?.auth ?? '', user_agent: navigator.userAgent.slice(0, 200), last_seen: new Date().toISOString()
   }, { onConflict: 'endpoint' });
+  if (error) throw error;
 }
 
 // One tap on each phone. After that, alerts arrive even when Compass is closed.
@@ -38,7 +39,9 @@ export function usePush() {
     if (Notification.permission === 'denied') { setState('blocked'); return; }
     navigator.serviceWorker.ready.then(async (reg) => {
       const sub = await reg.pushManager.getSubscription();
-      if (sub && Notification.permission === 'granted') { await save(profile.id, sub); setState('on'); } else setState('off');
+      if (sub && Notification.permission === 'granted') {
+        try { await save(profile.id, sub); const { data } = await supabase.from('push_subscriptions').select('id').eq('endpoint', sub.endpoint).eq('profile_id', profile.id).limit(1); setState(data && data.length ? 'on' : 'off'); } catch { setState('off'); }
+      } else setState('off');
     }).catch(() => setState('off'));
   }, [profile]);
 

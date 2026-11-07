@@ -37,7 +37,7 @@ export function StaffShell() {
   return (
     <div className="staffshell">
       <Outlet />
-      {myLocations.length > 0 && <SosButton locations={myLocations} defaultId={loc} hideFab />}
+      {myLocations.length > 0 && <SosButton locations={myLocations} defaultId={loc} />}
       <nav className="staffnav" aria-label="Main">
         {items.map(([k, e, l, n, go]) => (
           <button key={k} className={tab === k ? 'on' : ''} onClick={go} aria-current={tab === k ? 'page' : undefined}><span className="ico" aria-hidden><Icon name={e} size={24} stroke={1.7} /></span>{l}{n > 0 && <i>{n}</i>}</button>

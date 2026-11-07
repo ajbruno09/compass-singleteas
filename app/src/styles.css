@@ -231,7 +231,7 @@ tr.click { cursor: pointer; }
 .countercard .name { font: 650 18px/24px var(--font); }
 
 /* SOS */
-.sosfab { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: calc(88px + env(safe-area-inset-bottom)); z-index: 30; display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 0 18px; border-radius: 999px; border: 0; background: var(--bad); color: #fff; font: 650 15px/1 var(--font); letter-spacing: 0.04em; box-shadow: var(--shadow-2); cursor: pointer; }
+.sosfab { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: calc(150px + env(safe-area-inset-bottom)); z-index: 30; display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 0 18px; border-radius: 999px; border: 0; background: var(--bad); color: #fff; font: 650 15px/1 var(--font); letter-spacing: 0.04em; box-shadow: var(--shadow-2); cursor: pointer; }
 .sosfab.live { animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { transform: scale(1.06); } }
 .sosgo { background: var(--bad); color: #fff; }
