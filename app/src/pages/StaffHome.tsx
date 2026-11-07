@@ -190,6 +190,7 @@ export function StaffHome() {
         <button className="tile2" onClick={() => nav(`/indent?loc=${loc}`)}><span className="i"><Icon name="note" size={26} /></span><b>Indent</b><span className="small muted">Order for tomorrow</span></button>
         <button className="tile2" onClick={() => nav('/closing')}><span className="i"><Icon name="calbars" size={26} /></span><b>Closing stock</b><span className="small muted">Daily or weekly</span></button>
         <button className="tile2" onClick={() => window.dispatchEvent(new Event('compass:sos'))}><span className="i"><Icon name="siren2" size={26} /></span><b>SOS</b><span className="small muted">Need something now</span></button>
+        {myLocations.some((l) => l.code === 'snacks_production') && <button className="tile2" onClick={() => nav('/production')}><span className="i"><Icon name="box" size={26} /></span><b>Production</b><span className="small muted">Today's snacks</span></button>}
         <button className="tile2" onClick={() => nav('/messages')}><span className="i"><Icon name="chat" size={26} /></span><b>Messages</b><span className="small muted">Older notices</span></button>
       </div>
       <button className="countercard" onClick={() => nav('/mine')}>

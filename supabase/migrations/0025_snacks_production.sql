@@ -1,0 +1,4 @@
+-- Applied live via Supabase MCP on 7 Nov 2026 (migration 0025_snacks_production).
+-- Creates: location snacks_production, items (Kalonji, Ajwain, Poha, Samosa Sheet, Spring Roll Sheet, Light Soy Sauce, Oyster Sauce, Red Chilli Paste, Onion Samosa),
+-- tables prod_recipes, prod_recipe_lines, prod_plan, prod_levels, prod_orders, functions prod_loc, prod_on_hand, prod_ingredients, prod_order, prod_set_status, prod_set_yield,
+-- prod_daily_reminder (7:00 IST), prod_late_check (11:00 IST), prod_urgent_check (every 30 min). 10 snack recipes seeded per 100 pcs.
