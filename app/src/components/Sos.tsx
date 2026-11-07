@@ -77,8 +77,8 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
   const [qtys, setQtys] = useState<Record<number, string>>({});
   const [left, setLeft] = useState<number | null>(null);
   const [extra, setExtra] = useState<{ status: string; used_at: string | null } | null>(null);
-  const loadLeft = useCallback(async () => {
-    setLeft(null);
+  const loadLeft = useCallback(async (quiet?: boolean) => {
+    if (!quiet) setLeft(null);
     const [l, e] = await Promise.all([
       supabase.rpc('sos_left', { p_location_id: locationId }),
       supabase.from('sos_extra_requests').select('status, used_at').eq('location_id', locationId).gte('created_at', new Date(Date.now() - 20 * 3600 * 1000).toISOString()).order('created_at', { ascending: false }).limit(1)
@@ -87,6 +87,13 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
     setExtra(((e.data as { status: string; used_at: string | null }[]) ?? [])[0] ?? null);
   }, [locationId]);
   useEffect(() => { void loadLeft(); }, [loadLeft]);
+  // While the counter waits for Admin, keep checking, and check again the moment the phone comes back to the screen.
+  useEffect(() => {
+    const again = () => { if (document.visibilityState === 'visible') void loadLeft(true); };
+    const iv = window.setInterval(again, 5000);
+    document.addEventListener('visibilitychange', again); window.addEventListener('focus', again);
+    return () => { window.clearInterval(iv); document.removeEventListener('visibilitychange', again); window.removeEventListener('focus', again); };
+  }, [loadLeft]);
   async function askMore() {
     const { error } = await supabase.rpc('request_sos_extra', { p_location_id: locationId, p_note: '' });
     if (error) { toast(errText(error)); return; }
