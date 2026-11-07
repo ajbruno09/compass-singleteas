@@ -219,13 +219,15 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
           </div>
         ))}
       </fieldset>
-      <fieldset className="card" style={{ display: 'grid', gap: 10 }}>
-        <legend className="label">Name in other languages (optional)</legend>
-        {Object.entries(LANGUAGES).map(([code, label]) => (
-          <label key={code} className="row" style={{ gap: 10 }}><span className="small" style={{ width: 150 }}>{label}</span>
-            <input id={`item-local-${code}`} value={local[code] ?? ''} onChange={(e) => setLocal((p) => ({ ...p, [code]: e.target.value }))} /></label>
-        ))}
-      </fieldset>
+      <details className="card langs" open={Object.values(local).some((v) => v)}>
+        <summary className="label" style={{ cursor: 'pointer' }}>Name in other languages (optional){Object.values(local).filter((v) => v).length > 0 ? ` · ${Object.values(local).filter((v) => v).length} filled` : ''}</summary>
+        <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+          {Object.entries(LANGUAGES).map(([code, label]) => (
+            <label key={code} className="row" style={{ gap: 10 }}><span className="small" style={{ width: 150 }}>{label}</span>
+              <input id={`item-local-${code}`} value={local[code] ?? ''} onChange={(e) => setLocal((p) => ({ ...p, [code]: e.target.value }))} /></label>
+          ))}
+        </div>
+      </details>
       <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Active</label>
       {error && <p className="banner bad" role="alert">{error}</p>}
     </Sheet>
