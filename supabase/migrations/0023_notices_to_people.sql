@@ -1,0 +1,1 @@
+-- Applied live: notices.profile_ids uuid[] and notices_read policy updated so a notice can go to chosen people on any counter.

@@ -410,3 +410,5 @@ tr.click { cursor: pointer; }
 .lbl { display: inline-flex; align-items: center; gap: 8px; }
 .lbl svg { color: var(--ink-2); flex: none; }
 .tile2 .i { color: var(--brand); }
+
+.btn.pick.on, .btn.secondary.pick[aria-pressed=true] { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 700; }

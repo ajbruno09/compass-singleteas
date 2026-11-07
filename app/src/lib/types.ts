@@ -54,6 +54,6 @@ export interface Rule {
   unit: string; value: unknown; wired: boolean; money: boolean; sort: number; why: string; updated_at: string;
 }
 export interface RuleHist { id: number; key: string; value: unknown; effective_from: string; set_at: string; note: string; }
-export interface Notice { id: string; title: string; body: string; location_ids: number[] | null; pinned: boolean; expires_at: string | null; created_at: string; }
+export interface Notice { id: string; title: string; body: string; location_ids: number[] | null; profile_ids?: string[] | null; pinned: boolean; expires_at: string | null; created_at: string; }
 export interface AlertRow { id: string; level: 'urgent' | 'today' | 'fyi'; title: string; body: string; created_at: string; location_id: number | null; source: string; }
 export interface Signup { id: string; full_name: string; phone: string; location_ids: number[]; selfie: string | null; created_at: string; }
