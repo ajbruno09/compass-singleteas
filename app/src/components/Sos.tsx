@@ -11,6 +11,14 @@ import { useLang } from '../lib/i18n';
 const QUICK_NOTES = ['Finished', 'Almost over', 'Need it now', 'Wrong item came'];
 
 // The red SOS button on a counter's phone: "I need something right now".
+// People are called by their job, never by name: Admin, Store, Manager. Two of the same job get a number.
+const JOB: Record<string, string> = { owner: 'Admin', store: 'Store', manager: 'Manager' };
+function roleName(c: Contact, i: number, all: Contact[]): string {
+  const same = all.filter((x) => x.role === c.role);
+  const base = JOB[c.role] ?? 'Store';
+  return same.length > 1 ? `${base} ${same.indexOf(c) + 1}` : base;
+}
+
 export function SosButton({ locations, defaultId, hideFab }: { locations: Location[]; defaultId?: number; hideFab?: boolean }) {
   const toast = useToast();
   const { t } = useLang();
@@ -107,7 +115,7 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
           ? <p className="banner">{t('You asked Admin for one more. Please wait for the answer.')}</p>
           : <button className="btn primary floor" onClick={() => void askMore()}>{t('Ask Admin for one more SOS')}</button>}
         <p className="small muted">{t('You can also call the store.')}</p>
-        <div className="stack">{contacts.map((c) => <a key={c.phone} className="btn secondary floor" href={`tel:+91${c.phone}`}><Icon name="phone" /> {t('Call {name}', { name: c.full_name })}</a>)}</div>
+        <div className="stack">{contacts.map((c, i) => <a key={c.phone} className="btn secondary floor" href={`tel:+91${c.phone}`}><Icon name="phone" /> {t('Call {name}', { name: roleName(c, i, contacts) })}</a>)}</div>
       </>
     );
   }
@@ -212,7 +220,7 @@ function Status({ locationIds, alert, contacts, now, onDone }: { locationIds: nu
           : <p className="banner warn">{t('Waiting for the store to answer…')}</p>}
       {((!alert.acked_at && escalated) || overdue) && (
         <div className="stack">
-          {contacts.map((c) => <a key={c.phone} className="btn secondary floor" href={`tel:+91${c.phone}`}><Icon name="phone" /> {t('Call {name}', { name: c.full_name })}</a>)}
+          {contacts.map((c, i) => <a key={c.phone} className="btn secondary floor" href={`tel:+91${c.phone}`}><Icon name="phone" /> {t('Call {name}', { name: roleName(c, i, contacts) })}</a>)}
         </div>
       )}
       <button className="btn secondary floor" onClick={() => void done()}>{alert.acked_at || alert.issued_at ? t('I got it, close this') : t('Cancel, no longer needed')}</button>
