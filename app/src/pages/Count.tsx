@@ -8,7 +8,9 @@ import { AvatarButton } from '../components/AvatarButton';
 import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 
-interface It { id: number; name: string; local_names: Record<string, string> | null; unit: string; group_id: number | null; quick_amounts: number[] | null; count_frequency: string }
+interface It { id: number; name: string; local_names: Record<string, string> | null; unit: string; group_id: number | null; quick_amounts: number[] | null; count_frequency: string; base_unit?: string | null }
+
+const mult = (i: { unit: string; base_unit?: string | null }) => (i.unit === 'kg' && i.base_unit === 'g' ? 1000 : 1);
 
 export function CountPage() {
   const [sp] = useSearchParams();
@@ -49,12 +51,13 @@ export function CountPage() {
       if ((st as { status: string } | null)?.status === 'submitted') setSentAlready(true);
       const { data: ls } = await supabase.from('stock_count_lines').select('item_id, qty').eq('count_id', String(id));
       const rows = (ls as { item_id: number; qty: number }[]) ?? [];
-      setVals(Object.fromEntries(rows.map((r) => [r.item_id, String(Number(r.qty))])));
+      const um = new Map(list.map((x) => [x.id, mult(x)]));
+      setVals(Object.fromEntries(rows.map((r) => [r.item_id, String(Math.round(Number(r.qty) * (um.get(r.item_id) ?? 1) * 1000) / 1000)])));
       setSaved(Object.fromEntries(rows.map((r) => [r.item_id, true])));
     })();
   }, [loc, freq]);
 
-  const step = (i: It) => { const a = (i.quick_amounts ?? []).filter((n) => n > 0); return a.length ? Math.min(...a) : 1; };
+  const step = (i: It) => { const a = (i.quick_amounts ?? []).filter((n) => n > 0); return (a.length ? Math.min(...a) : 1) * mult(i); };
   const nameOf = (i: It) => (hi && i.local_names?.hi) || i.name;
   const shown = useMemo(() => items.filter((i) => i.name.toLowerCase().includes(q.toLowerCase())), [items, q]);
   const done = items.filter((i) => saved[i.id]).length;
@@ -62,7 +65,7 @@ export function CountPage() {
 
   async function save(i: It, v: string) {
     if (!countId || v.trim() === '' || Number.isNaN(Number(v))) return;
-    const { error } = await supabase.rpc('save_count_line', { p_count_id: countId, p_item_id: i.id, p_qty: Number(v) });
+    const { error } = await supabase.rpc('save_count_line', { p_count_id: countId, p_item_id: i.id, p_qty: Number(v) / mult(i) });
     if (error) setErr(errText(error)); else { setErr(''); setSaved((p) => ({ ...p, [i.id]: true })); }
   }
   async function send() {
@@ -84,7 +87,7 @@ export function CountPage() {
         <input placeholder={t('Find an item')} value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="stack">{shown.map((i) => (
           <div key={i.id} className="card row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-            <div style={{ minWidth: 0, flex: 1 }}><b>{nameOf(i)}</b><div className={'small ' + (saved[i.id] ? 'muted' : '')} style={saved[i.id] ? undefined : { color: '#B3541E' }}>{i.unit}{saved[i.id] ? ' · counted' : ' · not counted yet'}</div></div>
+            <div style={{ minWidth: 0, flex: 1 }}><b>{nameOf(i)}</b><div className={'small ' + (saved[i.id] ? 'muted' : '')} style={saved[i.id] ? undefined : { color: '#B3541E' }}>{mult(i) === 1000 ? 'g (grams, from the weighing machine)' : i.unit}{saved[i.id] ? ' · counted' : ' · not counted yet'}</div></div>
             <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
               <button className="qchip" aria-label="Less" onClick={() => { const n = Math.max(0, Number(vals[i.id] || 0) - step(i)); const s = String(Math.round(n * 1000) / 1000); setVals((p) => ({ ...p, [i.id]: s })); void save(i, s); }}>−</button>
               <input inputMode="decimal" className="num" style={{ width: 84, textAlign: 'center' }} aria-label={nameOf(i)} value={vals[i.id] ?? ''} onChange={(e) => { setVals((p) => ({ ...p, [i.id]: e.target.value })); setSaved((p) => { const c = { ...p }; delete c[i.id]; return c; }); }} onBlur={(e) => void save(i, e.target.value)} />

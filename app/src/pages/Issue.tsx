@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
-import { qty as fmtQty, errText } from '../lib/format';
+import { qty as fmtQty, errText, packFactor, round3 } from '../lib/format';
 import { timeOf } from '../lib/ist';
 import { useToast } from '../components/Toast';
 
-interface Item { id: number; name: string; unit: string }
+interface Item { id: number; name: string; unit: string; show_as?: string | null; purchase_factor?: number | null }
 interface IssueRow { id: string; issue_number: string; to_location_id: number; status: string; issued_at: string | null; for_date?: string | null; late_reason?: string | null; late_days?: number | null; issue_lines: { item_id: number; qty_issued: number; qty_received: number | null }[] }
 
 export function Issue() {
@@ -30,7 +30,7 @@ export function Issue() {
 
   useEffect(() => {
     supabase.rpc('business_date', { p_at: new Date().toISOString() }).then(({ data }) => setDay(String(data)));
-    supabase.from('items').select('id, name, unit').eq('active', true).order('name').then(({ data }) => setItems(Object.fromEntries(((data as Item[]) ?? []).map((i) => [i.id, i]))));
+    supabase.from('items').select('id, name, unit, show_as, purchase_factor').eq('active', true).order('name').then(({ data }) => setItems(Object.fromEntries(((data as Item[]) ?? []).map((i) => [i.id, i]))));
   }, []);
   useEffect(() => { if (loc == null && counters.length) setLoc(counters[0].id); }, [counters, loc]);
 
@@ -46,7 +46,7 @@ export function Issue() {
   const isLate = !!forDate && !!day && forDate < day;
 
   useEffect(() => {
-    if (!loc || !day || !forDate) return;
+    if (!loc || !day || !forDate || !Object.keys(items).length) return;
     setVals({}); setExtra([]); setErr('');
     (async () => {
       const [ind, oh] = await Promise.all([
@@ -57,9 +57,9 @@ export function Issue() {
       for (const r of (ind.data as { indent_lines: { item_id: number; qty: number }[] }[]) ?? []) for (const l of r.indent_lines) a[l.item_id] = (a[l.item_id] ?? 0) + Number(l.qty);
       setAsked(a);
       setStore(Object.fromEntries(((oh.data as { item_id: number; qty: number }[]) ?? []).map((r) => [r.item_id, Number(r.qty)])));
-      setVals(Object.fromEntries(Object.entries(a).map(([id, q]) => [id, String(q)])));
+      setVals(Object.fromEntries(Object.entries(a).map(([id, q]) => [id, String(items[Number(id)] && packFactor(items[Number(id)]) ? Math.max(1, Math.round(q / packFactor(items[Number(id)]))) : q)])));
     })();
-  }, [loc, day, forDate]);
+  }, [loc, day, forDate, items]);
 
   const ids = useMemo(() => Object.keys(asked).map(Number).concat(extra.filter((e) => !(e in asked))).filter((id) => items[id]).sort((a, b) => items[a].name.localeCompare(items[b].name)), [asked, extra, items]);
   const matches = useMemo(() => find.trim().length < 2 ? [] : Object.values(items).filter((i) => i.name.toLowerCase().includes(find.toLowerCase()) && !ids.includes(i.id)).slice(0, 6), [find, items, ids]);
@@ -67,7 +67,7 @@ export function Issue() {
 
   async function send() {
     setErr('');
-    const lines = Object.entries(vals).filter(([, v]) => Number(v) > 0).map(([id, v]) => ({ item_id: Number(id), qty: Number(v) }));
+    const lines = Object.entries(vals).filter(([, v]) => Number(v) > 0).map(([id, v]) => ({ item_id: Number(id), qty: round3(Number(v) * (packFactor(items[Number(id)] ?? {}) || 1)) }));
     if (!lines.length) return setErr('Enter a quantity for at least one item.');
     const reason = [why, whyNote.trim()].filter(Boolean).join(': ');
     if (isLate && !reason) return setErr('This indent is for an earlier day. Please say why it is being issued late.');
@@ -91,10 +91,10 @@ export function Issue() {
       <div className="seg" role="group" aria-label="Counter">{counters.map((c) => <button key={c.id} aria-pressed={loc === c.id} onClick={() => { setLoc(c.id); setForDate(day); }}>{c.name}</button>)}</div>
       <div className="tablewrap"><table>
         <thead><tr><th>Item</th><th className="r">Asked</th><th className="r">In store</th><th className="r" style={{ width: 130 }}>Issue now</th></tr></thead>
-        <tbody>{ids.map((id) => { const it = items[id]; const have = store[id] ?? 0; const want = Number(vals[id] ?? 0); const short = want > have;
-          return <tr key={id}><td><b>{it.name}</b> <span className="muted small">{it.unit}</span></td>
-            <td className="r num">{asked[id] != null ? fmtQty(asked[id], it.unit) : <span className="muted small">extra</span>}</td>
-            <td className="r num" style={{ color: short ? 'var(--bad, #B42335)' : undefined, fontWeight: short ? 700 : 400 }}>{fmtQty(have, it.unit)}</td>
+        <tbody>{ids.map((id) => { const it = items[id]; const f = packFactor(it); const have = store[id] ?? 0; const want = Number(vals[id] ?? 0) * (f || 1); const short = want > have; const show = (n: number) => (f ? `${Math.round((n / f) * 10) / 10} ${it.show_as}` : fmtQty(n, it.unit));
+          return <tr key={id}><td><b>{it.name}</b> <span className="muted small">{f ? it.show_as : it.unit}</span></td>
+            <td className="r num">{asked[id] != null ? show(asked[id]) : <span className="muted small">extra</span>}</td>
+            <td className="r num" style={{ color: short ? 'var(--bad, #B42335)' : undefined, fontWeight: short ? 700 : 400 }}>{show(have)}</td>
             <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110 }} aria-label={`Issue ${it.name}`} value={vals[id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} /></td></tr>; })}</tbody>
       </table>{ids.length === 0 && <p className="empty">{loc ? `${locName(loc)} has not sent an indent for today. You can still add items below.` : ''}</p>}</div>
       {isLate && (

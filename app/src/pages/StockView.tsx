@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
-import { qty as fmtQty } from '../lib/format';
+import { qty as fmtQty, packFactor } from '../lib/format';
 import type { Group } from '../lib/types';
 
-interface Item { id: number; name: string; unit: string; group_id: number | null }
+interface Item { id: number; name: string; unit: string; group_id: number | null; show_as?: string | null; purchase_factor?: number | null }
 interface OnHand { location_id: number; item_id: number; qty: number }
 
 export function StockView() {
@@ -17,7 +17,7 @@ export function StockView() {
   const [q, setQ] = useState('');
   const [onlyStock, setOnlyStock] = useState(true);
   useEffect(() => {
-    supabase.from('items').select('id, name, unit, group_id').eq('active', true).order('name').then(({ data }) => setItems((data as Item[]) ?? []));
+    supabase.from('items').select('id, name, unit, group_id, show_as, purchase_factor').eq('active', true).order('name').then(({ data }) => setItems((data as Item[]) ?? []));
     supabase.from('stock_on_hand').select('*').then(({ data }) => setOh((data as OnHand[]) ?? []));
     supabase.from('item_locations').select('item_id, location_id').then(({ data }) => setLinks(new Set(((data as { item_id: number; location_id: number }[]) ?? []).map((r) => `${r.location_id}:${r.item_id}`))));
     supabase.from('item_groups').select('*').order('sort').then(({ data }) => setGroups((data as Group[]) ?? []));
@@ -39,7 +39,7 @@ export function StockView() {
       {[...groups, { id: null as unknown as number, name: 'No shelf group yet', icon: '📦' } as Group].map((g) => { const list = rows.filter((i) => (g.id == null ? !groups.some((x) => x.id === i.group_id) : i.group_id === g.id)); if (!list.length) return null; return (
         <div key={g.id ?? 'none'}><h2 style={{ marginBottom: 8 }}>{g.icon} {g.name}</h2>
           <div className="tablewrap"><table><thead><tr><th>Item</th><th className="r">In hand</th></tr></thead>
-            <tbody>{list.map((i) => { const v = qtyOf.get(i.id) ?? 0; return <tr key={i.id}><td>{i.name}</td><td className="r num" style={{ color: v < 0 ? '#B42335' : undefined, fontWeight: v < 0 ? 700 : 400 }}>{fmtQty(v, i.unit)}</td></tr>; })}</tbody></table></div></div>); })}
+            <tbody>{list.map((i) => { const v = qtyOf.get(i.id) ?? 0; return <tr key={i.id}><td>{i.name}</td><td className="r num" style={{ color: v < 0 ? '#B42335' : undefined, fontWeight: v < 0 ? 700 : 400 }}>{(loc === 0 || loc === 1) && packFactor(i) ? <>{Math.round((v / packFactor(i)) * 10) / 10} {i.show_as}<span className="muted small"> ({fmtQty(v, i.unit)})</span></> : fmtQty(v, i.unit)}</td></tr>; })}</tbody></table></div></div>); })}
       {rows.length === 0 && <p className="empty card">Nothing to show here. {onlyStock ? 'Untick “Only items with stock” to see every item for this place, or enter opening stock first.' : 'No items are set up for this place yet.'}</p>}
     </>
   );

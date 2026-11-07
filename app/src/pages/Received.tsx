@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { useLang } from '../lib/i18n';
-import { errText } from '../lib/format';
+import { errText, packFactor, round3 } from '../lib/format';
 import { timeOf } from '../lib/ist';
 import { AvatarButton } from '../components/AvatarButton';
 import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 
 interface Pending { id: string; issue_number: string; issued_at: string }
-interface Line { item_id: number; name: string; local_names: Record<string, string> | null; unit: string; quick_amounts: number[] | null; qty_issued: number }
+interface Line { item_id: number; name: string; local_names: Record<string, string> | null; unit: string; quick_amounts: number[] | null; qty_issued: number; show_as?: string | null; purchase_factor?: number | null }
 
 export function ReceivedPage() {
   const [sp] = useSearchParams();
@@ -23,6 +23,7 @@ export function ReceivedPage() {
   const [cur, setCur] = useState<Pending | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [vals, setVals] = useState<Record<number, string>>({});
+  const facRef = useRef<Record<number, number>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const office = profile?.role === 'owner' || profile?.role === 'store' || profile?.role === 'manager';
@@ -36,7 +37,10 @@ export function ReceivedPage() {
 
   async function open(p: Pending) {
     const { data } = await supabase.rpc('issue_items_to_confirm', { p_issue_id: p.id });
-    const ls = (data as Line[]) ?? []; setLines(ls); setVals(Object.fromEntries(ls.map((l) => [l.item_id, String(Number(l.qty_issued))]))); setCur(p); setErr('');
+    const raw = (data as Line[]) ?? [];
+    const fac: Record<number, number> = {}; for (const l of raw) { const f = packFactor(l); if (f) fac[l.item_id] = f; }
+    facRef.current = fac;
+    const ls = raw.map((l) => (fac[l.item_id] ? { ...l, unit: l.show_as as string, qty_issued: round3(Number(l.qty_issued) / fac[l.item_id]), quick_amounts: [1] } : l)); setLines(ls); setVals(Object.fromEntries(ls.map((l) => [l.item_id, String(Number(l.qty_issued))]))); setCur(p); setErr('');
   }
   const step = (l: Line) => { const a = (l.quick_amounts ?? []).filter((n) => n > 0); return a.length ? Math.min(...a) : 1; };
   const nameOf = (l: Line) => (hi && l.local_names?.hi) || l.name;
@@ -48,7 +52,7 @@ export function ReceivedPage() {
     const big = lines.filter((l) => { const sent = Number(l.qty_issued); const got = Number(vals[l.item_id] || 0); return sent > 0 && (got === 0 || got >= sent * 5 || got <= sent / 5); });
     if (big.length && !window.confirm('Please check these, the number is very different from what the store sent:\n\n' + big.map((l) => `${nameOf(l)}: sent ${Number(l.qty_issued)} ${l.unit}, you entered ${Number(vals[l.item_id] || 0)}`).join('\n') + '\n\nIs this correct?')) return;
     setBusy(true);
-    const { error } = await supabase.rpc('confirm_issue', { p_issue_id: cur!.id, p_lines: lines.map((l) => ({ item_id: l.item_id, qty: Number(vals[l.item_id] || 0) })) });
+    const { error } = await supabase.rpc('confirm_issue', { p_issue_id: cur!.id, p_lines: lines.map((l) => ({ item_id: l.item_id, qty: round3(Number(vals[l.item_id] || 0) * (facRef.current[l.item_id] ?? 1)) })) });
     setBusy(false);
     if (error) return setErr(errText(error));
     toast(t('Thank you. Confirmed.')); setCur(null); void load();

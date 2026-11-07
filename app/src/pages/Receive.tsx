@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { qty as fmtQty, errText, date as fdate } from '../lib/format';
+import { qty as fmtQty, errText, date as fdate, packFactor, round3 } from '../lib/format';
 import { Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 
-interface Item { id: number; name: string; unit: string }
+interface Item { id: number; name: string; unit: string; show_as?: string | null; purchase_factor?: number | null }
 interface Vendor { id: string; name: string }
 interface Po { id: string; po_number: string; vendor_id: string; status: string; order_date: string; required_date: string | null; po_lines: { item_id: number; qty: number }[] }
 interface Grn { po_id: string; grn_lines: { item_id: number; qty_received: number }[] }
@@ -21,7 +21,7 @@ export function Receive() {
   const load = useCallback(async () => {
     const [p, i, v] = await Promise.all([
       supabase.from('purchase_orders').select('id, po_number, vendor_id, status, order_date, required_date, po_lines(item_id, qty)').in('status', ['sent', 'partly_received']).order('order_date', { ascending: false }),
-      supabase.from('items').select('id, name, unit').eq('active', true).order('name'),
+      supabase.from('items').select('id, name, unit, show_as, purchase_factor').eq('active', true).order('name'),
       supabase.from('vendors').select('id, name').eq('active', true).order('name')
     ]);
     const list = (p.data as Po[]) ?? [];
@@ -84,7 +84,7 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone }: { po: Po | n
 
   async function save() {
     setErr('');
-    const lines = Object.entries(vals).filter(([, v]) => Number(v) > 0).map(([id, v]) => ({ item_id: Number(id), qty: Number(v) }));
+    const lines = Object.entries(vals).filter(([, v]) => Number(v) > 0).map(([id, v]) => ({ item_id: Number(id), qty: round3(Number(v) * (packFactor(items[Number(id)] ?? {}) || 1)) }));
     if (!lines.length) return setErr('Enter what arrived for at least one item.');
     if (!po && !vendor) return setErr('Choose the vendor.');
     setBusy(true);
@@ -100,9 +100,9 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone }: { po: Po | n
       {!po && <label className="field"><span>Vendor</span><select value={vendor} onChange={(e) => setVendor(e.target.value)}><option value="">Choose…</option>{Object.values(vendors).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label>}
       <div className="tablewrap"><table>
         <thead><tr><th>Item</th>{po && <th className="r">Ordered</th>}<th className="r" style={{ width: 130 }}>Arrived now</th></tr></thead>
-        <tbody>{ids.map((id) => { const it = items[id]; if (!it) return null; const line = po?.po_lines.find((l) => l.item_id === id); const already = po && line ? got(po, id) : 0;
-          return <tr key={id}><td><b>{it.name}</b> <span className="muted small">{it.unit}</span></td>
-            {po && <td className="r num">{line ? <>{fmtQty(Number(line.qty), it.unit)}{already > 0 && <div className="small muted">got {fmtQty(already, it.unit)}</div>}</> : <span className="muted small">extra</span>}</td>}
+        <tbody>{ids.map((id) => { const it = items[id]; if (!it) return null; const line = po?.po_lines.find((l) => l.item_id === id); const already = po && line ? got(po, id) : 0; const f = packFactor(it); const d = (n: number) => (f ? `${Math.round((n / f) * 10) / 10} ${it.show_as}` : fmtQty(n, it.unit));
+          return <tr key={id}><td><b>{it.name}</b> <span className="muted small">{f ? it.show_as : it.unit}</span></td>
+            {po && <td className="r num">{line ? <>{d(Number(line.qty))}{already > 0 && <div className="small muted">got {d(already)}</div>}</> : <span className="muted small">extra</span>}</td>}
             <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110 }} aria-label={`Arrived ${it.name}`} value={vals[id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} /></td></tr>; })}</tbody>
       </table></div>
       <label className="field"><span>Add another item</span><input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Type a few letters" /></label>

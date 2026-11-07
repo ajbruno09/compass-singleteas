@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
-import { errText, qty as fmtQty } from '../lib/format';
+import { errText, qty as fmtQty, packFactor, round3 } from '../lib/format';
 import { clock12, dayLabel, isSealed, sealTime, timeOf, windowState, type Reminders } from '../lib/ist';
 import { REASONS, type DeptItem, type Group, type IndentReason, type IndentRec, type Usual } from '../lib/types';
 import { useToast } from '../components/Toast';
@@ -34,6 +34,7 @@ export function IndentPage() {
   const where = myLocations.find((l) => l.id === locId)?.name ?? '';
 
   const [items, setItems] = useState<DeptItem[]>([]);
+  const facRef = useRef<Record<number, number>>({});
   const [groups, setGroups] = useState<Group[]>([]);
   const [usual, setUsual] = useState<Record<number, Usual>>({});
   const [indent, setIndent] = useState<IndentRec | null>(null);
@@ -74,15 +75,20 @@ export function IndentPage() {
       supabase.rpc('open_indent', { p_location_id: locId })
     ]);
     if (ind.error) { toast(errText(ind.error)); setLoading(false); return; }
-    setItems((it.data as DeptItem[]) ?? []);
+    const raw = (it.data as DeptItem[]) ?? [];
+    const fac: Record<number, number> = {};
+    for (const i of raw) { const f = packFactor(i); if (f) fac[i.id] = f; }
+    facRef.current = fac;
+    const dv = (id: number, n: number) => (fac[id] ? round3(n / fac[id]) : n);
+    setItems(raw.map((i) => (fac[i.id] ? { ...i, unit: i.show_as as string, quick_amounts: [1, 2, 3, 4, 5] } : i)));
     setGroups((gr.data as Group[]) ?? []);
-    setUsual(Object.fromEntries(((us.data as Usual[]) ?? []).map((u) => [u.item_id, { ...u, usual: Number(u.usual), last_qty: Number(u.last_qty) }])));
+    setUsual(Object.fromEntries(((us.data as Usual[]) ?? []).map((u) => [u.item_id, { ...u, usual: dv(u.item_id, Number(u.usual)), last_qty: dv(u.item_id, Number(u.last_qty)) }])));
     setRem((win.data as Reminders) ?? {});
     const rec = ind.data as IndentRec;
     setIndent(rec);
     const lc = await supabase.rpc('last_closing', { p_location_id: locId });
     const lrows = (lc.data as { item_id: number; qty: number; counted_at: string; issued_since: number }[] | null) ?? [];
-    setLastNight(Object.fromEntries(lrows.map((r) => [r.item_id, { qty: Number(r.qty), issued: Number(r.issued_since) }])));
+    setLastNight(Object.fromEntries(lrows.map((r) => [r.item_id, { qty: dv(r.item_id, Number(r.qty)), issued: dv(r.item_id, Number(r.issued_since)) }])));
     setClosedAt(lrows[0]?.counted_at ?? null);
     const [rs, rq] = await Promise.all([
       supabase.from('indent_reasons').select('*').eq('active', true).order('sort'),
@@ -91,7 +97,7 @@ export function IndentPage() {
     setReasons((rs.data as IndentReason[]) ?? []);
     setReq(((rq.data as { status: string; reason: string; decision_note: string }[]) ?? [])[0] ?? null);
     const ln = await supabase.from('indent_lines').select('item_id, qty, reason').eq('indent_id', rec.id);
-    setLines(Object.fromEntries(((ln.data as { item_id: number; qty: number; reason: string | null }[]) ?? []).map((l) => [l.item_id, { qty: Number(l.qty), reason: l.reason ?? '' }])));
+    setLines(Object.fromEntries(((ln.data as { item_id: number; qty: number; reason: string | null }[]) ?? []).map((l) => [l.item_id, { qty: dv(l.item_id, Number(l.qty)), reason: l.reason ?? '' }])));
     setLoading(false);
   }, [locId, toast]);
   useEffect(() => { setView({ kind: 'groups' }); setQ(''); void load(); }, [load]);
@@ -113,13 +119,13 @@ export function IndentPage() {
     window.clearTimeout(timers.current[i.id]);
     timers.current[i.id] = window.setTimeout(async () => {
       const { error } = await supabase.rpc('set_indent_line', {
-        p_indent_id: indent.id, p_item_id: i.id, p_qty: next?.qty ?? 0, p_reason: next?.reason ?? null, p_method: 'tap'
+        p_indent_id: indent.id, p_item_id: i.id, p_qty: round3((next?.qty ?? 0) * (facRef.current[i.id] ?? 1)), p_reason: next?.reason ?? null, p_method: 'tap'
       });
       if (error) { toast(errText(error)); void load(); }
     }, 450);
   }
   const setQty = (i: DeptItem, n: number, keepReason = true) => {
-    const v = round(Math.max(0, n));
+    const v = facRef.current[i.id] ? Math.round(Math.max(0, n)) : round(Math.max(0, n));
     save(i, v > 0 ? { qty: v, reason: keepReason ? (lines[i.id]?.reason ?? '') : '' } : null);
   };
 

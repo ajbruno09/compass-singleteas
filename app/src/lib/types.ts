@@ -32,6 +32,7 @@ export interface Group { id: number; code: string; name: string; icon: string | 
 export interface DeptItem {
   id: number; name: string; local_names: Record<string, string> | null; group_id: number | null; unit: string;
   pack_note: string | null; quick_amounts: number[] | null; photo_path: string | null;
+  show_as?: string | null; purchase_factor?: number | null; base_unit?: string | null;
 }
 export interface IndentRec { id: string; location_id: number; for_date: string; status: 'draft' | 'submitted' | 'locked' | 'cancelled'; submitted_at: string | null; nothing_needed: boolean; first_submitted_at?: string | null; late?: boolean; outcome?: string | null; missed_reason?: string | null; reopen_until?: string | null; }
 export interface Usual { item_id: number; usual: number; last_qty: number; runs: number; }

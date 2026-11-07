@@ -18,3 +18,7 @@ export function quick(n: number, unit: string) {
 const dfmt = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 export const date = (s: string | null | undefined) => (s ? dfmt.format(new Date(s + (s.length === 10 ? 'T00:00:00' : ''))) : '—');
 export const errText = (e: unknown) => (e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Something went wrong. Try again.');
+
+// Items ordered and issued in packs (for example ice cream in tubs). Stock stays in the counted unit (kg); screens show packs.
+export const packFactor = (i: { show_as?: string | null; purchase_factor?: number | string | null }) => (i.show_as && Number(i.purchase_factor) > 0 ? Number(i.purchase_factor) : 0);
+export const round3 = (n: number) => Math.round(n * 1000) / 1000;

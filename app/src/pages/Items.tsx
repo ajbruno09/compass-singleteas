@@ -101,6 +101,7 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
   const [cost, setCost] = useState(item?.last_cost?.toString() ?? '');
   const [active, setActive] = useState(item?.active ?? true);
   const [baseUnit, setBaseUnit] = useState(item?.base_unit ?? '');
+  const [packOrder, setPackOrder] = useState(Boolean(item?.show_as));
   const [countsAs, setCountsAs] = useState(item?.counts_as ?? '');
   const [packName, setPackName] = useState(item?.pack_name ?? '');
   const [packSize, setPackSize] = useState(item?.pack_size?.toString() ?? '');
@@ -140,7 +141,7 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
         name: name.trim(), category_id: categoryId, group_id: groupId || null, unit, purchase_unit: purchaseUnit || null,
         purchase_factor: purchaseUnit ? Number(factor) : null, quick_amounts: quickVals, count_frequency: freq,
         tolerance_pct: Number(tol) || 0, last_cost: cost === '' ? null : Number(cost), active,
-        base_unit: baseUnit || null, counts_as: countsAs || null, pack_name: packName || null,
+        show_as: purchaseUnit && packOrder ? purchaseUnit : null, base_unit: baseUnit || null, counts_as: countsAs || null, pack_name: packName || null,
         pack_size: packSize === '' ? null : Number(packSize), pieces_per_pack: pieces === '' ? null : Number(pieces),
         slices_per_pack: slices === '' ? null : Number(slices), weight_per_pack_g: packG === '' ? null : Number(packG),
         wastage_pct: waste === '' ? null : Number(waste),
@@ -191,14 +192,15 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
         <label className="field"><span>Counted in</span>
           <select id="item-unit" value={unit} onChange={(e) => setUnit(e.target.value)}>{units.map((u) => <option key={u.code} value={u.code}>{u.name} ({u.code})</option>)}</select></label>
         <label className="field"><span>Bought in (if different)</span>
-          <select id="item-punit" value={purchaseUnit} onChange={(e) => setPurchaseUnit(e.target.value)}><option value="">Same</option>{units.map((u) => <option key={u.code} value={u.code}>{u.name}</option>)}</select></label>
+          <select id="item-punit" value={purchaseUnit} onChange={(e) => setPurchaseUnit(e.target.value)}><option value="">Same</option>{units.map((u) => <option key={u.code} value={u.code}>{u.name} ({u.code})</option>)}</select></label>
         {purchaseUnit && <label className="field"><span>{unit} in one {purchaseUnit}</span><input id="item-factor" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} className="num" /></label>}
+        {purchaseUnit && <label className="row" style={{ gap: 8, gridColumn: '1 / -1' }}><input type="checkbox" checked={packOrder} onChange={(e) => setPackOrder(e.target.checked)} />Counters order, and the store issues and stocks, in {purchaseUnit}s (the closing count stays in {unit})</label>}
       </div>
       <h2 style={{ marginTop: 8 }}>Stock details</h2>
       <p className="small muted">Optional. Leave anything blank and Compass simply shows “Not set yet”. You can fill these in later.</p>
       <div className="form-grid">
         <label className="field"><span>Stored and issued in</span>
-          <select id="item-base" value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)}><option value="">Not set yet</option>{['g', 'ml', 'nos', 'slices', 'bottle', 'roll', 'box', 'bunch', 'cyl'].map((u) => <option key={u} value={u}>{u}</option>)}</select></label>
+          <select id="item-base" value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)}><option value="">Not set yet</option>{units.map((u) => <option key={u.code} value={u.code}>{u.name} ({u.code})</option>)}</select></label>
         <label className="field"><span>Counted how</span>
           <select id="item-counts" value={countsAs} onChange={(e) => setCountsAs(e.target.value)}><option value="">Not set yet</option>{['By weight', 'By volume', 'By count', 'Whole packs only'].map((u) => <option key={u} value={u}>{u}</option>)}</select></label>
         <label className="field"><span>Pack name</span><input id="item-packname" value={packName} onChange={(e) => setPackName(e.target.value)} placeholder="e.g. Packet, Pouch, Tub" /></label>
