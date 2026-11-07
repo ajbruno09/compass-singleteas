@@ -40,7 +40,7 @@ const HI: Record<string, string> = {
   // SOS
   'SOS': 'SOS', 'Need something right now?': 'अभी कुछ चाहिए?', 'Your SOS': 'आपका SOS',
   'This makes a loud alarm on the store phone. Use it only when you really cannot wait.': 'इससे स्टोर के फ़ोन पर तेज़ अलार्म बजता है। सिर्फ़ तब इस्तेमाल करें जब बिल्कुल इंतज़ार न हो सके।',
-  'Which item? (you can skip this)': 'कौन सा सामान? (छोड़ सकते हैं)', 'Change': 'बदलें',
+  'Which item? (you can skip this)': 'कौन सा सामान? (छोड़ सकते हैं)', 'Which item do you need? Choose at least 1 (up to 3)': 'आपको कौन सा सामान चाहिए? कम से कम 1 चुनें (ज़्यादा से ज़्यादा 3)', 'Choose the item you need to send an SOS.': 'SOS भेजने के लिए सामान चुनें।', 'Change': 'बदलें',
   'Finished': 'ख़त्म हो गया', 'Almost over': 'लगभग ख़त्म', 'Need it now': 'अभी चाहिए', 'Wrong item came': 'ग़लत सामान आया',
   'Anything else to tell the store?': 'स्टोर को और कुछ बताना है?', 'Optional': 'ज़रूरी नहीं', 'Send SOS to the store': 'स्टोर को SOS भेजें',
   'SOS sent to the store': 'स्टोर को SOS भेज दिया', 'Request': 'अनुरोध', 'Sent at {time}': '{time} पर भेजा',

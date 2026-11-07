@@ -106,6 +106,7 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
   const found = useMemo(() => { const t = q.trim().toLowerCase(); return t ? items.filter((i) => i.name.toLowerCase().includes(t) || (i.local_names?.hi ?? '').includes(t)).slice(0, 8) : []; }, [q, items]);
   function choose(i: DeptItem) { setPicked((p) => (p.length >= MAX_ITEMS || p.some((x) => x.id === i.id) ? p : [...p, { ...i, loc: locationId }])); setQtys((p) => ({ ...p, [i.id]: String(i.quick_amounts?.[0] ?? 1) })); setQ(''); }
   async function send() {
+    if (picked.length === 0) { toast(t('Choose the item you need to send an SOS.')); return; }
     setBusy(true);
     const { data, error } = await supabase.rpc('raise_sos', { p_location_id: picked[0]?.loc ?? locationId, p_item_ids: picked.map((i) => i.id), p_qtys: Object.fromEntries(picked.map((i) => [String(i.id), Number(qtys[i.id] ?? 1) || 1])), p_note: note });
     setBusy(false);
@@ -160,7 +161,7 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
       )}
       {picked.length < MAX_ITEMS ? (
         <div className="stack">
-          <label className="field"><span>{picked.length ? t('Add another item (up to 3)') : t('Which items? (up to 3, you can skip this)')}</span>
+          <label className="field"><span>{picked.length ? t('Add another item (up to 3)') : t('Which item do you need? Choose at least 1 (up to 3)')}</span>
             <div className="searchbox"><Icon name="search" size={18} /><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && found[0]) choose(found[0]); }} placeholder={t('Type a few letters')} /></div>
           </label>
           {!q && recent.length > 0 && <div className="chips" aria-label={t('Often needed')}>{recent.filter((i) => !picked.some((x) => x.id === i.id)).map((i) => <button key={i.id} className="btn secondary" onClick={() => choose(i)}>{nm(i)}</button>)}</div>}
@@ -171,7 +172,8 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
       <label className="field"><span>{t('Anything else to tell the store?')}</span><input value={QUICK_NOTES.includes(note) ? '' : note} onChange={(e) => setNote(e.target.value)} placeholder={t('Optional')} /></label>
       {grant && left === 0 && <p className="banner ok">{t('Admin allowed one more SOS.')}</p>}
       {left != null && left <= 2 && left > 0 && <p className="small muted">{left === 1 ? t('This is your last SOS for today.') : t('{n} SOS left today', { n: left })}</p>}
-      <button className="btn floor sosgo" disabled={busy} onClick={() => void send()}>{busy ? t('Sending…') : t('Send SOS to the store')}</button>
+      {picked.length === 0 && <p className="small" style={{ color: 'var(--bad, #b3261e)' }}>{t('Choose the item you need to send an SOS.')}</p>}
+      <button className="btn floor sosgo" disabled={busy || picked.length === 0} onClick={() => void send()}>{busy ? t('Sending…') : t('Send SOS to the store')}</button>
     </>
   );
 }
