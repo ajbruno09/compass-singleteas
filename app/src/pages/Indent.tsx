@@ -322,6 +322,7 @@ function ItemRow({ item, name, line, usual, flag, night, onQty, onReason, reason
         {quicks.map((n) => <button key={n} className="qchip" onClick={() => onQty(cur + n)}>{addLabel(n, item.unit)}</button>)}
         {usual && <button className="qchip usualchip" onClick={() => onQty(usual.runs >= 2 ? usual.usual : usual.last_qty)}>
           {usual.runs >= 2 ? t('Usual {q}', { q: fmtQty(usual.usual, item.unit).replace(item.unit, u(item.unit)) }) : t('Last {q}', { q: fmtQty(usual.last_qty, item.unit).replace(item.unit, u(item.unit)) })}</button>}
+        {cur > 0 && <button className="qchip" style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, color: '#B3261E' }} onClick={() => { setTyping(false); onQty(0); }} aria-label={`${t('Clear')} ${name}`}><Icon name="trash" size={14} />{t('Clear')}</button>}
       </div>
       {night && <p className="small" style={{ margin: '6px 0 0', color: 'var(--muted, #5C6B63)' }}>{t('Last night you counted')} <b>{fmtQty(night.qty, item.unit).replace(item.unit, u(item.unit))}</b>{night.issued > 0 ? ` · ${t('store issued')} ${fmtQty(night.issued, item.unit).replace(item.unit, u(item.unit))}` : ''}.{night.qty > 0 && (line?.qty ?? 0) > 0 && usual && usual.usual > 0 && night.qty + night.issued >= usual.usual ? <b style={{ color: '#B3541E' }}> {t('That may already be enough. Check before you order.')}</b> : null}</p>}
       {flag && <Reasons value={line?.reason ?? ''} onPick={onReason} list={reasonList} />}

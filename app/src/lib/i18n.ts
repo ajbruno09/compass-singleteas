@@ -29,7 +29,7 @@ const HI: Record<string, string> = {
   'The store is working on this indent.': 'स्टोर इस इंडेंट पर काम कर रहा है।',
   'You told the store you need nothing. Sent {time}.': 'आपने स्टोर को बताया कि कुछ नहीं चाहिए। {time} पर भेजा।',
   'Sent to the store at {time}.': '{time} पर स्टोर को भेजा गया।', 'Change something': 'कुछ बदलें', 'Sent to the store': 'स्टोर को भेज दिया',
-  'Remove': 'हटाएँ', 'Less': 'कम', 'More': 'ज़्यादा', 'Type amount': 'मात्रा लिखें',
+  'Remove': 'हटाएँ', 'Clear': 'साफ़ करें', 'Less': 'कम', 'More': 'ज़्यादा', 'Type amount': 'मात्रा लिखें',
   // home
   'Hello, {name}': 'नमस्ते, {name}', 'Indent for {day}': '{day} का इंडेंट', 'Sign out': 'साइन आउट',
   'Indent time is on. Please send by {time}.': 'इंडेंट का समय चल रहा है। कृपया {time} तक भेजें।',
