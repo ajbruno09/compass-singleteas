@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
@@ -21,6 +21,7 @@ export function SosWatcher() {
   const [units, setUnits] = useState<Record<number, string>>({});
   const [now, setNow] = useState(Date.now());
   const [mutedUntil, setMutedUntil] = useState(0);
+  const [sure, setSure] = useState(false);
   const [armed, setArmed] = useState(alarmUnlocked());
   useEffect(() => { const f = () => setArmed(alarmUnlocked()); window.addEventListener('compass-armed', f); return () => window.removeEventListener('compass-armed', f); }, []);
   const role = profile?.role;
@@ -82,7 +83,16 @@ export function SosWatcher() {
     return () => stopAlarm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ringing, mutedUntil, armed, now >= mutedUntil]);
+  // A brand new SOS always rings, even if the sound was muted for an earlier one.
+  const seenIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    let fresh = false;
+    for (const a of ringing) { if (!seenIds.current.has(a.id)) { seenIds.current.add(a.id); fresh = true; } }
+    if (fresh) { setMutedUntil(0); setSure(false); }
+  }, [ringing]);
   function muteFor15() {
+    if (!sure) { setSure(true); window.setTimeout(() => setSure(false), 5000); return; }
+    setSure(false);
     setMutedUntil(Date.now() + MUTE_MINUTES * 60000);
     void supabase.rpc('log_sos_mute', { p_minutes: MUTE_MINUTES });
   }
@@ -139,7 +149,7 @@ export function SosWatcher() {
                 {role !== 'manager' && <button className="btn floor" onClick={() => nav('/sos')}>Open SOS page and issue</button>}
               </div>
             ))}
-            {now >= mutedUntil && armed && <button className="btn floor" onClick={muteFor15}>🔇 Mute for {MUTE_MINUTES} minutes</button>}
+            {now >= mutedUntil && armed && <button className="btn quiet" style={{ marginTop: 18, opacity: sure ? 1 : 0.7 }} onClick={muteFor15}>{sure ? `Tap again to mute for ${MUTE_MINUTES} minutes` : '🔇 Mute sound'}</button>}
             {now < mutedUntil && <p className="small">Sound is off for {Math.max(1, Math.ceil((mutedUntil - now) / 60000))} more minutes, then it rings again by itself.</p>}
             {!armed && <button className="btn floor" onClick={() => setArmed(unlockAlarm())}>Turn on sound</button>}
           </div>
