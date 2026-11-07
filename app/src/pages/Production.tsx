@@ -39,8 +39,10 @@ export function Production() {
   const [open, setOpen] = useState<number | null>(null);
   const [ings, setIngs] = useState<Ing[]>([]);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<'today' | 'plan' | 'levels'>('today');
+  const [tab, setTab] = useState<'today' | 'recipes' | 'plan' | 'levels'>('today');
   const [extra, setExtra] = useState({ item: 0, qty: 100, reason: '', urgent: false });
+  const [rc, setRc] = useState({ item: 0, qty: 100 });
+  const [rIngs, setRIngs] = useState<Ing[]>([]);
   const [made, setMade] = useState<Record<number, string>>({});
   const [add, setAdd] = useState<Record<number, { item: number; qty: number }>>({});
 
@@ -88,6 +90,11 @@ export function Production() {
     setOpen(o.id);
   };
 
+  useEffect(() => {
+    const id = rc.item || recipes[0]?.item_id;
+    if (tab !== 'recipes' || !id) return;
+    void (async () => { const { data } = await supabase.rpc('prod_ingredients', { p_item: id, p_qty: rc.qty }); setRIngs((data as Ing[]) ?? []); })();
+  }, [tab, rc.item, rc.qty, recipes]);
   const planFor = (day: number) => plan.filter((p) => p.weekday === day);
   const addPlan = (day: number) => {
     const a = add[day] ?? { item: recipes[0]?.item_id ?? 0, qty: 100 };
@@ -105,11 +112,12 @@ export function Production() {
   return (
     <div className={staffView ? 'phone' : ''} style={staffView ? undefined : { display: 'grid', gap: 14, maxWidth: 760 }}>
       <div className="phone-head"><b style={{ font: '800 20px/24px var(--font-display)' }}>Snacks production</b></div>
-      {admin && (
+      {!staffView && (
         <div className="countersw" role="tablist">
           <button className={tab === 'today' ? 'on' : ''} onClick={() => setTab('today')}>Today</button>
-          <button className={tab === 'plan' ? 'on' : ''} onClick={() => setTab('plan')}>Weekly plan</button>
-          <button className={tab === 'levels' ? 'on' : ''} onClick={() => setTab('levels')}>Stock levels</button>
+          <button className={tab === 'recipes' ? 'on' : ''} onClick={() => setTab('recipes')}>Recipes</button>
+          {admin && <><button className={tab === 'plan' ? 'on' : ''} onClick={() => setTab('plan')}>Weekly plan</button>
+          <button className={tab === 'levels' ? 'on' : ''} onClick={() => setTab('levels')}>Stock levels</button></>}
         </div>
       )}
 
@@ -191,6 +199,22 @@ export function Production() {
               ))}
             </>
           )}
+        </>
+      )}
+
+      {tab === 'recipes' && (
+        <>
+          <p className="muted small">Ingredients for the snacks we make. Quantities are for the pieces you choose. 100 is the standard batch.</p>
+          <div className="card" style={{ display: 'grid', gap: 10 }}>
+            <select value={rc.item || recipes[0]?.item_id || 0} onChange={(e) => setRc({ ...rc, item: Number(e.target.value) })}>{recipes.map((r) => <option key={r.item_id} value={r.item_id}>{r.items?.name}</option>)}</select>
+            {recipes[0] && <div className="row" style={{ justifyContent: 'space-between' }}><span className="muted small">Pieces</span><Stepper r={rec.get(rc.item || recipes[0].item_id)!} v={rc.qty} set={(n) => setRc({ ...rc, qty: n })} /></div>}
+            {rIngs.map((i) => (
+              <div key={i.ingredient_id} className="row" style={{ justifyContent: 'space-between' }}>
+                <span>{i.name}</span><span><b>{fmt(i.qty)}</b> <span className="muted small">{i.unit}</span>{!i.unit_ok && <span className="chip late" style={{ marginLeft: 6 }}>unit?</span>}</span>
+              </div>
+            ))}
+            {rIngs.some((i) => !i.unit_ok) && <div className="small muted">"unit?" means the recipe is in kg or L but the item is counted in packets, bunches or bottles. To be confirmed.</div>}
+          </div>
         </>
       )}
 

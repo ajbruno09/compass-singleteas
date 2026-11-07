@@ -65,7 +65,7 @@ export function Recipes() {
 
   return (
     <>
-      <div className="pagehead"><div><p className="label">Masters</p><h1>Recipes</h1><p className="muted small" style={{ marginTop: 2 }}>{Object.keys(have).length} of {dishes.length} active dishes have a recipe.</p></div>
+      <div className="pagehead"><div><p className="label">Masters</p><h1>Recipes</h1><p className="muted small" style={{ marginTop: 2 }}>{Object.keys(have).length} of {dishes.length} active dishes have a recipe. Snack recipes (samosas, cutlets, spring rolls) are under Snacks production, Recipes tab.</p></div>
         <Link to="/upload?tab=recipes" className="btn"><Icon name="layers" /> Bulk upload all recipes</Link></div>
       <div className="row">
         <label className="field" style={{ minWidth: 300, flex: 1 }}><span>Choose a dish</span>
