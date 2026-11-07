@@ -84,7 +84,6 @@ export function Dashboard() {
       </div>
       <AlertsPanel />
       <div className="grid-tiles">
-        <Link to="/items" className="card tile" style={tile}><span className="label">Items</span><span className="big">{counts.items}</span><span className="small muted">{counts.noPhoto ? `${counts.noPhoto} without a photo` : 'All have photos'}</span></Link>
         <Link to="/vendors" className="card tile" style={tile}><span className="label">Vendors</span><span className="big">{counts.vendors}</span><span className="small" style={{ color: counts.noPhone ? 'var(--warn)' : undefined, fontWeight: counts.noPhone ? 550 : 400 }}>{counts.noPhone ? `${counts.noPhone} without WhatsApp` : 'All reachable'}</span></Link>
         {profile?.role === 'owner' && <Link to="/people" className="card tile" style={tile}><span className="label">People with access</span><span className="big">{counts.people}</span><span className="small muted">Owner, store and counters</span></Link>}
         {seesMoney && <Link to="/bills" className="card tile attn" style={tile}><span className="label" style={{ color: 'var(--warn)' }}>Unpaid to vendors</span><span className="big">{money(unpaid)}</span><span className="small" style={{ color: 'var(--warn)', fontWeight: 550 }}>{flagged > 0 ? `${flagged} bills need a check` : 'Nothing flagged'}</span></Link>}

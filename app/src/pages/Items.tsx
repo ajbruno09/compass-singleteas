@@ -42,7 +42,7 @@ export function Items() {
   return (
     <>
       <div className="pagehead">
-        <div><p className="label">Masters</p><h1>Items</h1></div>
+        <div><p className="label">Masters</p><h1>Items</h1><p className="muted small" style={{ marginTop: 2 }}>{loading ? 'Loading…' : shown.length === rows.length ? `${rows.length} items${rows.some((r) => !r.photo_path) ? ` · ${rows.filter((r) => !r.photo_path).length} without a photo` : ''}` : `Showing ${shown.length} of ${rows.length} items`}</p></div>
         <div className="row"><button className="btn" onClick={exportXlsx}><Icon name="layers" />Download Excel</button>{canEdit && <Link to="/upload?tab=items" className="btn"><Icon name="layers" />Bulk upload</Link>}
         {canEdit && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" />Add item</button>}</div>
       </div>
