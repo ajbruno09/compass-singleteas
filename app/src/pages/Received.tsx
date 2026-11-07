@@ -10,7 +10,7 @@ import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 
 interface Pending { id: string; issue_number: string; issued_at: string }
-interface Line { item_id: number; name: string; local_names: Record<string, string> | null; unit: string; quick_amounts: number[] | null }
+interface Line { item_id: number; name: string; local_names: Record<string, string> | null; unit: string; quick_amounts: number[] | null; qty_issued: number }
 
 export function ReceivedPage() {
   const [sp] = useSearchParams();
@@ -36,7 +36,7 @@ export function ReceivedPage() {
 
   async function open(p: Pending) {
     const { data } = await supabase.rpc('issue_items_to_confirm', { p_issue_id: p.id });
-    setLines((data as Line[]) ?? []); setVals({}); setCur(p); setErr('');
+    const ls = (data as Line[]) ?? []; setLines(ls); setVals(Object.fromEntries(ls.map((l) => [l.item_id, String(Number(l.qty_issued))]))); setCur(p); setErr('');
   }
   const step = (l: Line) => { const a = (l.quick_amounts ?? []).filter((n) => n > 0); return a.length ? Math.min(...a) : 1; };
   const nameOf = (l: Line) => (hi && l.local_names?.hi) || l.name;
@@ -45,6 +45,8 @@ export function ReceivedPage() {
     setErr('');
     const missing = lines.filter((l) => (vals[l.item_id] ?? '').trim() === '');
     if (missing.length && !window.confirm(t('{n} items have no number. They will count as not received. Continue?', { n: missing.length }))) return;
+    const big = lines.filter((l) => { const sent = Number(l.qty_issued); const got = Number(vals[l.item_id] || 0); return sent > 0 && (got === 0 || got >= sent * 5 || got <= sent / 5); });
+    if (big.length && !window.confirm('Please check these, the number is very different from what the store sent:\n\n' + big.map((l) => `${nameOf(l)}: sent ${Number(l.qty_issued)} ${l.unit}, you entered ${Number(vals[l.item_id] || 0)}`).join('\n') + '\n\nIs this correct?')) return;
     setBusy(true);
     const { error } = await supabase.rpc('confirm_issue', { p_issue_id: cur!.id, p_lines: lines.map((l) => ({ item_id: l.item_id, qty: Number(vals[l.item_id] || 0) })) });
     setBusy(false);
@@ -60,10 +62,10 @@ export function ReceivedPage() {
         <div className="stack">{list.map((p) => <button key={p.id} className="countercard" onClick={() => open(p)}>
           <Icon name="box" size={30} stroke={1.6} /><span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>{t('Delivery')} {p.issue_number}</span><span className="small muted">{t('Sent {time}', { time: timeOf(p.issued_at) })}</span></span><span className="chip due">{t('Open')}</span></button>)}</div>
       )) : (<>
-        <p className="muted small">{t('Count what actually reached your counter and type it for each item.')}</p>
+        <p className="muted small">Numbers are filled in as the store sent them. Check what reached your counter and change only what is different.</p>
         <div className="stack">{lines.map((l) => (
           <div key={l.item_id} className="card row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-            <div style={{ minWidth: 0, flex: 1 }}><b>{nameOf(l)}</b><div className="small muted">{l.unit}</div></div>
+            <div style={{ minWidth: 0, flex: 1 }}><b>{nameOf(l)}</b><div className="small muted">Store sent {Number(l.qty_issued)} {l.unit}{Number(vals[l.item_id] || 0) !== Number(l.qty_issued) && <b style={{ color: 'var(--bad)', marginLeft: 6 }}>changed</b>}</div></div>
             <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
               <button className="qchip" aria-label="Less" onClick={() => setVals((p) => ({ ...p, [l.item_id]: String(Math.max(0, Math.round((Number(p[l.item_id] || 0) - step(l)) * 1000) / 1000)) }))}>−</button>
               <input inputMode="decimal" className="num" style={{ width: 84, textAlign: 'center' }} aria-label={nameOf(l)} value={vals[l.item_id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [l.item_id]: e.target.value }))} />
