@@ -7,6 +7,7 @@ import { money2, quick, errText } from '../lib/format';
 import { LANGUAGES, type Item } from '../lib/types';
 import { Sheet } from '../components/Sheet';
 import { Icon } from '../components/Icon';
+import { downloadWorkbook } from '../lib/sheets';
 import { useToast } from '../components/Toast';
 
 interface ItemRow extends Item { item_locations: { location_id: number; par_level: number | null }[] }
@@ -29,13 +30,20 @@ export function Items() {
   useEffect(() => { load(); }, []);
 
   const shown = useMemo(() => rows.filter((r) => (cat === 'all' || r.category_id === cat) && r.name.toLowerCase().includes(q.trim().toLowerCase())), [rows, cat, q]);
+  async function exportXlsx() {
+    const catName = (id: number) => categories.find((c) => c.id === id)?.name ?? '';
+    const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    await downloadWorkbook(`Items_${day}.xlsx`, `Single Teas items, ${day}`, [`${shown.length} items${cat !== 'all' || q ? ' (filtered as on screen)' : ''}.`],
+      [{ name: 'Items', cols: [{ label: 'Item', width: 34 }, { label: 'Category', width: 22 }, { label: 'Unit', width: 8 }, { label: 'Counted', width: 10 }, { label: 'Used at', width: 34 }, { label: 'Last cost', width: 11 }, { label: 'Pack', width: 20 }, { label: 'Active', width: 8 }],
+        rows: shown.map((r) => [r.name, catName(r.category_id), r.unit, r.count_frequency === 'daily' ? 'Daily' : 'Weekly', r.item_locations.map((l) => locName(l.location_id)).join(', '), r.last_cost ?? null, (r as { pack_note?: string }).pack_note || '', r.active ? 'Yes' : 'No']) }]);
+  }
   const locName = (id: number) => locations.find((l) => l.id === id)?.name ?? '';
 
   return (
     <>
       <div className="pagehead">
         <div><p className="label">Masters</p><h1>Items</h1></div>
-        <div className="row">{canEdit && <Link to="/upload?tab=items" className="btn"><Icon name="layers" />Bulk upload</Link>}
+        <div className="row"><button className="btn" onClick={exportXlsx}><Icon name="layers" />Download Excel</button>{canEdit && <Link to="/upload?tab=items" className="btn"><Icon name="layers" />Bulk upload</Link>}
         {canEdit && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" />Add item</button>}</div>
       </div>
       <div className="row">
