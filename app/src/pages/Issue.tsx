@@ -6,7 +6,7 @@ import { timeOf } from '../lib/ist';
 import { useToast } from '../components/Toast';
 
 interface Item { id: number; name: string; unit: string }
-interface IssueRow { id: string; issue_number: string; to_location_id: number; status: string; issued_at: string | null; issue_lines: { item_id: number; qty_issued: number; qty_received: number | null }[] }
+interface IssueRow { id: string; issue_number: string; to_location_id: number; status: string; issued_at: string | null; for_date?: string | null; late_reason?: string | null; late_days?: number | null; issue_lines: { item_id: number; qty_issued: number; qty_received: number | null }[] }
 
 export function Issue() {
   const { locations } = useSession();
@@ -21,6 +21,10 @@ export function Issue() {
   const [extra, setExtra] = useState<number[]>([]);
   const [find, setFind] = useState('');
   const [today, setToday] = useState<IssueRow[]>([]);
+  const [forDate, setForDate] = useState('');
+  const [old, setOld] = useState<{ indent_id: string; location_id: number; location_name: string; for_date: string; items: number }[]>([]);
+  const [why, setWhy] = useState('');
+  const [whyNote, setWhyNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -32,17 +36,21 @@ export function Issue() {
 
   const loadToday = useCallback(async () => {
     if (!day) return;
-    const { data } = await supabase.from('issues').select('id, issue_number, to_location_id, status, issued_at, issue_lines(item_id, qty_issued, qty_received)').gte('issued_at', day + 'T00:00:00+05:30').order('issued_at', { ascending: false });
+    const { data } = await supabase.from('issues').select('id, issue_number, to_location_id, status, issued_at, for_date, late_reason, late_days, issue_lines(item_id, qty_issued, qty_received)').gte('issued_at', day + 'T00:00:00+05:30').order('issued_at', { ascending: false });
     setToday((data as IssueRow[]) ?? []);
   }, [day]);
   useEffect(() => { void loadToday(); }, [loadToday]);
+  const loadOld = useCallback(async () => { const { data } = await supabase.rpc('unissued_indents'); setOld((data as typeof old) ?? []); }, []);
+  useEffect(() => { void loadOld(); }, [loadOld]);
+  useEffect(() => { if (day && !forDate) setForDate(day); }, [day, forDate]);
+  const isLate = !!forDate && !!day && forDate < day;
 
   useEffect(() => {
-    if (!loc || !day) return;
+    if (!loc || !day || !forDate) return;
     setVals({}); setExtra([]); setErr('');
     (async () => {
       const [ind, oh] = await Promise.all([
-        supabase.from('indents').select('indent_lines(item_id, qty)').eq('location_id', loc).eq('for_date', day).in('status', ['submitted', 'locked']),
+        supabase.from('indents').select('indent_lines(item_id, qty)').eq('location_id', loc).eq('for_date', forDate).in('status', ['submitted', 'locked']),
         supabase.from('stock_on_hand').select('item_id, qty').eq('location_id', 1)
       ]);
       const a: Record<number, number> = {};
@@ -51,7 +59,7 @@ export function Issue() {
       setStore(Object.fromEntries(((oh.data as { item_id: number; qty: number }[]) ?? []).map((r) => [r.item_id, Number(r.qty)])));
       setVals(Object.fromEntries(Object.entries(a).map(([id, q]) => [id, String(q)])));
     })();
-  }, [loc, day]);
+  }, [loc, day, forDate]);
 
   const ids = useMemo(() => Object.keys(asked).map(Number).concat(extra.filter((e) => !(e in asked))).filter((id) => items[id]).sort((a, b) => items[a].name.localeCompare(items[b].name)), [asked, extra, items]);
   const matches = useMemo(() => find.trim().length < 2 ? [] : Object.values(items).filter((i) => i.name.toLowerCase().includes(find.toLowerCase()) && !ids.includes(i.id)).slice(0, 6), [find, items, ids]);
@@ -61,17 +69,26 @@ export function Issue() {
     setErr('');
     const lines = Object.entries(vals).filter(([, v]) => Number(v) > 0).map(([id, v]) => ({ item_id: Number(id), qty: Number(v) }));
     if (!lines.length) return setErr('Enter a quantity for at least one item.');
+    const reason = [why, whyNote.trim()].filter(Boolean).join(': ');
+    if (isLate && !reason) return setErr('This indent is for an earlier day. Please say why it is being issued late.');
     setBusy(true);
-    const { error } = await supabase.rpc('create_issue', { p_to: loc, p_lines: lines });
+    const { error } = await supabase.rpc('create_issue', { p_to: loc, p_lines: lines, p_for_date: forDate || null, p_reason: isLate ? reason : null });
     setBusy(false);
     if (error) return setErr(errText(error));
-    toast(`Issued to ${locName(loc!)}. The counter will confirm.`); setVals({}); setAsked({}); setExtra([]); void loadToday();
+    toast(`Issued to ${locName(loc!)}. The counter will confirm.`); setVals({}); setAsked({}); setExtra([]); setWhy(''); setWhyNote(''); setForDate(day); void loadToday(); void loadOld();
   }
 
   return (
     <>
       <div className="pagehead"><div><p className="label">Store</p><h1>Issue to counters</h1><p className="muted small" style={{ marginTop: 2 }}>Filled from what each counter asked for. Change any amount, then send. The counter confirms what it received.</p></div></div>
-      <div className="seg" role="group" aria-label="Counter">{counters.map((c) => <button key={c.id} aria-pressed={loc === c.id} onClick={() => setLoc(c.id)}>{c.name}</button>)}</div>
+      {old.length > 0 && (
+        <div className="card" style={{ borderColor: 'var(--warn, #B7791F)', display: 'grid', gap: 8 }}>
+          <b>Indents sent earlier but not issued yet</b>
+          <span className="small muted">You can still issue these. You will be asked for the reason, and Admin is told.</span>
+          <div className="row" style={{ gap: 8 }}>{old.map((o) => <button key={o.indent_id} className={'btn secondary' + (loc === o.location_id && forDate === o.for_date ? ' pick on' : '')} onClick={() => { setLoc(o.location_id); setForDate(o.for_date); }}>{o.location_name} · {new Date(o.for_date + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · {o.items} items</button>)}</div>
+        </div>
+      )}
+      <div className="seg" role="group" aria-label="Counter">{counters.map((c) => <button key={c.id} aria-pressed={loc === c.id} onClick={() => { setLoc(c.id); setForDate(day); }}>{c.name}</button>)}</div>
       <div className="tablewrap"><table>
         <thead><tr><th>Item</th><th className="r">Asked</th><th className="r">In store</th><th className="r" style={{ width: 130 }}>Issue now</th></tr></thead>
         <tbody>{ids.map((id) => { const it = items[id]; const have = store[id] ?? 0; const want = Number(vals[id] ?? 0); const short = want > have;
@@ -80,6 +97,14 @@ export function Issue() {
             <td className="r num" style={{ color: short ? 'var(--bad, #B42335)' : undefined, fontWeight: short ? 700 : 400 }}>{fmtQty(have, it.unit)}</td>
             <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110 }} aria-label={`Issue ${it.name}`} value={vals[id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} /></td></tr>; })}</tbody>
       </table>{ids.length === 0 && <p className="empty">{loc ? `${locName(loc)} has not sent an indent for today. You can still add items below.` : ''}</p>}</div>
+      {isLate && (
+        <div className="card" style={{ display: 'grid', gap: 8, borderColor: 'var(--bad, #B42335)' }}>
+          <b>This indent is for {new Date(forDate + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, issued late</b>
+          <span className="small muted">Please say why. This goes to Admin.</span>
+          <div className="row" style={{ gap: 8 }}>{['Counter was off', 'Holiday', 'Stock not available', 'Forgot or missed', 'Other'].map((r) => <button key={r} className={'btn secondary' + (why === r ? ' pick on' : '')} aria-pressed={why === r} onClick={() => setWhy(r)}>{r}</button>)}</div>
+          <input placeholder="Add a note (needed if Other)" value={whyNote} onChange={(e) => setWhyNote(e.target.value)} />
+        </div>
+      )}
       <label className="field"><span>Add another item</span><input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Type a few letters" /></label>
       {matches.length > 0 && <div className="row">{matches.map((m) => <button key={m.id} className="qchip" onClick={() => { setExtra((p) => [...p, m.id]); setFind(''); }}>{m.name}</button>)}</div>}
       {err && <p className="banner bad" role="alert">{err}</p>}
@@ -92,8 +117,9 @@ export function Issue() {
           return <div key={s.id} className="card">
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <div><b>{locName(s.to_location_id)}</b> <span className="muted small">· {s.issue_number} · {timeOf(s.issued_at)} · {s.issue_lines.length} items</span></div>
-              {s.status === 'submitted' ? <span className="chip due">Waiting for counter</span> : diff.length ? <span className="chip late">{diff.length} differ</span> : <span className="chip done">Confirmed</span>}
+              {s.late_days ? <span className="chip flag">Late {s.late_days}d</span> : null}{s.status === 'submitted' ? <span className="chip due">Waiting for counter</span> : diff.length ? <span className="chip late">{diff.length} differ</span> : <span className="chip done">Confirmed</span>}
             </div>
+            {s.late_reason && <div className="small" style={{ marginTop: 6 }}><b>Issued late:</b> {s.late_reason}</div>}
             {diff.length > 0 && <div className="small" style={{ marginTop: 6 }}>{diff.map((l) => `${items[l.item_id]?.name}: issued ${fmtQty(Number(l.qty_issued), items[l.item_id]?.unit)}, counter says ${fmtQty(Number(l.qty_received), items[l.item_id]?.unit)}`).join(' · ')}</div>}
           </div>; })}</div>
       )}
