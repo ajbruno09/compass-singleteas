@@ -24,6 +24,7 @@ export const NAV: NavItem[] = [
   { to: '/stockview', label: 'Stock in hand', icon: 'layers', roles: ['owner', 'manager', 'store'] },
   { to: '/counts', label: 'Closing counts', icon: 'moon', roles: ['owner', 'manager', 'store'] },
   { to: '/items', label: 'Items', icon: 'tag', roles: ['owner', 'manager', 'store'] },
+  { to: '/photos', label: 'Item photos', icon: 'box', roles: ['owner', 'manager'] },
   { to: '/upload', label: 'Bulk upload', icon: 'layers', roles: ['owner', 'manager', 'store'] },
   { to: '/production', label: 'Snacks production', icon: 'box', roles: ['owner', 'manager', 'store'] },
   { to: '/recipes', label: 'Recipes', icon: 'scale', roles: ['owner', 'manager', 'store', 'accounts'] },
