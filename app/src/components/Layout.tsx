@@ -27,6 +27,7 @@ export const NAV: NavItem[] = [
   { to: '/photos', label: 'Item photos', icon: 'box', roles: ['owner', 'manager'] },
   { to: '/upload', label: 'Bulk upload', icon: 'layers', roles: ['owner', 'manager', 'store'] },
   { to: '/production', label: 'Snacks production', icon: 'box', roles: ['owner', 'manager', 'store'] },
+  { to: '/gas', label: 'Gas cylinders', icon: 'box', roles: ['owner', 'manager', 'store'] },
   { to: '/recipes', label: 'Recipes', icon: 'scale', roles: ['owner', 'manager', 'store', 'accounts'] },
   { to: '/inventory', label: 'Plates and glasses', icon: 'box', roles: ['owner', 'manager', 'store'] },
   { to: '/maintenance', label: 'Maintenance', icon: 'clock', roles: ['owner', 'manager', 'store'] },

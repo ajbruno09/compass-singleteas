@@ -27,6 +27,7 @@ import { Join } from './pages/Join';
 import { Upload } from './pages/Upload';
 import { Photos } from './pages/Photos';
 import { Production } from './pages/Production';
+import { Gas } from './pages/Gas';
 import { Recipes } from './pages/Recipes';
 import { Inventory } from './pages/Inventory';
 import { Maintenance } from './pages/Maintenance';
@@ -53,7 +54,7 @@ import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />
+  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/gas': <Gas />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />
 };
 
 // After signing in, people with more than one app choose which to open. Once per visit.
@@ -109,6 +110,7 @@ function Gate() {
         <Route path="/count" element={<CountPage />} />
         <Route path="/received" element={<ReceivedPage />} />
         <Route path="/production" element={<Production />} />
+        <Route path="/gas" element={<Gas />} />
         <Route path="/mine" element={<MyCompass />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

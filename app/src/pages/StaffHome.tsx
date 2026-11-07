@@ -23,6 +23,8 @@ export function StaffHome() {
   const { t, local, toggle, canSwitch } = useLang();
   const ids = myLocations.map((l) => l.id);
   const [loc, setLoc] = useState(getCounter(ids));
+  const [gasDuty, setGasDuty] = useState(false);
+  useEffect(() => { if (!profile) return; void supabase.from('duty_people').select('duty').eq('profile_id', profile.id).eq('duty', 'gas_weigh').then(({ data }) => setGasDuty(!!data?.length)); }, [profile]);
   const [status, setStatus] = useState<Record<number, IndentRec>>({});
   const [date, setDate] = useState('');
   const [rem, setRem] = useState<Reminders>({});
@@ -191,6 +193,7 @@ export function StaffHome() {
         <button className="tile2" onClick={() => nav('/closing')}><span className="i"><Icon name="calbars" size={26} /></span><b>Closing stock</b><span className="small muted">Daily or weekly</span></button>
         <button className="tile2" onClick={() => window.dispatchEvent(new Event('compass:sos'))}><span className="i"><Icon name="siren2" size={26} /></span><b>SOS</b><span className="small muted">Need something now</span></button>
         {myLocations.some((l) => l.code === 'snacks_production') && <button className="tile2" onClick={() => nav('/production')}><span className="i"><Icon name="box" size={26} /></span><b>Production</b><span className="small muted">Today's snacks</span></button>}
+        {gasDuty && <button className="tile2" onClick={() => nav('/gas')}><span className="i"><Icon name="box" size={26} /></span><b>Weigh gas</b><span className="small muted">Cylinders tonight</span></button>}
         <button className="tile2" onClick={() => nav('/messages')}><span className="i"><Icon name="chat" size={26} /></span><b>Messages</b><span className="small muted">Older notices</span></button>
       </div>
       <button className="countercard" onClick={() => nav('/mine')}>
