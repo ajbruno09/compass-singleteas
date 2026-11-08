@@ -412,3 +412,11 @@ tr.click { cursor: pointer; }
 .tile2 .i { color: var(--brand); }
 
 .btn.pick.on, .btn.secondary.pick[aria-pressed=true] { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 700; }
+
+/* Gas screens: compact boxes */
+.gas { max-width: 480px; }
+.gas .card input, .gas .card select { max-width: 100%; }
+.gas .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
+.gas .two > div { display: grid; gap: 4px; min-width: 0; }
+.gas .two input { width: 100%; }
+.gas .two .btn { width: 100%; justify-content: center; }

@@ -24,6 +24,8 @@ export function Vendors() {
   const [editing, setEditing] = useState<Vendor | 'new' | null>(null);
   const [paying, setPaying] = useState<Vendor | null>(null);
   const [q, setQ] = useState('');
+  const [showOff, setShowOff] = useState(false);
+  const [removing, setRemoving] = useState<Vendor | null>(null);
   const canEdit = profile?.role === 'owner' || profile?.role === 'accounts';
   const seesMoney = profile?.role !== 'store';
 
@@ -43,7 +45,9 @@ export function Vendors() {
   }
   useEffect(() => { load(); }, []);
 
-  const shown = useMemo(() => rows.filter((r) => r.name.toLowerCase().includes(q.trim().toLowerCase())), [rows, q]);
+  const shown = useMemo(() => rows.filter((r) => (showOff || r.active) && r.name.toLowerCase().includes(q.trim().toLowerCase())), [rows, q, showOff]);
+  const offCount = rows.filter((r) => !r.active).length;
+  async function bringBack(v: Vendor) { const { error } = await supabase.from('vendors').update({ active: true }).eq('id', v.id); if (error) alert(errText(error)); else void load(); }
   const missingPhone = rows.filter((r) => r.active && !(r.whatsapp || r.phone)).length;
 
   return (
@@ -53,19 +57,22 @@ export function Vendors() {
         {canEdit && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" />Add vendor</button>}
       </div>
       {missingPhone > 0 && <p className="banner warn">{missingPhone} active vendors have no WhatsApp number. Add them so POs can be sent in one tap.</p>}
-      <input id="vendor-search" placeholder="Search vendors" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 320 }} />
+      <div className="row" style={{ gap: 12 }}>
+        <input id="vendor-search" placeholder="Search vendors" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 320 }} />
+        {offCount > 0 && <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={showOff} onChange={(e) => setShowOff(e.target.checked)} />Show removed vendors ({offCount})</label>}
+      </div>
       <div className="tablewrap">
         <table>
-          <thead><tr><th>Vendor</th><th>WhatsApp</th><th>Credit days</th>{canEdit && <th style={{ width: 150 }} />}{seesMoney && <><th className="r">Bills</th><th className="r">Billed</th><th className="r">Unpaid</th></>}</tr></thead>
+          <thead><tr><th>Vendor</th><th>WhatsApp</th><th>Credit days</th>{canEdit && <th style={{ width: 210 }} />}{seesMoney && <><th className="r">Bills</th><th className="r">Billed</th><th className="r">Unpaid</th></>}</tr></thead>
           <tbody>
             {shown.map((v) => {
               const t = totals[v.id];
               return (
                 <tr key={v.id} className={canEdit ? 'click' : ''} onClick={() => canEdit && setEditing(v)}>
-                  <td><strong>{v.name}</strong>{!v.active && <span className="chip off" style={{ marginLeft: 8 }}>Inactive</span>}{v.category && <div className="small muted">{v.category}</div>}</td>
+                  <td><strong>{v.name}</strong>{!v.active && <span className="chip off" style={{ marginLeft: 8 }}>Removed</span>}{v.code && <span className="small muted" style={{ marginLeft: 8 }}>{v.code}</span>}{v.category && <div className="small muted">{v.category}</div>}</td>
                   <td className="num small">{v.whatsapp || v.phone || <span className="chip late">Missing</span>}</td>
                   <td className="num">{v.credit_days ?? '—'}</td>
-                  {canEdit && <td onClick={(e) => e.stopPropagation()}><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="btn quiet" onClick={() => setEditing(v)}>Edit</button><button className="btn quiet" onClick={() => setPaying(v)}>Pay</button></div></td>}
+                  {canEdit && <td onClick={(e) => e.stopPropagation()}><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="btn quiet" onClick={() => setEditing(v)}>Edit</button>{v.active ? <><button className="btn quiet" onClick={() => setPaying(v)}>Pay</button><button className="btn quiet" onClick={() => setRemoving(v)}>Remove</button></> : <button className="btn quiet" onClick={() => void bringBack(v)}>Bring back</button>}</div></td>}
                   {seesMoney && <><td className="r num">{t?.bills ?? 0}</td><td className="r num">{money(t?.billed ?? 0)}</td>
                     <td className="r num" style={{ color: (t?.balance ?? 0) > 0 ? 'var(--watch)' : undefined, fontWeight: (t?.balance ?? 0) > 0 ? 700 : 400 }}>{money(t?.balance ?? 0)}</td></>}
                 </tr>
@@ -75,6 +82,7 @@ export function Vendors() {
         </table>
         {shown.length === 0 && <p className="empty">No vendors yet.</p>}
       </div>
+      {removing && <RemoveSheet vendor={removing} unpaid={totals[removing.id]?.balance ?? 0} onClose={() => setRemoving(null)} onDone={() => { setRemoving(null); void load(); }} />}
       {paying && <PaySheet vendor={paying} onClose={() => setPaying(null)} onEdit={() => { setEditing(paying); setPaying(null); }} />}
       {editing && <VendorForm vendor={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </>
@@ -156,6 +164,27 @@ function PaySheet({ vendor, onClose, onEdit }: { vendor: Vendor; onClose: () => 
     <Sheet title={`Pay ${vendor.name}`} onClose={onClose} footer={<button className="btn secondary" onClick={onEdit}>Edit vendor</button>}>
       {qr ? <div style={{ display: 'grid', placeItems: 'center' }}><img src={qr} alt="Payment QR" style={{ width: 'min(320px, 100%)', background: '#fff', padding: 8, borderRadius: 12 }} /></div> : <p className="banner warn">No QR uploaded yet. Tap Edit vendor to add the QR image.</p>}
       <div className="stack">{rows.filter(([, v]) => v).map(([k, v]) => <div key={k} className="row" style={{ justifyContent: 'space-between' }}><span className="muted">{k}</span><span className="row" style={{ gap: 6 }}><b className="num">{v}</b><button className="btn quiet" onClick={() => copy(v!)}>Copy</button></span></div>)}</div>
+    </Sheet>
+  );
+}
+
+function RemoveSheet({ vendor, unpaid, onClose, onDone }: { vendor: Vendor; unpaid: number; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [n, setN] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { supabase.from('items').select('id', { count: 'exact', head: true }).eq('default_vendor_id', vendor.id).eq('active', true).then(({ count }) => setN(count ?? 0)); }, [vendor.id]);
+  async function go() {
+    setBusy(true);
+    const { error } = await supabase.from('vendors').update({ active: false }).eq('id', vendor.id);
+    setBusy(false);
+    if (error) return toast(errText(error));
+    toast(`${vendor.name} removed. You can bring them back any time.`); onDone();
+  }
+  return (
+    <Sheet title={`Remove ${vendor.name}?`} onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Keep vendor</button><button className="btn primary" disabled={busy || n === null} onClick={go}>{busy ? 'Removing…' : 'Remove vendor'}</button></>}>
+      <p>They will no longer show when ordering. Their past orders, bills and payments stay exactly as they are, and you can bring them back from this page.</p>
+      {n !== null && n > 0 && <p className="banner warn">{n} item{n === 1 ? '' : 's'} still use {vendor.name} as the usual vendor. Pick another usual vendor for them in Buying.</p>}
+      {unpaid > 0 && <p className="banner warn">There is still {money(unpaid)} unpaid to this vendor. It stays on record.</p>}
     </Sheet>
   );
 }

@@ -8,9 +8,10 @@ import { AvatarButton } from '../components/AvatarButton';
 import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 
-interface It { id: number; name: string; local_names: Record<string, string> | null; unit: string; group_id: number | null; quick_amounts: number[] | null; count_frequency: string; base_unit?: string | null }
+interface It { id: number; name: string; local_names: Record<string, string> | null; unit: string; group_id: number | null; quick_amounts: number[] | null; count_frequency: string; base_unit?: string | null; pieceG?: number; portionKg?: number }
 
-const mult = (i: { unit: string; base_unit?: string | null }) => (i.unit === 'kg' && i.base_unit === 'g' ? 1000 : 1);
+// Shown per kg stored: grams for weighed items, pieces for chicken counted by the piece.
+const mult = (i: { unit: string; base_unit?: string | null; pieceG?: number }) => (i.pieceG ? 1000 / i.pieceG : i.unit === 'kg' && i.base_unit === 'g' ? 1000 : 1);
 
 export function CountPage() {
   const [sp] = useSearchParams();
@@ -42,6 +43,12 @@ export function CountPage() {
         const { data } = await supabase.rpc('department_items', { p_location_id: loc });
         list = ((data as It[]) ?? []);
       }
+      // Chicken portions are counted by the piece; stock stays in kg underneath.
+      const ex = await supabase.from('items').select('id, pack_name, pieces_per_pack, weight_per_pack_g, details').in('id', list.map((x) => x.id));
+      for (const r of ((ex.data as { id: number; pack_name: string | null; pieces_per_pack: number | null; weight_per_pack_g: number | null; details: { piece_g?: number } | null }[]) ?? [])) {
+        const it = list.find((x) => x.id === r.id);
+        if (it && it.unit === 'kg' && r.pack_name === 'portion' && Number(r.details?.piece_g) > 0) { it.pieceG = Number(r.details?.piece_g); it.portionKg = Number(r.weight_per_pack_g) / 1000; }
+      }
       const daily = list.filter((i) => i.count_frequency === freq);
       setItems(loc === 1 && !daily.length ? list : daily);
       const { data: id, error } = await supabase.rpc('open_count', { p_location_id: loc, p_freq: freq });
@@ -57,7 +64,7 @@ export function CountPage() {
     })();
   }, [loc, freq]);
 
-  const step = (i: It) => { const a = (i.quick_amounts ?? []).filter((n) => n > 0); return (a.length ? Math.min(...a) : 1) * mult(i); };
+  const step = (i: It) => { if (i.pieceG) return 1; const a = (i.quick_amounts ?? []).filter((n) => n > 0); return (a.length ? Math.min(...a) : 1) * mult(i); };
   const nameOf = (i: It) => (hi && i.local_names?.hi) || i.name;
   const shown = useMemo(() => items.filter((i) => i.name.toLowerCase().includes(q.toLowerCase())), [items, q]);
   const done = items.filter((i) => saved[i.id]).length;
@@ -87,7 +94,7 @@ export function CountPage() {
         <input placeholder={t('Find an item')} value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="stack">{shown.map((i) => (
           <div key={i.id} className="card row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-            <div style={{ minWidth: 0, flex: 1 }}><b>{nameOf(i)}</b><div className={'small ' + (saved[i.id] ? 'muted' : '')} style={saved[i.id] ? undefined : { color: '#B3541E' }}>{mult(i) === 1000 ? 'g (grams, from the weighing machine)' : i.unit}{saved[i.id] ? ' · counted' : ' · not counted yet'}</div></div>
+            <div style={{ minWidth: 0, flex: 1 }}><b>{nameOf(i)}</b><div className={'small ' + (saved[i.id] ? 'muted' : '')} style={saved[i.id] ? undefined : { color: '#B3541E' }}>{i.pieceG ? `pieces${vals[i.id] && i.portionKg ? ` · about ${Math.round((Number(vals[i.id]) * i.pieceG / 1000 / i.portionKg) * 10) / 10} portions` : ''}` : mult(i) === 1000 ? 'g (grams, from the weighing machine)' : i.unit}{saved[i.id] ? ' · counted' : ' · not counted yet'}</div></div>
             <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
               <button className="qchip" aria-label="Less" onClick={() => { const n = Math.max(0, Number(vals[i.id] || 0) - step(i)); const s = String(Math.round(n * 1000) / 1000); setVals((p) => ({ ...p, [i.id]: s })); void save(i, s); }}>−</button>
               <input inputMode="decimal" className="num" style={{ width: 84, textAlign: 'center' }} aria-label={nameOf(i)} value={vals[i.id] ?? ''} onChange={(e) => { setVals((p) => ({ ...p, [i.id]: e.target.value })); setSaved((p) => { const c = { ...p }; delete c[i.id]; return c; }); }} onBlur={(e) => void save(i, e.target.value)} />

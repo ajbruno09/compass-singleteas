@@ -29,7 +29,7 @@ const n2 = (n: number) => String(Math.round(n * 100) / 100);
 const stepOf = (unit: string) => (unit === 'kg' || unit === 'L' ? 0.5 : 1);
 // Quantities are kept in the counted unit (pcs). Vendors sell in packs (trays), so show and send packs.
 type PackItem = { unit: string; purchase_factor: number | null; purchase_unit: string | null };
-const packed = (i: PackItem, qty: number) => (i.purchase_factor && Number(i.purchase_factor) > 1 && i.purchase_unit && i.purchase_unit !== i.unit ? { qty: qty / Number(i.purchase_factor), unit: i.purchase_unit } : { qty, unit: i.unit });
+const packed = (i: PackItem, qty: number) => (i.purchase_factor && (Number(i.purchase_factor) > 1 || i.purchase_unit === 'bird') && i.purchase_unit && i.purchase_unit !== i.unit ? { qty: qty / Number(i.purchase_factor), unit: i.purchase_unit } : { qty, unit: i.unit });
 const packText = (i: PackItem, qty: number) => { const p = packed(i, qty); return p.unit === i.unit ? `${n2(qty)} ${i.unit}` : `${n2(p.qty)} ${p.unit}${Math.abs(p.qty - 1) < 1e-9 ? '' : 's'} (${n2(qty)} ${i.unit})`; };
 const packLine = (i: PackItem, qty: number) => { const p = packed(i, qty); return { qty: p.qty, unit: p.unit + (p.unit !== i.unit && Math.abs(p.qty - 1) >= 1e-9 ? 's' : '') }; };
 const roundUp = (n: number, step: number) => Math.ceil(n / step - 1e-9) * step;
@@ -69,6 +69,9 @@ export function Buying() {
   const [edit, setEdit] = useState<Record<number, number>>({});
   const [openV, setOpenV] = useState<string | null>(null);
   const [dlg, setDlg] = useState<{ vendorId: string; poId?: string } | null>(null);
+  const [moved, setMoved] = useState<Record<number, string>>({});
+  const [moveFor, setMoveFor] = useState<number | null>(null);
+  const [moveTo, setMoveTo] = useState('');
   const [otherFor, setOtherFor] = useState<number | null>(null);
   const [otherText, setOtherText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -140,12 +143,13 @@ export function Buying() {
   }, [sentInd, itemMap, onHand, orderedBy, edit, rateMap, locations]);
 
   const toBuy = rows.filter((r) => r.qty > 0);
-  const loose = toBuy.filter((r) => !r.item.default_vendor_id);
+  const vOf = (r: Row) => moved[r.item.id] ?? r.item.default_vendor_id;
+  const loose = toBuy.filter((r) => !vOf(r));
   const byVendor = useMemo(() => {
     const m = new Map<string, Row[]>();
-    for (const r of toBuy) if (r.item.default_vendor_id) m.set(r.item.default_vendor_id, [...(m.get(r.item.default_vendor_id) ?? []), r]);
+    for (const r of toBuy) { const v = moved[r.item.id] ?? r.item.default_vendor_id; if (v) m.set(v, [...(m.get(v) ?? []), r]); }
     return m;
-  }, [toBuy]);
+  }, [toBuy, moved]);
   const vendorIds = useMemo(() => {
     const ids = new Set<string>([...byVendor.keys(), ...pos.map((p) => p.vendor_id)]);
     return [...ids].filter((id) => vendorMap.has(id)).sort((a, b) => vendorMap.get(a)!.name.localeCompare(vendorMap.get(b)!.name));
@@ -161,6 +165,18 @@ export function Buying() {
     if (error) return toast(errText(error));
     toast(`${itemMap.get(itemId)?.name} will be bought from ${label} from now on`);
     await loadStatic(); setOtherFor(null); setOtherText('');
+  }
+  function moveToday(itemId: number) {
+    if (!moveTo) return;
+    setMoved((p) => ({ ...p, [itemId]: moveTo }));
+    toast(`${itemMap.get(itemId)?.name} moved to ${vendorMap.get(moveTo)?.name} for today`);
+    setMoveFor(null); setMoveTo('');
+  }
+  async function moveUsual(itemId: number) {
+    if (!moveTo) return;
+    await usual(itemId, moveTo, vendorMap.get(moveTo)?.name ?? '');
+    setMoved((p) => { const n = { ...p }; delete n[itemId]; return n; });
+    setMoveFor(null); setMoveTo('');
   }
   async function addOther(itemId: number) {
     const name = otherText.trim(); if (!name) return;
@@ -242,7 +258,7 @@ export function Buying() {
                       {list.length > 0 && (
                         <div className="tablewrap" style={{ border: 0, borderRadius: 0, boxShadow: 'none' }}>
                           <table>
-                            <thead><tr><th>Item</th><th>Asked by counters</th><th className="r">Asked</th><th className="r">In store</th><th className="r">Suggested</th><th>Order</th><th className="r">Estimate</th></tr></thead>
+                            <thead><tr><th>Item</th><th>Asked by counters</th><th className="r">Asked</th><th className="r">In store</th><th className="r">Suggested</th><th>Order</th><th className="r">Estimate</th><th /></tr></thead>
                             <tbody>{list.map((r) => (
                               <tr key={r.item.id}>
                                 <td><b>{r.item.name}</b>{r.item.rate_varies && <span className="chip late ratetag">Rate varies</span>}{r.ordered > 0 && <div className="muted small">{n2(r.ordered)} {r.item.unit} already ordered</div>}</td>
@@ -256,10 +272,25 @@ export function Buying() {
                                   <button aria-label="More" onClick={() => setEdit((p) => ({ ...p, [r.item.id]: r.qty + r.step }))}>+</button>
                                 </div></td>
                                 <td className="r num">{r.rate != null ? money(r.qty * r.rate) : '—'}</td>
+                                <td><button className="btn quiet" onClick={() => { setMoveFor(moveFor === r.item.id ? null : r.item.id); setMoveTo(''); }}>Move</button></td>
                               </tr>))}</tbody>
                           </table>
                         </div>
                       )}
+                      {list.filter((r) => r.item.id === moveFor).map((r) => (
+                        <div key={'mv' + r.item.id} className="banner" style={{ margin: '10px 16px 0' }}>
+                          <div><b>Move {r.item.name}</b> to another vendor</div>
+                          <div className="row" style={{ gap: 8, marginTop: 6 }}>
+                            <select aria-label="Vendor" value={moveTo} onChange={(e) => setMoveTo(e.target.value)} style={{ minWidth: 220 }}>
+                              <option value="">Choose vendor</option>
+                              {vendors.filter((x) => x.id !== vid).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                            </select>
+                            <button className="btn primary" disabled={!moveTo} onClick={() => moveToday(r.item.id)}>Just for today</button>
+                            <button className="btn" disabled={!moveTo} onClick={() => void moveUsual(r.item.id)}>Make usual vendor</button>
+                            <button className="btn quiet" onClick={() => setMoveFor(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      ))}
                       {vpos.length > 0 && (
                         <div className="row" style={{ padding: '10px 16px 0', gap: 8 }}>
                           <span className="muted small">Placed:</span>
@@ -358,6 +389,7 @@ function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, onClose, onDone 
         ) : (
           <>
             <button className="btn" onClick={() => { if (!printText(title, isMsg ? preview : rows.map((r) => `${r.item.name}  ${packText(r.item, r.qty)}`).join('\n'))) toast('Allow pop-ups to print'); }}>Print</button>
+            {!isMsg && <button className="btn" onClick={async () => toast((await copyText(`${vendor.name}\n` + rows.map((r, i) => `${i + 1}. ${r.item.name} ${packText(r.item, r.qty)}`).join('\n'))) ? 'List copied' : 'Could not copy')}>Copy list</button>}
             <button className="btn primary" disabled={busy || needTime || rows.length === 0} onClick={place}>{busy ? 'Saving…' : action}</button>
           </>
         )}

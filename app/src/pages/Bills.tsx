@@ -19,6 +19,7 @@ export function Bills() {
   const [filter, setFilter] = useState<Filter>('pending');
   const [paying, setPaying] = useState<Bill | null>(null);
   const [adding, setAdding] = useState(false);
+  const [noBill, setNoBill] = useState(0);
   const canPay = profile?.role === 'owner' || profile?.role === 'accounts';
 
   async function load() {
@@ -31,7 +32,7 @@ export function Bills() {
     setVendors((v as Vendor[]) ?? []);
     setRemarks(Object.fromEntries(((r as { id: string; remarks: string }[]) ?? []).map((x) => [x.id, x.remarks])));
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); supabase.from('goods_receipts').select('id', { count: 'exact', head: true }).eq('bill_later', true).then(({ count }) => setNoBill(count ?? 0)); }, []);
 
   const shown = useMemo(() => rows.filter((r) => (!vendor || r.vendor_id === vendor)
     && (filter === 'all' || (filter === 'pending' ? Number(r.balance) > 0 : r.payment_status === 'Paid'))), [rows, vendor, filter]);
@@ -44,6 +45,7 @@ export function Bills() {
         <div><p className="label">Accounts</p><h1>Bills and payments</h1></div>
         {canPay && <button className="btn primary" onClick={() => setAdding(true)}><Icon name="plus" />Add bill</button>}
       </div>
+      {noBill > 0 && <p className="banner warn">{noBill} delivery bill{noBill === 1 ? '' : 's'} not received yet. The store adds the photo from Receive goods.</p>}
       <div className="grid-tiles">
         <div className="card tile"><span className="label">Bills shown</span><span className="big">{shown.length}</span></div>
         <div className="card tile"><span className="label">Billed</span><span className="big">{money(sum((r) => (r.status === 'cancelled' ? 0 : Number(r.amount))))}</span></div>

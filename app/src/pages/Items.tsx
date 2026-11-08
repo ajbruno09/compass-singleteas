@@ -18,6 +18,9 @@ export function Items() {
   const [rows, setRows] = useState<ItemRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [cat, setCat] = useState<number | 'all'>('all');
+  const [grp, setGrp] = useState<number | 'all'>('all');
+  const [ctr, setCtr] = useState<number | 'all'>('all');
+  const [groupList, setGroupList] = useState<{ id: number; name: string }[]>([]);
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<ItemRow | 'new' | null>(null);
   const canEdit = profile?.role === 'owner' || profile?.role === 'manager';
@@ -27,13 +30,16 @@ export function Items() {
     setRows((data as ItemRow[]) ?? []);
     setLoading(false);
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); supabase.from('item_groups').select('id, name').order('sort').then(({ data }) => setGroupList((data as { id: number; name: string }[]) ?? [])); }, []);
+  const tabCats = useMemo(() => categories.filter((c) => rows.some((r) => r.category_id === c.id)), [categories, rows]);
+  const groupsHere = useMemo(() => groupList.filter((g) => rows.some((r) => (cat === 'all' || r.category_id === cat) && (r as { group_id?: number | null }).group_id === g.id)), [groupList, rows, cat]);
+  const ctrsHere = useMemo(() => locations.filter((l) => rows.some((r) => r.item_locations.some((x) => x.location_id === l.id))), [locations, rows]);
 
-  const shown = useMemo(() => rows.filter((r) => (cat === 'all' || r.category_id === cat) && r.name.toLowerCase().includes(q.trim().toLowerCase())), [rows, cat, q]);
+  const shown = useMemo(() => rows.filter((r) => (cat === 'all' || r.category_id === cat) && (grp === 'all' || (r as { group_id?: number | null }).group_id === grp) && (ctr === 'all' || r.item_locations.some((l) => l.location_id === ctr)) && r.name.toLowerCase().includes(q.trim().toLowerCase())), [rows, cat, grp, ctr, q]);
   async function exportXlsx() {
     const catName = (id: number) => categories.find((c) => c.id === id)?.name ?? '';
     const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-    await downloadWorkbook(`Items_${day}.xlsx`, `Single Teas items, ${day}`, [`${shown.length} items${cat !== 'all' || q ? ' (filtered as on screen)' : ''}.`],
+    await downloadWorkbook(`Items_${day}.xlsx`, `Single Teas items, ${day}`, [`${shown.length} items${cat !== 'all' || grp !== 'all' || ctr !== 'all' || q ? ' (filtered as on screen)' : ''}.`],
       [{ name: 'Items', cols: [{ label: 'Item', width: 34 }, { label: 'Category', width: 22 }, { label: 'Unit', width: 8 }, { label: 'Counted', width: 10 }, { label: 'Used at', width: 34 }, { label: 'Last cost', width: 11 }, { label: 'Pack', width: 20 }, { label: 'Active', width: 8 }],
         rows: shown.map((r) => [r.name, catName(r.category_id), r.unit, r.count_frequency === 'daily' ? 'Daily' : 'Weekly', r.item_locations.map((l) => locName(l.location_id)).join(', '), r.last_cost ?? null, (r as { pack_note?: string }).pack_note || '', r.active ? 'Yes' : 'No']) }]);
   }
@@ -46,11 +52,17 @@ export function Items() {
         <div className="row"><button className="btn" onClick={exportXlsx}><Icon name="layers" />Download Excel</button>{canEdit && <Link to="/upload?tab=items" className="btn"><Icon name="layers" />Bulk upload</Link>}
         {canEdit && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" />Add item</button>}</div>
       </div>
-      <div className="row">
+      <div className="row" style={{ marginBottom: 8 }}>
         <div className="seg" role="group" aria-label="Category">
-          <button aria-pressed={cat === 'all'} onClick={() => setCat('all')}>All</button>
-          {categories.map((c) => <button key={c.id} aria-pressed={cat === c.id} onClick={() => setCat(c.id)}>{c.name}</button>)}
+          <button aria-pressed={cat === 'all'} onClick={() => { setCat('all'); setGrp('all'); }}>All</button>
+          {tabCats.map((c) => <button key={c.id} aria-pressed={cat === c.id} onClick={() => { setCat(c.id); setGrp('all'); }}>{c.name} <span className="muted small">{rows.filter((r) => r.category_id === c.id).length}</span></button>)}
         </div>
+      </div>
+      <div className="row" style={{ marginBottom: 10 }}>
+        <label style={{ minWidth: 190 }}><span className="label" style={{ display: 'none' }}>Group</span>
+          <select aria-label="Group" value={grp} onChange={(e) => setGrp(e.target.value === 'all' ? 'all' : Number(e.target.value))}><option value="all">Group: all</option>{groupsHere.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+        <label style={{ minWidth: 190 }}><span className="label" style={{ display: 'none' }}>Counter</span>
+          <select aria-label="Counter" value={ctr} onChange={(e) => setCtr(e.target.value === 'all' ? 'all' : Number(e.target.value))}><option value="all">Counter: all</option>{ctrsHere.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
         <label style={{ marginLeft: 'auto', minWidth: 220 }}>
           <span className="label" style={{ display: 'none' }}>Search</span>
           <input id="item-search" placeholder="Search items" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -186,7 +198,7 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
       <label className="field"><span>Name</span><input id="item-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Curd" /></label>
       <div className="form-grid">
         <label className="field"><span>Category</span>
-          <select id="item-cat" value={categoryId} onChange={(e) => setCategoryId(Number(e.target.value))}>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <select id="item-cat" value={categoryId} onChange={(e) => setCategoryId(Number(e.target.value))}>{categories.filter((c) => c.id === categoryId || !['chemicals', 'safety', 'guest_supplies', 'durables'].includes(c.code ?? '')).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
         <label className="field"><span>Shelf group (where it shows in Stock in hand)</span>
           <select id="item-group" value={groupId} onChange={(e) => setGroupId(Number(e.target.value))}><option value={0}>No group yet</option>{groupList.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
         <label className="field"><span>Counted in</span>

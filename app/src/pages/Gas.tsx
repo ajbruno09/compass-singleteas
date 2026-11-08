@@ -22,7 +22,7 @@ async function sendPhoto(code: string, f: File): Promise<string> {
 function PhotoPick({ file, set }: { file: File | null; set: (f: File | null) => void }) {
   return (
     <label className="btn secondary" style={{ cursor: 'pointer' }}>
-      {file ? 'Photo taken. Tap to retake' : 'Take photo of the scale'}
+      {file ? 'Photo taken. Retake' : 'Take photo'}
       <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => set(e.target.files?.[0] ?? null)} />
     </label>
   );
@@ -74,9 +74,10 @@ function WeighTab({ canSeeAll }: { canSeeAll: boolean }) {
           <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
             <p className="small muted">Last weight {kg(chosen.last_gross_g)} kg · empty weight stamped {kg(chosen.tare_g)} kg · gas left about {kg(chosen.last_gross_g - chosen.tare_g, 1)} kg</p>
             {fix && <p className="small" style={{ color: 'var(--bad, #b3261e)' }}>This cylinder is already weighed tonight. Saving again is a correction and the Admin will see it.</p>}
-            <label className="small muted">Weight on the scale (kg)</label>
-            <input inputMode="decimal" placeholder="for example 38.15" value={val} onChange={(e) => setVal(e.target.value)} />
-            <PhotoPick file={photo} set={setPhoto} />
+            <div className="two">
+              <div><label className="small muted">Weight on the scale (kg)</label><input inputMode="decimal" placeholder="38.15" value={val} onChange={(e) => setVal(e.target.value)} /></div>
+              <div><label className="small muted">Photo of the scale</label><PhotoPick file={photo} set={setPhoto} /></div>
+            </div>
             <button className="btn" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Confirmed'}</button>
           </div>
         )}
@@ -108,11 +109,13 @@ function ReceiveTab({ onDone }: { onDone: () => void }) {
     <div className="card" style={{ display: 'grid', gap: 10 }}>
       <p className="label">Receive a full cylinder</p>
       <label className="small muted">Cylinder number</label><input value={code} onChange={(e) => setCode(e.target.value)} autoCapitalize="characters" />
-      <label className="small muted">Empty weight stamped on the cylinder (kg)</label><input inputMode="decimal" placeholder="for example 16.2" value={tare} onChange={(e) => setTare(e.target.value)} />
-      <label className="small muted">Weight on the scale now (kg)</label><input inputMode="decimal" placeholder="for example 35.3" value={gross} onChange={(e) => setGross(e.target.value)} />
-      <label className="small muted">Supplier (optional)</label><input value={sup} onChange={(e) => setSup(e.target.value)} />
+      <div className="two">
+        <div><label className="small muted">Empty weight stamped (kg)</label><input inputMode="decimal" placeholder="16.2" value={tare} onChange={(e) => setTare(e.target.value)} /></div>
+        <div><label className="small muted">On the scale now (kg)</label><input inputMode="decimal" placeholder="35.3" value={gross} onChange={(e) => setGross(e.target.value)} /></div>
+      </div>
       {tare && gross && <p className="small">Expected {kg(exp)} kg. {short > 0 ? <b style={{ color: 'var(--bad, #b3261e)' }}>Short by {short} g.</b> : 'Weight is full.'}</p>}
       <PhotoPick file={photo} set={setPhoto} />
+      <label className="small muted">Supplier (optional)</label><input value={sup} onChange={(e) => setSup(e.target.value)} />
       <button className="btn" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Receive cylinder'}</button>
     </div>
   );
@@ -161,9 +164,10 @@ function IssueTab({ cyls, onDone }: { cyls: Cyl[]; onDone: () => void }) {
           {!skip && (<>
             <label className="small muted">Old cylinder coming back</label>
             <select value={oldCode} onChange={(e) => setOldCode(e.target.value)}><option value="">Choose the old cylinder</option>{here.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}</select>
-            <label className="small muted">Weight of the old cylinder now (kg)</label>
-            <input inputMode="decimal" placeholder="empty is about 16" value={oldW} onChange={(e) => setOldW(e.target.value)} />
-            <PhotoPick file={photo} set={setPhoto} />
+            <div className="two">
+              <div><label className="small muted">Old cylinder weight now (kg)</label><input inputMode="decimal" placeholder="about 16" value={oldW} onChange={(e) => setOldW(e.target.value)} /></div>
+              <div><label className="small muted">Photo of the scale</label><PhotoPick file={photo} set={setPhoto} /></div>
+            </div>
           </>)}
           <label className="row" style={{ gap: 8, flexWrap: 'nowrap' }}><input type="checkbox" style={{ width: 'auto' }} checked={skip} onChange={(e) => setSkip(e.target.checked)} /><span className="small">Issue without closing the old one (the Admin is told)</span></label>
           {skip && (<>
@@ -211,7 +215,7 @@ export function Gas() {
   useEffect(() => { void load(); }, [load]);
   const tabs: [typeof tab, string][] = admin ? [['weigh', 'Weigh'], ['receive', 'Receive'], ['issue', 'Issue'], ['register', 'Register']] : [['weigh', 'Weigh']];
   return (
-    <div className={admin ? '' : 'phone'}>
+    <div className={'gas ' + (admin ? '' : 'phone')}>
       <div className="pagehead"><div><p className="label">Fuel</p><h1>Gas cylinders</h1></div></div>
       {tabs.length > 1 && <div className="row" style={{ gap: 6, marginBottom: 12 }}>{tabs.map(([k, l]) => <button key={k} className={tab === k ? 'btn' : 'btn secondary'} onClick={() => setTab(k)}>{l}</button>)}</div>}
       {tab === 'weigh' && <WeighTab canSeeAll={admin} />}

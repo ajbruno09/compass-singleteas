@@ -19,6 +19,7 @@ export function StatusStrip() {
   const [bio, setBio] = useState(false);
   const [armed, setArmed] = useState(alarmUnlocked());
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   useEffect(() => { void bioSupported().then(setBioOk); setBio(!!uid && bioEnabled(uid)); }, [uid]);
   if (!profile) return null;
   const watching = ['store', 'owner', 'manager'].includes(profile.role);
@@ -41,6 +42,12 @@ export function StatusStrip() {
       ? { key: 'sos', icon: 'siren', label: 'SOS sound', on: true, hint: 'SOS siren is on. Tap to test the sound', act: () => testBeep() }
       : { key: 'sos', icon: 'siren', label: 'Turn on SOS sound', on: false, hint: 'Tap once so the SOS siren can ring on this phone', act: () => { setArmed(unlockAlarm()); testBeep(); window.dispatchEvent(new Event('compass-armed')); } });
   if (!chips.length) return null;
+  if (chips.every((c) => c.on) && !open)
+    return (
+      <div className="statusstrip" role="group" aria-label="This phone">
+        <button className="stat on" onClick={() => setOpen(true)} aria-label="This phone is set up. Tap to see details"><Check size={15} strokeWidth={2.6} /><span>This phone is all set</span></button>
+      </div>
+    );
   return (
     <div className="statusstrip" role="group" aria-label="This phone">
       {chips.map((c) => (
