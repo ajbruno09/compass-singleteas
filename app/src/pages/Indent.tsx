@@ -61,6 +61,8 @@ export function IndentPage() {
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 20000); return () => window.clearInterval(id); }, []);
   useEffect(() => { const pop = () => { setView({ kind: 'groups' }); setQ(''); }; window.addEventListener('popstate', pop); return () => window.removeEventListener('popstate', pop); }, []);
 
+  const [lpg, setLpg] = useState<{ gas_left_kg: number | null; in_use: number; issued_today: boolean } | null>(null);
+  useEffect(() => { if (locId == null) return; supabase.rpc('lpg_status', { p_location: locId }).then(({ data }) => setLpg((data as typeof lpg) ?? null)); }, [locId]);
   const label = useCallback((i: DeptItem) => (local && lang && i.local_names?.[lang]) || i.name, [local, lang]);
   void hi;
 
@@ -240,7 +242,9 @@ export function IndentPage() {
             <>
               {visible.length === 0 ? <p className="empty card">{view.kind === 'search' ? t('No item with that name on your counter.') : t('Nothing here yet.')}</p> : (
                 <div className="stack">
-                  {visible.map((i) => (
+                  {visible.map((i) => i.id === 658 ? (
+                    <LpgRow key={i.id} name={label(i)} on={(lines[i.id]?.qty ?? 0) > 0} lpg={lpg} onChange={(on) => setQty(i, on ? 1 : 0)} />
+                  ) : (
                     <ItemRow key={i.id} item={i} name={label(i)} line={lines[i.id]} usual={usual[i.id]} flag={flagged(i, lines[i.id])} night={lastNight?.[i.id]}
                       onQty={(n) => setQty(i, n)} onReason={(r) => lines[i.id] && save(i, { qty: lines[i.id].qty, reason: r })} reasonList={moreReasons} />
                   ))}
@@ -287,6 +291,21 @@ export function IndentPage() {
       {voice && <VoiceOrder items={items} label={label} onClose={() => setVoice(false)}
         onAdd={(ls) => { ls.forEach((l) => setQty(l.item, l.qty)); toast(t('Added {n} items by voice', { n: ls.length })); }} />}
 
+    </div>
+  );
+}
+
+function LpgRow({ name, on, lpg, onChange }: { name: string; on: boolean; lpg: { gas_left_kg: number | null; in_use: number; issued_today: boolean } | null; onChange: (on: boolean) => void }) {
+  const { t } = useLang();
+  return (
+    <div className={'irow' + (on ? ' has' : '')}>
+      <div className="irow-top">
+        <div className="pic">{name.slice(0, 1)}</div>
+        <div className="irow-name"><b>{name}</b>
+          <div className="small muted">{lpg?.gas_left_kg != null ? t('About {n} kg of gas left in your cylinder.', { n: String(lpg.gas_left_kg) }) : t('One full cylinder, issued by the store.')}</div>
+          {lpg?.issued_today && <div className="small" style={{ color: '#2F7D4F' }}>{t('A cylinder was already issued to you today.')}</div>}</div>
+        <button className={'btn ' + (on ? 'primary' : 'secondary')} aria-pressed={on} onClick={() => onChange(!on)}>{on ? t('Requested') : t('Request 1 cylinder')}</button>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { qty as fmtQty, errText, packFactor, round3 } from '../lib/format';
@@ -22,6 +23,7 @@ export function Issue() {
   const [find, setFind] = useState('');
   const [today, setToday] = useState<IssueRow[]>([]);
   const [forDate, setForDate] = useState('');
+  const [lpgDone, setLpgDone] = useState(false);
   const [old, setOld] = useState<{ indent_id: string; location_id: number; location_name: string; for_date: string; items: number }[]>([]);
   const [why, setWhy] = useState('');
   const [whyNote, setWhyNote] = useState('');
@@ -61,13 +63,14 @@ export function Issue() {
     })();
   }, [loc, day, forDate, items]);
 
+  useEffect(() => { setLpgDone(false); if (!loc) return; supabase.rpc('lpg_status', { p_location: loc }).then(({ data }) => setLpgDone(!!(data as { issued_today?: boolean } | null)?.issued_today)); }, [loc, today.length]);
   const ids = useMemo(() => Object.keys(asked).map(Number).concat(extra.filter((e) => !(e in asked))).filter((id) => items[id]).sort((a, b) => items[a].name.localeCompare(items[b].name)), [asked, extra, items]);
   const matches = useMemo(() => find.trim().length < 2 ? [] : Object.values(items).filter((i) => i.name.toLowerCase().includes(find.toLowerCase()) && !ids.includes(i.id)).slice(0, 6), [find, items, ids]);
   const locName = (id: number) => locations.find((l) => l.id === id)?.name ?? '';
 
   async function send() {
     setErr('');
-    const lines = Object.entries(vals).filter(([, v]) => Number(v) > 0).map(([id, v]) => ({ item_id: Number(id), qty: round3(Number(v) * (packFactor(items[Number(id)] ?? {}) || 1)) }));
+    const lines = Object.entries(vals).filter(([id, v]) => Number(id) !== 658 && Number(v) > 0).map(([id, v]) => ({ item_id: Number(id), qty: round3(Number(v) * (packFactor(items[Number(id)] ?? {}) || 1)) }));
     if (!lines.length) return setErr('Enter a quantity for at least one item.');
     const reason = [why, whyNote.trim()].filter(Boolean).join(': ');
     if (isLate && !reason) return setErr('This indent is for an earlier day. Please say why it is being issued late.');
@@ -92,6 +95,9 @@ export function Issue() {
       <div className="tablewrap"><table>
         <thead><tr><th>Item</th><th className="r">Asked</th><th className="r">In store</th><th className="r" style={{ width: 130 }}>Issue now</th></tr></thead>
         <tbody>{ids.map((id) => { const it = items[id]; const f = packFactor(it); const have = store[id] ?? 0; const want = Number(vals[id] ?? 0) * (f || 1); const short = want > have; const show = (n: number) => (f ? `${Math.round((n / f) * 10) / 10} ${it.show_as}` : fmtQty(n, it.unit));
+          if (id === 658) return <tr key={id}><td><b>{it.name}</b> <span className="muted small">cylinder</span></td>
+            <td className="r num">{asked[id] != null ? '1 cylinder' : <span className="muted small">extra</span>}</td>
+            <td className="r" colSpan={2}>{lpgDone ? <span className="chip done">Cylinder issued today</span> : <Link className="btn secondary" to="/gas">Issue on the Gas screen</Link>}</td></tr>;
           return <tr key={id}><td><b>{it.name}</b> <span className="muted small">{f ? it.show_as : it.unit}</span></td>
             <td className="r num">{asked[id] != null ? show(asked[id]) : <span className="muted small">extra</span>}</td>
             <td className="r num" style={{ color: short ? 'var(--bad, #B42335)' : undefined, fontWeight: short ? 700 : 400 }}>{show(have)}</td>
