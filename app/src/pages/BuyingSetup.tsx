@@ -59,7 +59,8 @@ export function BuyingSetup() {
     return { pack_label: e.pack_label ?? r.pack_label ?? '', pack_qty: e.pack_qty ?? (r.pack_qty != null ? String(r.pack_qty) : ''), price: e.price ?? (r.price != null ? String(r.price) : ''), vendor_id: e.vendor_id ?? r.default_vendor_id ?? '' };
   };
   const needs = (r: Row) => { const v = val(r); return !v.pack_label || !(Number(v.pack_qty) > 0) || !(Number(v.price) > 0) || !v.vendor_id; };
-  const isNew = (r: Row) => !r.price && Date.now() - new Date(r.item_created).getTime() < 7 * 864e5;
+  const LAUNCH = '2026-11-09'; // items added from this day on are shown as New
+  const isNew = (r: Row) => !r.price && r.item_created.slice(0, 10) >= LAUNCH && Date.now() - new Date(r.item_created).getTime() < 14 * 864e5;
   const counts = useMemo(() => ({
     all: rows.length, need: rows.filter(needs).length, price: rows.filter((r) => !r.price).length,
     vendor: rows.filter((r) => !r.default_vendor_id).length, new: rows.filter(isNew).length,
@@ -121,8 +122,8 @@ export function BuyingSetup() {
         <input placeholder="Search items" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginLeft: 'auto', width: 220 }} />
       </div>
 
-      <div className="tablewrap"><table className="table" style={{ minWidth: 1180, whiteSpace: 'nowrap' }}>
-        <thead><tr><th>Item</th><th>We buy it as</th><th className="r">Quantity in one pack</th><th className="r">Pack price (incl. GST)</th><th className="r">Cost per counted unit</th><th className="r">Change</th><th>Last updated from</th><th>Usual vendor</th><th>Status</th></tr></thead>
+      <div className="tablewrap"><table className="table" style={{ minWidth: 900 }}>
+        <thead><tr><th>Item</th><th>We buy it as</th><th className="r">Quantity in one pack</th><th className="r">Pack price (incl. GST)</th><th className="r">Cost per counted unit</th><th>Usual vendor</th><th>Status</th></tr></thead>
         <tbody>
           {shown.map((r) => {
             const v = val(r); const pq = Number(v.pack_qty); const pr = Number(v.price);
@@ -130,19 +131,17 @@ export function BuyingSetup() {
             const st = !v.pack_label || !(pq > 0) ? 'Needs pack size' : !(pr > 0) ? 'Needs price' : !v.vendor_id ? 'Needs vendor' : 'Complete';
             return (
               <tr key={r.item_id} style={edits[r.item_id] ? { background: 'var(--warn-bg)' } : undefined}>
-                <td><b>{r.name}</b>{isNew(r) && <span className="chip due" style={{ marginLeft: 8 }}>New</span>}<div className="muted small">{r.rate_group === 'fresh_chicken' ? 'Fresh chicken rate group' : (r.group_id ? groups[r.group_id] : '')}</div></td>
+                <td style={{ minWidth: 170 }}><b>{r.name}</b>{isNew(r) && <span className="chip due" style={{ marginLeft: 8 }}>New</span>}<div className="muted small">{r.rate_group === 'fresh_chicken' ? 'Fresh chicken rate group' : (r.group_id ? groups[r.group_id] : '')}</div></td>
                 <td>{manual ? <select style={{ width: 110 }} value={v.pack_label} onChange={(e) => set(r.item_id, { pack_label: e.target.value })}><option value="">Choose</option>{PACKS.map((p) => <option key={p}>{p}</option>)}</select> : (v.pack_label || <span className="muted">Not set</span>)}</td>
                 <td className="r num">{manual ? <input className="num" inputMode="decimal" style={{ width: 80 }} value={v.pack_qty} placeholder={r.unit} onChange={(e) => set(r.item_id, { pack_qty: e.target.value })} /> : (v.pack_qty ? `${v.pack_qty} ${r.unit}` : <span className="muted">—</span>)}</td>
                 <td className="r num">{manual ? <input className="num" inputMode="decimal" style={{ width: 84 }} value={v.price} placeholder="₹" onChange={(e) => set(r.item_id, { price: e.target.value })} /> : (v.price ? '₹' + Number(v.price).toLocaleString('en-IN') : <span className="muted">—</span>)}</td>
-                <td className="r num"><b>{live != null ? `${inr(live)} / ${r.unit}` : '—'}</b></td>
-                <td className="r num small">{arrow(r)}{r.prev_unit_cost != null && <div className="muted">was {inr(r.prev_unit_cost)}</div>}</td>
-                <td className="small muted">{sourceText(r)}</td>
-                <td>{manual ? <select style={{ width: 190 }} value={v.vendor_id} onChange={(e) => set(r.item_id, { vendor_id: e.target.value })}><option value="">Choose</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select> : (vName.get(v.vendor_id) ?? <span className="muted">Not set</span>)}</td>
+                <td className="r num"><b>{live != null ? `${inr(live)} / ${r.unit}` : '—'}</b><div className="small">{arrow(r)}{r.prev_unit_cost != null && <span className="muted"> was {inr(r.prev_unit_cost)}</span>}</div><div className="small muted">{sourceText(r)}</div></td>
+                <td>{manual ? <select style={{ width: 170 }} value={v.vendor_id} onChange={(e) => set(r.item_id, { vendor_id: e.target.value })}><option value="">Choose</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select> : (vName.get(v.vendor_id) ?? <span className="muted">Not set</span>)}</td>
                 <td><span className={`chip ${st === 'Complete' ? 'done' : 'late'}`}>{st}</span></td>
               </tr>
             );
           })}
-          {shown.length === 0 && <tr><td colSpan={9} className="muted" style={{ padding: 20 }}>Nothing here.</td></tr>}
+          {shown.length === 0 && <tr><td colSpan={7} className="muted" style={{ padding: 20 }}>Nothing here.</td></tr>}
         </tbody>
       </table></div>
 
