@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText } from '../lib/format';
@@ -16,6 +16,7 @@ export function SosWatcher() {
   const { profile, locations } = useSession();
   const toast = useToast();
   const nav = useNavigate();
+  const onSosPage = useLocation().pathname === '/sos';
   const [alerts, setAlerts] = useState<SosAlert[]>([]);
   const [names, setNames] = useState<Record<number, string>>({});
   const [units, setUnits] = useState<Record<number, string>>({});
@@ -78,11 +79,11 @@ export function SosWatcher() {
 
   useEffect(() => {
     // A mute is only for a short while. When the time is up the alarm comes back on by itself.
-    const loud = ringing.length > 0 && now >= mutedUntil;
+    const loud = ringing.length > 0 && now >= mutedUntil && !onSosPage;
     if (loud && armed) startAlarm(); else stopAlarm();
     return () => stopAlarm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ringing, mutedUntil, armed, now >= mutedUntil]);
+  }, [ringing, mutedUntil, armed, now >= mutedUntil, onSosPage]);
   // A brand new SOS always rings, even if the sound was muted for an earlier one.
   const seenIds = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -133,7 +134,7 @@ export function SosWatcher() {
         <div key={a.id} className="banner warn">{where(a)} sent an SOS. If the store does not answer in {Math.max(0, SOS_AFTER_SECONDS - age(a))} seconds, this phone will ring.</div>
       ))}
 
-      {ringing.length > 0 && (
+      {ringing.length > 0 && !onSosPage && (
         <div className="sosoverlay" role="alertdialog" aria-label="SOS">
           <div className="soscard">
             <p className="sosbig">🚨 SOS</p>
@@ -147,6 +148,7 @@ export function SosWatcher() {
                   ? <p style={{ fontWeight: 600 }}>Overdue. You said {a.eta_minutes} min. Please issue now.</p>
                   : <div className="seg">{[10, 20, 30, 60].map((m) => <button key={m} className="sosbtn" onClick={() => void ack(a, m)}>On it, {m} min</button>)}</div>}
                 {role !== 'manager' && <button className="btn floor" onClick={() => nav('/sos')}>Open SOS page and issue</button>}
+                {role !== 'manager' && <button className="btn floor" onClick={() => void done(a)}>Already issued. Close this</button>}
               </div>
             ))}
             {now >= mutedUntil && armed && <button className="btn quiet" style={{ marginTop: 18, opacity: sure ? 1 : 0.7 }} onClick={muteFor15}>{sure ? `Tap again to mute for ${MUTE_MINUTES} minutes` : '🔇 Mute sound'}</button>}
