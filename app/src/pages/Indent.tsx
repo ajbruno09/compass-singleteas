@@ -222,8 +222,9 @@ export function IndentPage() {
           {view.kind === 'groups' && (
             <>
               <button className="usualbar" onClick={() => openView({ kind: 'usual' })} disabled={Object.keys(usual).length === 0}>
-                <span style={{ fontSize: 26 }}>⭐</span>
-                <span><b>{t('My usual')}</b><br /><span className="small muted">{Object.keys(usual).length ? t('{n} items you ask for often', { n: Object.keys(usual).length }) : t('Fills in after your first few indents')}</span></span>
+                <span className="ustar">★</span>
+                <span className="utext"><b>{t('My usual')}</b><span className="small muted">{Object.keys(usual).length ? t('{n} items you ask for often', { n: Object.keys(usual).length }) : t('Fills in after your first few indents')}</span></span>
+                <span className="uarrow" aria-hidden="true">›</span>
               </button>
               <div className="groupgrid">
                 {groupInfo.map(({ g, count, picked }) => (
