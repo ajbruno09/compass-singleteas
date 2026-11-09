@@ -101,7 +101,7 @@ export function Issue() {
           <span className="small muted">On now: <b>{pStat.label}</b>. {pStat.ordering_open ? 'Kitchen counters can place the party indent' : 'Ordering has closed'}{pStat.open_until ? ` until ${new Date(pStat.open_until).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}` : ''}. Issue the items, and close it when the party is done.</span>
           <button className="btn secondary" onClick={() => void partyOff()}>Close party order</button>
         </>) : (<>
-          <span className="small muted">Off. Switch it on for a party and the kitchen counters can order any items for it.</span>
+          <span className="small muted">Off. Switch it on for a party. The kitchen counters can order any items until the date and time you choose, then it disappears from their screens.</span>
           <input value={pLabel} onChange={(e) => setPLabel(e.target.value)} placeholder="Party name, for example Sharma wedding" style={{ minHeight: 44 }} />
           <label className="field"><span>Open for ordering until</span><input type="datetime-local" value={pUntil} onChange={(e) => setPUntil(e.target.value)} style={{ minHeight: 44 }} /></label>
           <button className="btn primary" disabled={!pLabel.trim() || !pUntil} onClick={() => void partyOn()}>Switch on party order</button>
