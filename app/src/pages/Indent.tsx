@@ -55,7 +55,18 @@ export function IndentPage() {
   const [now, setNow] = useState(Date.now());
   const [accepted, setAccepted] = useState<Record<number, boolean>>({});
   const [ask, setAsk] = useState(false);
+  const [cart, setCart] = useState<{ total: number; priced: number; unpriced: number } | null>(null);
   const [lastNight, setLastNight] = useState<Record<number, { qty: number; issued: number }> | null>(null);
+  const lineKey = Object.entries(lines).map(([k, v]) => `${k}:${v.qty}`).join(',');
+  useEffect(() => {
+    if (!review || !indent) return;
+    const h = window.setTimeout(async () => {
+      const { data } = await supabase.rpc('indent_cart_value', { p_indent_id: indent.id });
+      const r = (Array.isArray(data) ? data[0] : data) as { total: number; priced: number; unpriced: number } | undefined;
+      setCart(r ? { total: Number(r.total), priced: Number(r.priced), unpriced: Number(r.unpriced) } : null);
+    }, 500);
+    return () => window.clearTimeout(h);
+  }, [review, indent, lineKey]);
   const [closedAt, setClosedAt] = useState<string | null>(null);
   const { t, hi, local, extra: lang, toggle, canSwitch, unit: u, group: gname } = useLang();
   const [voice, setVoice] = useState(false);
@@ -285,7 +296,9 @@ export function IndentPage() {
           {missingReason.length > 0 && <p className="banner warn">{missingReason.length === 1 ? t('One item is well above your usual. Tick that you are sure, and tell the store why.') : t('{n} items are well above your usual. Tick that you are sure, and tell the store why.', { n: missingReason.length })}</p>}
           <div className="card" style={{ padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="muted">{t('Cart value')}</span>
-            <span className="chip off">{t('Coming soon')}</span>
+            {cart && cart.priced > 0
+              ? <span style={{ textAlign: 'right' }}><b className="num" style={{ fontSize: 18 }}>₹{Math.round(cart.total).toLocaleString('en-IN')}</b>{cart.unpriced > 0 && <div className="small muted">{cart.unpriced === 1 ? t('+ 1 item without a price yet') : t('+ {n} items without a price yet', { n: cart.unpriced })}</div>}</span>
+              : <span className="chip off">{t('Coming soon')}</span>}
           </div>
           {items.filter((i) => lines[i.id]).map((i) => (
             <div key={i.id} className="card" style={{ padding: 12 }}>
