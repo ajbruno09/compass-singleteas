@@ -6,11 +6,13 @@ import { useToast } from '../components/Toast';
 
 interface Row {
   item_id: number; name: string; unit: string; group_id: number | null; default_vendor_id: string | null; rate_group: string | null; item_created: string;
-  price: number | null; pack_label: string | null; pack_qty: number | null; bill_date: string | null; source: string | null; ref: string | null;
+  price: number | null; pack_label: string | null; pack_qty: number | null; content_qty: number | null; content_unit: string | null; bill_date: string | null; source: string | null; ref: string | null;
   unit_cost: number | null; prev_unit_cost: number | null; prev_date: string | null;
 }
 interface Vendor { id: string; name: string; is_store: boolean }
-interface Edit { pack_label?: string; pack_qty?: string; price?: string; vendor_id?: string }
+interface Edit { pack_label?: string; pack_qty?: string; price?: string; vendor_id?: string; content_qty?: string; content_unit?: string }
+const MEASURED = ['kg', 'g', 'L', 'l', 'ml'];
+const CONTENT_UNITS = ['ml', 'L', 'g', 'kg'];
 const PACKS = ['kg', 'pack', 'tray', 'case', 'bag', 'box', 'bottle', 'piece', 'roll', 'dozen', 'litre', 'can'];
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 const inr = (n: number) => '₹' + (n >= 100 ? Math.round(n).toLocaleString('en-IN') : n.toFixed(2));
@@ -56,7 +58,7 @@ export function BuyingSetup() {
   const vName = useMemo(() => new Map(vendors.map((v) => [v.id, v.name])), [vendors]);
   const val = (r: Row) => {
     const e = edits[r.item_id] ?? {};
-    return { pack_label: e.pack_label ?? r.pack_label ?? '', pack_qty: e.pack_qty ?? (r.pack_qty != null ? String(r.pack_qty) : ''), price: e.price ?? (r.price != null ? String(r.price) : ''), vendor_id: e.vendor_id ?? r.default_vendor_id ?? '' };
+    return { pack_label: e.pack_label ?? r.pack_label ?? '', pack_qty: e.pack_qty ?? (r.pack_qty != null ? String(r.pack_qty) : ''), price: e.price ?? (r.price != null ? String(r.price) : ''), vendor_id: e.vendor_id ?? r.default_vendor_id ?? '', content_qty: e.content_qty ?? (r.content_qty != null ? String(r.content_qty) : ''), content_unit: e.content_unit ?? r.content_unit ?? 'ml' };
   };
   const needs = (r: Row) => { const v = val(r); return !v.pack_label || !(Number(v.pack_qty) > 0) || !(Number(v.price) > 0) || !v.vendor_id; };
   const LAUNCH = '2026-11-09'; // items added from this day on are shown as New
@@ -84,7 +86,7 @@ export function BuyingSetup() {
 
   async function save() {
     setBusy(true);
-    const rowsOut = Object.entries(edits).map(([id, e]) => { const r = rows.find((x) => x.item_id === Number(id))!; const v = val(r); return { item_id: r.item_id, pack_label: v.pack_label, pack_qty: v.pack_qty, price: v.price, vendor_id: v.vendor_id }; });
+    const rowsOut = Object.entries(edits).map(([id, e]) => { const r = rows.find((x) => x.item_id === Number(id))!; const v = val(r); return { item_id: r.item_id, pack_label: v.pack_label, pack_qty: v.pack_qty, price: v.price, vendor_id: v.vendor_id, content_qty: v.content_qty, content_unit: v.content_unit }; });
     const { error } = await supabase.rpc('save_buying_setup', { p_rows: rowsOut });
     setBusy(false);
     if (error) { toast(errText(error)); return; }
@@ -123,7 +125,7 @@ export function BuyingSetup() {
       </div>
 
       <div className="tablewrap"><table className="table" style={{ minWidth: 900 }}>
-        <thead><tr><th>Item</th><th>We buy it as</th><th className="r">Quantity in one pack</th><th className="r">Pack price (incl. GST)</th><th className="r">Cost per counted unit</th><th>Usual vendor</th><th>Status</th></tr></thead>
+        <thead><tr><th>Item</th><th>We buy it as</th><th className="r">Quantity in one pack</th><th className="r">Contents of one unit</th><th className="r">Pack price (incl. GST)</th><th className="r">Cost per counted unit</th><th>Usual vendor</th><th>Status</th></tr></thead>
         <tbody>
           {shown.map((r) => {
             const v = val(r); const pq = Number(v.pack_qty); const pr = Number(v.price);
@@ -134,14 +136,15 @@ export function BuyingSetup() {
                 <td style={{ minWidth: 170 }}><b>{r.name}</b>{isNew(r) && <span className="chip due" style={{ marginLeft: 8 }}>New</span>}<div className="muted small">{r.rate_group === 'fresh_chicken' ? 'Fresh chicken rate group' : (r.group_id ? groups[r.group_id] : '')}</div></td>
                 <td>{manual ? <select style={{ width: 110 }} value={v.pack_label} onChange={(e) => set(r.item_id, { pack_label: e.target.value })}><option value="">Choose</option>{PACKS.map((p) => <option key={p}>{p}</option>)}</select> : (v.pack_label || <span className="muted">Not set</span>)}</td>
                 <td className="r num">{manual ? <input className="num" inputMode="decimal" style={{ width: 80 }} value={v.pack_qty} placeholder={r.unit} onChange={(e) => set(r.item_id, { pack_qty: e.target.value })} /> : (v.pack_qty ? `${v.pack_qty} ${r.unit}` : <span className="muted">—</span>)}</td>
+                <td className="r num">{MEASURED.includes(r.unit) ? <span className="muted">Measured in {r.unit}</span> : manual ? <span className="row" style={{ gap: 4, justifyContent: 'flex-end', flexWrap: 'nowrap' }}><input className="num" inputMode="decimal" style={{ width: 70 }} value={v.content_qty} placeholder="e.g. 500" onChange={(e) => set(r.item_id, { content_qty: e.target.value })} /><select style={{ width: 64 }} value={v.content_unit} onChange={(e) => set(r.item_id, { content_unit: e.target.value })}>{CONTENT_UNITS.map((u) => <option key={u}>{u}</option>)}</select></span> : (Number(v.content_qty) > 0 ? `${v.content_qty} ${v.content_unit} per ${r.unit}` : <span className="muted">Not set</span>)}</td>
                 <td className="r num">{manual ? <input className="num" inputMode="decimal" style={{ width: 84 }} value={v.price} placeholder="₹" onChange={(e) => set(r.item_id, { price: e.target.value })} /> : (v.price ? '₹' + Number(v.price).toLocaleString('en-IN') : <span className="muted">—</span>)}</td>
-                <td className="r num"><b>{live != null ? `${inr(live)} / ${r.unit}` : '—'}</b><div className="small">{arrow(r)}{r.prev_unit_cost != null && <span className="muted"> was {inr(r.prev_unit_cost)}</span>}</div><div className="small muted">{sourceText(r)}</div></td>
+                <td className="r num"><b>{live != null ? `${inr(live)} / ${r.unit}` : '—'}</b><div className="small">{arrow(r)}{r.prev_unit_cost != null && <span className="muted"> was {inr(r.prev_unit_cost)}</span>}</div>{live != null && Number(v.content_qty) > 0 && !MEASURED.includes(r.unit) && <div className="small">{(() => { const big = v.content_unit === 'L' || v.content_unit === 'kg'; const per = live / (Number(v.content_qty) * (big ? 1000 : 1)); return `₹${per.toFixed(per < 1 ? 3 : 2)} / ${big ? (v.content_unit === 'L' ? 'ml' : 'g') : v.content_unit}`; })()}</div>}<div className="small muted">{sourceText(r)}</div></td>
                 <td>{manual ? <select style={{ width: 170 }} value={v.vendor_id} onChange={(e) => set(r.item_id, { vendor_id: e.target.value })}><option value="">Choose</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select> : (vName.get(v.vendor_id) ?? <span className="muted">Not set</span>)}</td>
                 <td><span className={`chip ${st === 'Complete' ? 'done' : 'late'}`}>{st}</span></td>
               </tr>
             );
           })}
-          {shown.length === 0 && <tr><td colSpan={7} className="muted" style={{ padding: 20 }}>Nothing here.</td></tr>}
+          {shown.length === 0 && <tr><td colSpan={8} className="muted" style={{ padding: 20 }}>Nothing here.</td></tr>}
         </tbody>
       </table></div>
 
