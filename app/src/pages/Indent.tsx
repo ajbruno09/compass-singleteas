@@ -23,7 +23,7 @@ const addLabel = (n: number, unit: string) => {
   return `+${n}`;
 };
 
-const CAT_PHOTO: Record<number, string> = { 1: 'veg', 2: 'dairy', 3: 'chicken', 4: 'atta', 5: 'spices', 6: 'sauces', 7: 'frozen', 17: 'kitchen', 9: 'bread', 10: 'drinks', 11: 'icecream', 12: 'packaging', 13: 'cleaning', 14: 'gas', 15: 'stationery', 16: 'dryfruits' };
+const CAT_PHOTO: Record<number, string> = { 1: 'veg', 2: 'dairy', 3: 'chicken', 4: 'atta', 5: 'spices', 6: 'sauces', 7: 'frozen', 17: 'kitchen', 18: 'oilsalt', 9: 'bread', 10: 'drinks', 11: 'icecream', 12: 'packaging', 13: 'cleaning', 14: 'gas', 15: 'stationery', 16: 'dryfruits' };
 
 export function IndentPage() {
   const { myLocations } = useSession();
