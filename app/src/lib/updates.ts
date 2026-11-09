@@ -1,7 +1,7 @@
 import { registerSW } from 'virtual:pwa-register';
 
 // Keeps the installed app current: checks for a new version on open, whenever the app comes back to the
-// front, and every few minutes. When a new version is found it installs and the page reloads by itself.
+// front, and every 30 seconds while it is open. When a new version is found it installs and the page reloads by itself.
 export function keepAppFresh() {
   if (!('serviceWorker' in navigator)) return;
   const hadController = !!navigator.serviceWorker.controller;
@@ -16,7 +16,7 @@ export function keepAppFresh() {
     const check = () => { void reg.update().catch(() => undefined); };
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
     window.addEventListener('online', check);
-    window.setInterval(check, 5 * 60 * 1000);
+    window.setInterval(() => { if (document.visibilityState === 'visible') check(); }, 30 * 1000);
   } });
   void update;
 }
