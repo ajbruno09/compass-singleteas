@@ -45,6 +45,7 @@ export function Rules() {
           </table>
         </section>
       ))}
+      {isOwner && <SharedCosts />}
       {isOwner && <AdminContact />}
       {isOwner && <StartFresh />}
       {editing && <RuleForm rule={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void load(); }} />}
@@ -144,6 +145,80 @@ function AdminContact() {
       <p className="muted">The Contact Admin link on the sign in page opens WhatsApp to this number. Change it here whenever Admin changes.</p>
       <label className="field"><span>WhatsApp number</span><input id="admin-number" className="num" inputMode="numeric" maxLength={10} value={num} onChange={(e) => setNum(e.target.value.replace(/\D/g, ''))} /></label>
       <button className="btn primary" style={{ justifySelf: 'start' }} disabled={busy || num.length !== 10} onClick={() => void save()}>{busy ? 'Saving…' : 'Save number'}</button>
+    </section>
+  );
+}
+
+type Share = { id: number; label: string; sort: number; water_pct: number; cyl_mode: 'split' | 'direct' | 'none'; cyl_pct: number; cyl_note: string | null };
+type MonthRow = { id: number; label: string; water_amt: number; cyl_amt: number; cyl_pool: number };
+const inr = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
+
+function SharedCosts() {
+  const toast = useToast();
+  const [shares, setShares] = useState<Share[]>([]);
+  const [litres, setLitres] = useState('1000');
+  const [rate, setRate] = useState('1');
+  const [days, setDays] = useState(30);
+  const [month, setMonth] = useState<MonthRow[]>([]);
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    const [a, b, c] = await Promise.all([
+      supabase.from('shared_cost_shares').select('*').order('sort'),
+      supabase.from('shared_cost_config').select('*').eq('id', 1).single(),
+      supabase.rpc('shared_cost_month'),
+    ]);
+    setShares(((a.data ?? []) as Share[]).map((x) => ({ ...x, water_pct: Number(x.water_pct), cyl_pct: Number(x.cyl_pct) })));
+    if (b.data) { setLitres(String(Number(b.data.water_litres_day))); setRate(String(Number(b.data.water_rate))); setDays(b.data.water_days); }
+    setMonth(((c.data ?? []) as MonthRow[]).map((x) => ({ ...x, water_amt: Number(x.water_amt), cyl_amt: Number(x.cyl_amt), cyl_pool: Number(x.cyl_pool) })));
+    setDirty(false);
+  };
+  useEffect(() => { void load(); }, []);
+  const total = (Number(litres) || 0) * (Number(rate) || 0) * days;
+  const wSum = shares.reduce((t, x) => t + x.water_pct, 0);
+  const cSum = shares.reduce((t, x) => t + (x.cyl_mode === 'split' ? x.cyl_pct : 0), 0);
+  const ok = Math.round(wSum * 100) === 10000 && Math.round(cSum * 100) === 10000;
+  const set = (id: number, k: 'water_pct' | 'cyl_pct', v: string) => { setShares((l) => l.map((x) => x.id === id ? { ...x, [k]: Number(v) || 0 } : x)); setDirty(true); };
+  const save = async () => {
+    setBusy(true);
+    const { error } = await supabase.rpc('save_shared_costs', { p_litres: Number(litres) || 0, p_rate: Number(rate) || 0, p_shares: shares.map((x) => ({ id: x.id, water_pct: x.water_pct, cyl_pct: x.cyl_mode === 'split' ? x.cyl_pct : 0 })) });
+    setBusy(false);
+    if (error) { toast(errText(error)); return; }
+    toast('Saved'); void load();
+  };
+  const pct = (id: number, k: 'water_pct' | 'cyl_pct', v: number) => (
+    <input className="sc-in" inputMode="decimal" value={String(v)} onChange={(e) => set(id, k, e.target.value)} aria-label="percent" />
+  );
+  const pool = month[0]?.cyl_pool ?? 0;
+  return (
+    <section className="tablewrap sc" style={{ marginTop: 24 }}>
+      <div className="sc-head"><h2>Shared kitchen costs</h2><span className="small muted">Split by percentage and shown on each counter's monthly cost, apart from what it ordered. They never change the indent cart value.</span></div>
+      <div className="sc-calc">
+        <label><span>Water per day (litres)</span><input className="sc-in w" inputMode="decimal" value={litres} onChange={(e) => { setLitres(e.target.value); setDirty(true); }} /></label>
+        <label><span>Rate per litre (₹, includes upkeep)</span><input className="sc-in w" inputMode="decimal" value={rate} onChange={(e) => { setRate(e.target.value); setDirty(true); }} /></label>
+        <div><span>Days</span><b>{days}</b></div>
+        <div className="hi"><span>Water per month</span><b className="num">{inr(total)}</b></div>
+      </div>
+      <table>
+        <thead><tr><th>Counter</th><th className="n">Water share</th><th className="n">Water</th><th className="n">Cylinder share</th><th className="n">Cylinder this month</th></tr></thead>
+        <tbody>
+          {shares.map((x) => {
+            const m = month.find((r) => r.id === x.id);
+            return (
+              <tr key={x.id}>
+                <td><strong>{x.label}</strong></td>
+                <td className="n">{pct(x.id, 'water_pct', x.water_pct)}%</td>
+                <td className="n num">{inr(total * x.water_pct / 100)}</td>
+                <td className="n">{x.cyl_mode === 'split' ? <>{pct(x.id, 'cyl_pct', x.cyl_pct)}%</> : <span className="small muted">{x.cyl_note}</span>}</td>
+                <td className="n num">{x.cyl_mode === 'none' ? <span className="muted">·</span> : inr(m?.cyl_amt ?? 0)}</td>
+              </tr>
+            );
+          })}
+          <tr className="tot"><td>Total</td><td className={'n' + (Math.round(wSum * 100) === 10000 ? '' : ' bad')}>{wSum}%</td><td className="n num">{inr(total)}</td><td className={'n' + (Math.round(cSum * 100) === 10000 ? '' : ' bad')}>{cSum}%</td><td className="n num">{inr(pool)} shared</td></tr>
+        </tbody>
+      </table>
+      <div className="sc-foot"><span className="small muted">{ok ? 'Cylinder cost comes from cylinders issued from the Store this month.' : 'Each share column must add up to 100% before you can save.'}</span>
+        <span className="row" style={{ gap: 8 }}><button className="btn" disabled={!dirty || busy} onClick={() => void load()}>Discard</button><button className="btn primary" disabled={!dirty || !ok || busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button></span></div>
     </section>
   );
 }
