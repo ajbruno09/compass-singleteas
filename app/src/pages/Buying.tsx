@@ -16,8 +16,9 @@ interface IndentRow { id: string; location_id: number; status: string; indent_li
 interface PoLine { item_id: number; qty: number; unit_rate: number | null }
 interface PoRow {
   id: string; po_number: string; vendor_id: string; status: string; notes: string; sent_at: string | null; order_date: string;
-  required_date: string | null; required_time: string | null; delivery: boolean; channel: string; for_date: string | null; po_lines: PoLine[];
+  required_date: string | null; required_time: string | null; delivery: boolean; channel: string; for_date: string | null; po_lines: PoLine[]; party?: boolean;
 }
+interface PS { item_id: number; vendor_id: string | null; approved_asked: number; buy_qty: number; ordered_qty: number }
 type Kind = 'wa' | 'phone' | 'app' | 'bought';
 const kindOf = (v: VendorRow): Kind => (v.order_channel === 'whatsapp_group' ? 'wa' : v.order_channel === 'phone' ? 'phone' : v.order_channel === 'app' ? 'app' : 'bought');
 
@@ -68,7 +69,12 @@ export function Buying() {
   const [pos, setPos] = useState<PoRow[]>([]);
   const [edit, setEdit] = useState<Record<number, number>>({});
   const [openV, setOpenV] = useState<string | null>(null);
-  const [dlg, setDlg] = useState<{ vendorId: string; poId?: string } | null>(null);
+  const [dlg, setDlg] = useState<{ vendorId: string; poId?: string; party?: boolean } | null>(null);
+  const [partyLoc, setPartyLoc] = useState<number | null>(null);
+  const [partyLabel, setPartyLabel] = useState('');
+  const [ps, setPs] = useState<PS[]>([]);
+  const [pdraft, setPdraft] = useState<Record<number, { vendor?: string; qty?: number }>>({});
+  const [pbusy, setPbusy] = useState(false);
   const [moved, setMoved] = useState<Record<number, string>>({});
   const [moveFor, setMoveFor] = useState<number | null>(null);
   const [moveTo, setMoveTo] = useState('');
@@ -93,8 +99,10 @@ export function Buying() {
     const [ind, oh, po] = await Promise.all([
       supabase.from('indents').select('id, location_id, status, indent_lines(item_id, qty)').eq('for_date', date),
       supabase.from('stock_on_hand').select('item_id, qty').eq('location_id', STORE_ID),
-      supabase.from('purchase_orders').select('id, po_number, vendor_id, status, notes, sent_at, order_date, required_date, required_time, delivery, channel, for_date, po_lines(item_id, qty, unit_rate)').eq('for_date', date).neq('status', 'cancelled').order('created_at')
+      supabase.from('purchase_orders').select('id, po_number, vendor_id, status, notes, sent_at, order_date, required_date, required_time, delivery, channel, for_date, party, po_lines(item_id, qty, unit_rate)').eq('for_date', date).neq('status', 'cancelled').order('created_at')
     ]);
+    const [pl, pst, psr] = await Promise.all([supabase.rpc('party_loc'), supabase.rpc('party_status'), supabase.from('party_sourcing').select('item_id, vendor_id, approved_asked, buy_qty, ordered_qty').eq('for_date', date)]);
+    setPartyLoc(pl.data == null ? null : Number(pl.data)); setPartyLabel(String((pst.data as { label?: string } | null)?.label ?? '')); setPs((psr.data as PS[]) ?? []);
     setIndents((ind.data as IndentRow[]) ?? []);
     setOnHand(Object.fromEntries(((oh.data as { item_id: number; qty: number }[]) ?? []).map((r) => [r.item_id, Number(r.qty)])));
     setPos((po.data as PoRow[]) ?? []);
@@ -108,14 +116,16 @@ export function Buying() {
   }, [load]);
 
   const counters = locations.filter((l) => l.kind === 'department' && l.active);
-  const sentInd = indents.filter((r) => r.status === 'submitted' || r.status === 'locked');
+  const sentAll = indents.filter((r) => r.status === 'submitted' || r.status === 'locked');
+  const sentInd = sentAll.filter((r) => r.location_id !== partyLoc);
+  const partyInd = sentAll.filter((r) => r.location_id === partyLoc);
   const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const vendorMap = useMemo(() => new Map(vendors.map((v) => [v.id, v])), [vendors]);
   const rateMap = useMemo(() => new Map(vitems.filter((v) => v.agreed_rate != null).map((v) => [`${v.vendor_id}:${v.item_id}`, Number(v.agreed_rate)])), [vitems]);
 
   const orderedBy = useMemo(() => {
     const m = new Map<number, number>();
-    for (const p of pos) for (const l of p.po_lines) m.set(l.item_id, (m.get(l.item_id) ?? 0) + Number(l.qty));
+    for (const p of pos) if (!p.party) for (const l of p.po_lines) m.set(l.item_id, (m.get(l.item_id) ?? 0) + Number(l.qty));
     return m;
   }, [pos]);
 
@@ -151,9 +161,38 @@ export function Buying() {
     return m;
   }, [toBuy, moved]);
   const vendorIds = useMemo(() => {
-    const ids = new Set<string>([...byVendor.keys(), ...pos.map((p) => p.vendor_id)]);
+    const ids = new Set<string>([...byVendor.keys(), ...pos.filter((p) => !p.party).map((p) => p.vendor_id)]);
     return [...ids].filter((id) => vendorMap.has(id)).sort((a, b) => vendorMap.get(a)!.name.localeCompare(vendorMap.get(b)!.name));
   }, [byVendor, pos, vendorMap]);
+
+  // ----- Party order track: kept apart from the day's normal buying and from store stock -----
+  const psMap = useMemo(() => new Map(ps.map((x) => [x.item_id, x])), [ps]);
+  const partyAsked = useMemo(() => { const m = new Map<number, number>(); for (const r of partyInd) for (const l of r.indent_lines) m.set(l.item_id, (m.get(l.item_id) ?? 0) + Number(l.qty)); return m; }, [partyInd]);
+  const partyNew = useMemo(() => [...partyAsked].map(([id, asked]) => { const item = itemMap.get(id); if (!item) return null; const p = psMap.get(id); const pend = Math.max(0, asked - Number(p?.approved_asked ?? 0)); return pend > 0 ? { item, asked, pend, p } : null; }).filter(Boolean).sort((a, b) => a!.item.name.localeCompare(b!.item.name)) as { item: ItemRow; asked: number; pend: number; p?: PS }[], [partyAsked, psMap, itemMap]);
+  const pVendor = (r: { item: ItemRow; p?: PS }) => pdraft[r.item.id]?.vendor ?? r.p?.vendor_id ?? r.item.default_vendor_id ?? '';
+  const pQty = (r: { pend: number; item: ItemRow }) => pdraft[r.item.id]?.qty ?? r.pend;
+  const partyToPlace = useMemo(() => {
+    const m = new Map<string, Row[]>();
+    for (const x of ps) {
+      const rem = Number(x.buy_qty) - Number(x.ordered_qty); const item = itemMap.get(x.item_id);
+      if (rem <= 1e-9 || !x.vendor_id || !item) continue;
+      const rate = rateMap.get(`${x.vendor_id}:${x.item_id}`) ?? (item.last_cost != null ? Number(item.last_cost) : null);
+      const step = item.purchase_factor ? Number(item.purchase_factor) : stepOf(item.unit);
+      m.set(x.vendor_id, [...(m.get(x.vendor_id) ?? []), { item, asked: partyAsked.get(x.item_id) ?? rem, by: [{ loc: 'Party', qty: rem }], inStore: 0, ordered: 0, sug: rem, qty: rem, rate, step }]);
+    }
+    return m;
+  }, [ps, itemMap, rateMap, partyAsked]);
+  const partyPos = pos.filter((p) => p.party);
+  const partyBlocked = partyNew.some((r) => pQty(r) > 0 && !pVendor(r));
+  async function partyOk() {
+    setPbusy(true);
+    const lines = partyNew.map((r) => ({ item_id: r.item.id, qty: pQty(r), vendor_id: pVendor(r) || null }));
+    const { error } = await supabase.rpc('party_approve', { p_date: date, p_lines: lines });
+    setPbusy(false);
+    if (error) return toast(errText(error));
+    setPdraft({}); toast('Sent to buying. Place the party orders below.'); await load();
+  }
+  function setAllEmpty(v: string) { if (!v) return; setPdraft((d) => { const n = { ...d }; for (const r of partyNew) if (!pVendor(r)) n[r.item.id] = { ...n[r.item.id], vendor: v }; return n; }); }
 
   const estimate = (list: Row[]) => list.reduce((t, r) => t + (r.rate != null ? r.qty * r.rate : 0), 0);
   const grand = vendorIds.reduce((t, id) => t + estimate(byVendor.get(id) ?? []), 0);
@@ -202,7 +241,7 @@ export function Buying() {
       <PoCancelInbox onChanged={() => { void load(); }} />
 
       <div className="kpis">
-        <div className="card kp"><div className="label">Counters sent</div><div className="num kpn">{sentInd.length} of {counters.length}</div></div>
+        <div className="card kp"><div className="label">Counters sent</div><div className="num kpn">{sentInd.length} of {counters.filter((c) => c.id !== partyLoc).length}</div></div>
         <div className="card kp"><div className="label">Items to buy</div><div className="num kpn">{itemCount}</div></div>
         <div className="card kp"><div className="label">Estimated value</div><div className="num kpn">{money(grand)}</div><div className="muted small">at last available rates, to plan cash</div></div>
         <div className="card kp"><div className="label">Orders sent</div><div className="num kpn">{ordersSent}</div></div>
@@ -210,6 +249,63 @@ export function Buying() {
 
       {loading ? <p className="muted">Loading…</p> : (
         <>
+          {(partyNew.length > 0 || partyToPlace.size > 0 || partyPos.length > 0) && (
+            <div className="card" style={{ borderColor: 'var(--brand)' }}>
+              <div className="row" style={{ justifyContent: 'space-between' }}>
+                <div><b>Party order{partyLabel ? `: ${partyLabel}` : ''}</b><div className="muted small">Bought separately from the daily buying. Nothing here uses store stock.</div></div>
+                <span className="chip due">Separate track</span>
+              </div>
+              {partyNew.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <p className="small"><b>Step 1.</b> Choose where each item comes from, then tap OK. Usual vendors are filled in for planned items.</p>
+                  <div className="tablewrap" style={{ border: 0, boxShadow: 'none' }}>
+                    <table>
+                      <thead><tr><th>Item</th><th className="r">Asked</th><th>Buy from</th><th>To buy</th></tr></thead>
+                      <tbody>{partyNew.map((r) => { const q = pQty(r); const step = r.item.purchase_factor ? Number(r.item.purchase_factor) : stepOf(r.item.unit); const v = pVendor(r); return (
+                        <tr key={r.item.id}>
+                          <td><b>{r.item.name}</b>{r.p && r.p.approved_asked > 0 && <div className="muted small">Added after the first OK</div>}</td>
+                          <td className="r num">{packText(r.item, r.pend)}</td>
+                          <td><select aria-label={`Buy ${r.item.name} from`} value={v} onChange={(e) => setPdraft((d) => ({ ...d, [r.item.id]: { ...d[r.item.id], vendor: e.target.value } }))} style={{ minWidth: 180, borderColor: !v && q > 0 ? 'var(--bad)' : undefined }}>
+                            <option value="">Choose</option>
+                            {vendors.map((x) => <option key={x.id} value={x.id}>{x.name}{x.id === r.item.default_vendor_id ? ' (usual)' : ''}</option>)}
+                          </select></td>
+                          <td><div className="stepper">
+                            <button aria-label="Less" onClick={() => setPdraft((d) => ({ ...d, [r.item.id]: { ...d[r.item.id], qty: Math.max(0, q - step) } }))}>−</button>
+                            <span className="num">{packText(r.item, q)}</span>
+                            <button aria-label="More" onClick={() => setPdraft((d) => ({ ...d, [r.item.id]: { ...d[r.item.id], qty: q + step } }))}>+</button>
+                          </div></td>
+                        </tr>); })}</tbody>
+                    </table>
+                  </div>
+                  <div className="row" style={{ justifyContent: 'space-between', marginTop: 8 }}>
+                    <div className="row" style={{ gap: 6 }}><span className="muted small">Set all empty to</span>
+                      <select aria-label="Set all empty to" value="" onChange={(e) => setAllEmpty(e.target.value)}><option value="">Choose</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></div>
+                    <button className="btn primary" disabled={pbusy || partyBlocked} onClick={partyOk}>{pbusy ? 'Saving…' : 'OK, send to buying'}</button>
+                  </div>
+                  {partyBlocked && <p className="small muted" style={{ marginTop: 6 }}>Choose a source for every item you are buying. Set an item to 0 if it is not needed.</p>}
+                </div>
+              )}
+              {partyToPlace.size > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <p className="small"><b>{partyNew.length > 0 ? 'Step 2.' : 'Ready to order.'}</b> Place the party orders.</p>
+                  <div className="stack" style={{ gap: 6 }}>
+                    {[...partyToPlace.entries()].map(([vid, list]) => { const v = vendorMap.get(vid); if (!v) return null; return (
+                      <div key={vid} className="row" style={{ justifyContent: 'space-between', border: '1px solid var(--line)', borderRadius: 10, padding: '8px 12px' }}>
+                        <div><b>{v.name}</b> <span className="muted small">{list.length} {list.length === 1 ? 'item' : 'items'}: {list.map((r) => r.item.name).slice(0, 4).join(', ')}{list.length > 4 ? '…' : ''}</span></div>
+                        <button className="btn primary" onClick={() => setDlg({ vendorId: vid, party: true })}>{kindOf(v) === 'bought' ? 'Open shopping list' : 'Review order'}</button>
+                      </div>); })}
+                  </div>
+                </div>
+              )}
+              {partyPos.length > 0 && (
+                <div className="row" style={{ marginTop: 10, gap: 8 }}>
+                  <span className="muted small">Placed:</span>
+                  {partyPos.map((po) => <button key={po.id} className="chip done pickchip" onClick={() => setDlg({ vendorId: po.vendor_id, poId: po.id, party: true })}>{vendorMap.get(po.vendor_id)?.name} · {po.po_number}</button>)}
+                </div>
+              )}
+            </div>
+          )}
+
           {loose.length > 0 && (
             <div className="banner warn buy-loose">
               <div><b>{loose.length} {loose.length === 1 ? 'item has' : 'items have'} no usual vendor yet.</b> Pick where each comes from. Compass remembers it for next time.</div>
@@ -239,7 +335,7 @@ export function Buying() {
             {vendorIds.map((vid) => {
               const v = vendorMap.get(vid)!; const kind = kindOf(v);
               const list = byVendor.get(vid) ?? [];
-              const vpos = pos.filter((p) => p.vendor_id === vid);
+              const vpos = pos.filter((p) => p.vendor_id === vid && !p.party);
               const open = openV === vid;
               const allDone = list.length === 0;
               const chip = allDone ? <span className="chip done">{kind === 'bought' ? 'Bought' : 'Sent'}</span> : vpos.length ? <span className="chip late">New items to order</span> : <span className="chip late">{kind === 'bought' ? 'To buy' : 'Not sent'}</span>;
@@ -313,7 +409,7 @@ export function Buying() {
       {dlg && dv && (
         <OrderSheet
           key={dlg.poId ?? dlg.vendorId}
-          vendor={dv} kind={kindOf(dv)} po={dpo} rows={byVendor.get(dv.id) ?? []} itemMap={itemMap} forDate={date}
+          vendor={dv} kind={kindOf(dv)} po={dpo} rows={(dlg.party ? partyToPlace.get(dv.id) : byVendor.get(dv.id)) ?? []} party={dlg.party ? (partyLabel || 'Party') : undefined} itemMap={itemMap} forDate={date}
           onClose={() => setDlg(null)}
           onDone={async (keep) => { setEdit({}); await load(); if (!keep) setDlg(null); }}
         />
@@ -322,8 +418,8 @@ export function Buying() {
   );
 }
 
-function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, onClose, onDone }: {
-  vendor: VendorRow; kind: Kind; po?: PoRow; rows: Row[]; itemMap: Map<number, ItemRow>; forDate: string; onClose: () => void; onDone: (keepOpen: boolean) => Promise<void>;
+function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, party, onClose, onDone }: {
+  party?: string; vendor: VendorRow; kind: Kind; po?: PoRow; rows: Row[]; itemMap: Map<number, ItemRow>; forDate: string; onClose: () => void; onDone: (keepOpen: boolean) => Promise<void>;
 }) {
   const toast = useToast();
   const today = istToday();
@@ -331,7 +427,7 @@ function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, onClose, onDone 
   const [reqDate, setReqDate] = useState(forDate < today ? today : forDate);
   const [reqTime, setReqTime] = useState(lsGet(timeKey));
   const [delivery, setDelivery] = useState(true);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(party ? `Party order: ${party}` : '');
   const [pickTime, setPickTime] = useState(false);
   const [ticks, setTicks] = useState<Record<number, boolean>>({});
   const [busy, setBusy] = useState(false);
@@ -354,7 +450,7 @@ function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, onClose, onDone 
   async function place() {
     setBusy(true);
     const lines = rows.map((r) => ({ item_id: r.item.id, qty: r.qty, unit_rate: r.rate ?? '', asked: r.asked, in_store: r.inStore }));
-    const { data, error } = await supabase.rpc('create_po', {
+    const { data, error } = await supabase.rpc(party ? 'party_create_po' : 'create_po', {
       p_vendor_id: vendor.id, p_for_date: forDate, p_required_date: isMsg ? reqDate : forDate, p_required_time: isMsg ? reqTime : null,
       p_delivery: delivery, p_notes: notes, p_channel: vendor.order_channel, p_lines: lines
     });
