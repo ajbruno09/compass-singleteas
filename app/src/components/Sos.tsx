@@ -7,6 +7,8 @@ import { useToast } from './Toast';
 import { Sheet } from './Sheet';
 import { Icon } from './Icon';
 import { useLang } from '../lib/i18n';
+import { useNavigate } from 'react-router-dom';
+import { useReceiveGate } from '../lib/gate';
 
 const QUICK_NOTES = ['Finished', 'Almost over', 'Need it now', 'Wrong item came'];
 
@@ -44,7 +46,7 @@ export function SosButton({ locations, defaultId, hideFab }: { locations: Locati
     return () => { void supabase.removeChannel(ch); window.clearInterval(poll); window.clearInterval(tick); };
   }, [key, refresh]);
 
-  useEffect(() => { const o = () => setOpen(true); window.addEventListener('compass:sos', o); return () => window.removeEventListener('compass:sos', o); }, []);
+  useEffect(() => { const o = () => setOpen(true); const c = () => setOpen(false); window.addEventListener('compass:sos', o); window.addEventListener('compass:sos-close', c); return () => { window.removeEventListener('compass:sos', o); window.removeEventListener('compass:sos-close', c); }; }, []);
   useEffect(() => { if (open) supabase.rpc('sos_contacts').then(({ data }) => setContacts((data as Contact[]) ?? [])); }, [open]);
 
   return (
@@ -73,6 +75,9 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
   const locationId = chosenLoc ?? 0;
   const setLocationId = (id: number) => setChosenLoc(id);
   const [reason, setReason] = useState('');
+  const nav = useNavigate();
+  const rg = useReceiveGate(locations.map((l) => l.id));
+  const blockedHere = !!(chosenLoc && rg.gates[chosenLoc]?.blocked);
   const [items, setItems] = useState<DeptItem[]>([]);
   useEffect(() => { if (!chosenLoc) { setItems([]); return; } supabase.rpc('department_items', { p_location_id: locationId }).then(({ data }) => setItems((data as DeptItem[]) ?? [])); }, [locationId]);
   const [q, setQ] = useState('');
@@ -135,6 +140,20 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
       )}
     </>
   );
+  if (blockedHere) {
+    return (
+      <>
+        {head}
+        <div className="banner bad" style={{ display: 'grid', gap: 8 }}>
+          <b>{t('Yesterday\'s items are not received yet')}</b>
+          <span className="small">{t('Please receive them first. It takes a minute. Then you can send an SOS.')}</span>
+          <button className="btn primary" style={{ minHeight: 48 }} onClick={() => { nav(`/received?loc=${chosenLoc}`); window.dispatchEvent(new Event('compass:sos-close')); }}>{t('Go to Receive')}</button>
+        </div>
+        <p className="small muted">{t('You can also call the store.')}</p>
+        <div className="stack">{contacts.map((c, i) => <a key={c.phone} className="btn secondary floor" href={`tel:+91${c.phone}`}><Icon name="phone" /> {t('Call {name}', { name: roleName(c, i, contacts) })}</a>)}</div>
+      </>
+    );
+  }
   const grant = extra?.status === 'approved' && !extra.used_at;
   if (left === 0 && !grant) {
     return (

@@ -8,6 +8,7 @@ import { REASONS, type DeptItem, type Group, type IndentReason, type IndentRec, 
 import { useToast } from '../components/Toast';
 import { AvatarButton } from '../components/AvatarButton';
 import { Icon } from '../components/Icon';
+import { useReceiveGate } from '../lib/gate';
 import { Sheet } from '../components/Sheet';
 import { useLang } from '../lib/i18n';
 import { VoiceOrder, voiceSupported } from '../components/VoiceOrder';
@@ -32,6 +33,8 @@ export function IndentPage() {
   const [sp, setSp] = useSearchParams();
   const locId = Number(sp.get('loc')) || myLocations[0]?.id || null;
   const where = myLocations.find((l) => l.id === locId)?.name ?? '';
+  const gate = useReceiveGate(locId ? [locId] : []);
+  const blocked = !!(locId && gate.gates[locId]?.blocked);
 
   const [items, setItems] = useState<DeptItem[]>([]);
   const facRef = useRef<Record<number, number>>({});
@@ -178,6 +181,19 @@ export function IndentPage() {
 
   if (locId == null) return <div className="phone"><p className="empty card">{t('No counter is set up for you yet.')}</p></div>;
 
+  if (blocked) {
+    return (
+      <div className="phone">
+        <div className="phone-head"><button className="btn quiet" onClick={() => nav('/')} aria-label="Back"><Icon name="back" /></button><b>{t('{where} indent', { where })}</b><AvatarButton /></div>
+        <div className="banner bad" style={{ display: 'grid', gap: 8 }}>
+          <b>{t('Yesterday\'s items are not received yet')}</b>
+          <span className="small">{t('The store issued items that you have not confirmed. Please receive them first. It takes a minute.')}</span>
+          <button className="btn primary" style={{ minHeight: 48 }} onClick={() => nav(`/received?loc=${locId}`)}>{t('Go to Receive')}</button>
+        </div>
+        <p className="small muted">{t('Admin can release this if there is a real reason.')}</p>
+      </div>
+    );
+  }
   return (
     <div className="phone">
       <div className="phone-head">

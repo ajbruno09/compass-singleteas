@@ -24,6 +24,10 @@ export function Issue() {
   const [today, setToday] = useState<IssueRow[]>([]);
   const [forDate, setForDate] = useState('');
   const [lpgDone, setLpgDone] = useState(false);
+  const [blockedList, setBlockedList] = useState<{ location_id: number; name: string; old: number }[]>([]);
+  const loadBlocked = useCallback(async () => { const { data } = await supabase.rpc('receive_blocked_list'); setBlockedList((data as typeof blockedList) ?? []); }, []);
+  useEffect(() => { void loadBlocked(); }, [loadBlocked]);
+  async function release(id: number) { const { error } = await supabase.rpc('release_receive_block', { p_location: id }); if (error) toast(errText(error)); else { toast('Released for today'); void loadBlocked(); } }
   const [old, setOld] = useState<{ indent_id: string; location_id: number; location_name: string; for_date: string; items: number }[]>([]);
   const [why, setWhy] = useState('');
   const [whyNote, setWhyNote] = useState('');
@@ -84,6 +88,13 @@ export function Issue() {
   return (
     <>
       <div className="pagehead"><div><p className="label">Store</p><h1>Issue to counters</h1><p className="muted small" style={{ marginTop: 2 }}>Filled from what each counter asked for. Change any amount, then send. The counter confirms what it received.</p></div></div>
+      {blockedList.length > 0 && (
+        <div className="card" style={{ borderColor: '#F3B48E', display: 'grid', gap: 8 }}>
+          <b>Counters that have not received yesterday's items</b>
+          <span className="small muted">Until they receive, these counters cannot indent or send an SOS. You can release one for today if there is a real reason.</span>
+          {blockedList.map((b) => <div key={b.location_id} className="row" style={{ justifyContent: 'space-between' }}><span><b>{b.name}</b> <span className="muted small">· {b.old} {b.old === 1 ? 'issue' : 'issues'} waiting</span></span><button className="btn secondary" onClick={() => void release(b.location_id)}>Release for today</button></div>)}
+        </div>
+      )}
       {old.length > 0 && (
         <div className="card" style={{ borderColor: 'var(--warn, #B7791F)', display: 'grid', gap: 8 }}>
           <b>Indents sent earlier but not issued yet</b>

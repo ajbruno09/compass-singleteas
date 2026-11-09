@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { SosButton } from './Sos';
 import { Icon } from './Icon';
+import { useReceiveGate } from '../lib/gate';
 
 const KEY = 'compass.counter';
 export const getCounter = (ids: number[]) => { try { const v = Number(sessionStorage.getItem(KEY)); if (ids.includes(v)) return v; } catch { /* ignore */ } return ids[0] ?? 0; };
@@ -17,6 +18,7 @@ export function StaffShell() {
   const [due, setDue] = useState(0);
   const ids = myLocations.map((l) => l.id);
   const loc = getCounter(ids);
+  const rg = useReceiveGate(ids);
   useEffect(() => {
     (async () => {
       if (!ids.length) return;
@@ -27,10 +29,11 @@ export function StaffShell() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids.join(','), here]);
-  const tab = here === '/' ? 'home' : here.startsWith('/indent') ? 'indent' : here.startsWith('/count') || here.startsWith('/closing') ? 'closing' : '';
+  const tab = here === '/' ? 'home' : here.startsWith('/indent') ? 'indent' : here.startsWith('/received') ? 'receive' : here.startsWith('/count') || here.startsWith('/closing') ? 'closing' : '';
   const items: [string, string, string, number, () => void][] = [
     ['home', 'home', 'Home', 0, () => nav('/')],
     ['indent', 'note', 'Indent', 0, () => nav(`/indent?loc=${loc}`)],
+    ['receive', 'inbox', 'Receive', rg.pending, () => nav(`/received?loc=${loc}`)],
     ['closing', 'calbars', 'Closing', due, () => nav('/closing')],
     ['sos', 'siren2', 'SOS', 0, () => window.dispatchEvent(new Event('compass:sos'))]
   ];
