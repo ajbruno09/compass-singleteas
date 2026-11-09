@@ -115,61 +115,34 @@ export function StaffHome() {
 
       <div className="hsec">To do</div>
       {myLocations.length === 0 && <p className="banner warn">No counter has been given to you yet. Please tell Admin, so they can set it up.</p>}
-      {myLocations.length > 1 ? (() => {
-        const n = myLocations.length;
-        const sentIds = myLocations.filter((l) => sentText(status[l.id]));
-        const dailyDone = myLocations.filter((l) => daily[l.id] === 'submitted');
-        const weeklyDone = myLocations.filter((l) => weekly[l.id] === 'submitted');
+      {myLocations.length > 0 && (() => {
+        const notSent = myLocations.filter((l) => !sentText(status[l.id]));
+        const dailyLeft = myLocations.filter((l) => daily[l.id] !== 'submitted');
+        const weeklyLeft = sun ? myLocations.filter((l) => weekly[l.id] !== 'submitted') : [];
         const toConfirm = myLocations.reduce((a, l) => a + (waiting[l.id] || 0), 0);
-        const names = (done: typeof myLocations) => myLocations.filter((l) => !done.includes(l)).map((l) => l.name).join(', ');
-        const Line = ({ e, label, done, all, chip, left, go }: { e: string; label: string; done: number; all: number; chip: string; left: string; go: () => void }) => (
-          <button style={{ background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left', display: 'grid', gap: 2 }} onClick={go}>
-            <span className="row" style={{ justifyContent: 'space-between' }}><span className="lbl"><Icon name={e} size={20} /> {label}</span><span className={'chip ' + chip}>{done} of {all}{done === all ? ' ✓' : ''}</span></span>
-            {done < all && left && <span className="small muted">Still to do: {left}</span>}
-          </button>
-        );
+        const many = myLocations.length > 1;
+        const names = (xs: typeof myLocations) => xs.map((l) => l.name).join(', ');
+        const rows: { k: string; e: string; label: string; chip: string; cls: string; sub?: string; go: () => void }[] = [];
+        if (notSent.length) rows.push({ k: 'ind', e: 'note', label: 'Send indent', cls: win === 'late' ? 'late' : 'due', go: () => nav(`/indent?loc=${notSent[0].id}`),
+          chip: many ? `${notSent.length} left` : win === 'early' ? `From ${clock12(rem.indent_open ?? '15:30')}` : win === 'late' ? 'Late, send now' : `Due ${clock12(rem.indent_due ?? '17:00')}`, sub: many ? names(notSent) : undefined });
+        if (dailyLeft.length) rows.push({ k: 'dc', e: 'calbars', label: 'Do daily closing', cls: 'late', go: () => nav('/closing'),
+          chip: many ? `${dailyLeft.length} left` : daily[dailyLeft[0].id] ? 'Started' : 'Due tonight', sub: many ? names(dailyLeft) : undefined });
+        if (weeklyLeft.length) rows.push({ k: 'wc', e: 'cal', label: 'Do weekly closing', cls: 'late', go: () => nav('/closing'),
+          chip: many ? `${weeklyLeft.length} left` : 'Due today', sub: many ? names(weeklyLeft) : undefined });
+        if (toConfirm > 0) rows.push({ k: 'rc', e: 'inbox', label: 'Confirm items from the store', cls: 'late', go: () => nav(`/received?loc=${myLocations.find((l) => (waiting[l.id] || 0) > 0)?.id ?? loc}`), chip: `${toConfirm} to confirm` });
+        if (gasDuty) rows.push({ k: 'gas', e: 'box', label: 'Weigh gas', cls: 'due', go: () => nav('/gas'), chip: 'Tonight', sub: 'Both cylinders, with a photo of each' });
+        if (!rows.length) return <div className="card"><span className="lbl"><Icon name="check" size={20} /> Nothing to do right now. All done.</span></div>;
         return (
           <div className="card stack" style={{ gap: 12 }}>
-            <Line e="note" label="Indents sent" done={sentIds.length} all={n} chip={sentIds.length === n ? 'done' : win === 'late' ? 'late' : 'due'} left={names(sentIds)} go={() => nav(`/indent?loc=${loc}`)} />
-            <Line e="calbars" label="Daily closing done" done={dailyDone.length} all={n} chip={dailyDone.length === n ? 'done' : 'late'} left={names(dailyDone)} go={() => nav('/closing')} />
-            <Line e="cal" label="Weekly closing done" done={weeklyDone.length} all={n} chip={weeklyDone.length === n ? 'done' : sun ? 'late' : 'due'} left={sun ? names(weeklyDone) : 'Due Sunday'} go={() => nav('/closing')} />
-            {toConfirm > 0 && <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }} onClick={() => nav(`/received?loc=${loc}`)}><span className="lbl"><Icon name="inbox" size={20} /> Items from the store</span><span className="chip late">{toConfirm} to confirm</span></button>}
+            {rows.map((r) => (
+              <button key={r.k} style={{ background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left', display: 'grid', gap: 2 }} onClick={r.go}>
+                <span className="row" style={{ justifyContent: 'space-between' }}><span className="lbl"><Icon name={r.e} size={20} /> {r.label}</span><span className={'chip ' + r.cls}>{r.chip}</span></span>
+                {r.sub && <span className="small muted">{r.sub}</span>}
+              </button>
+            ))}
           </div>
         );
-      })() : (
-      <div className="card stack" style={{ gap: 10 }}>
-        {myLocations.map((l) => {
-          const s = sentText(status[l.id]);
-          return (
-            <div key={l.id} className="stack" style={{ gap: 10 }}>
-              <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav(`/indent?loc=${l.id}`)}>
-                <span className="lbl"><Icon name="note" size={20} /> Indent</span>
-                <span className={'chip ' + (s ? 'done' : win === 'late' ? 'late' : 'due')}>{s ?? (win === 'early' ? `From ${clock12(rem.indent_open ?? '15:30')}` : win === 'late' ? 'Late, send now' : `Due ${clock12(rem.indent_due ?? '17:00')}`)}</span>
-              </button>
-              <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav('/closing')}>
-                <span className="lbl"><Icon name="calbars" size={20} /> Daily closing</span>
-                <span className={'chip ' + (daily[l.id] === 'submitted' ? 'done' : 'late')}>{daily[l.id] === 'submitted' ? 'Done ✓' : daily[l.id] ? 'Started' : 'Due tonight'}</span>
-              </button>
-              <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav('/closing')}>
-                <span className="lbl"><Icon name="cal" size={20} /> Weekly closing</span>
-                <span className={'chip ' + (weekly[l.id] === 'submitted' ? 'done' : sun ? 'late' : 'due')}>{weekly[l.id] === 'submitted' ? 'Done ✓' : sun ? 'Due today' : 'Due Sunday'}</span>
-              </button>
-              {waiting[l.id] > 0 && (
-                <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }} onClick={() => nav(`/received?loc=${l.id}`)}>
-                  <span className="lbl"><Icon name="inbox" size={20} /> Items from the store</span><span className="chip late">{waiting[l.id]} to confirm</span>
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      )}
-
-      {gasDuty && (
-        <button className="countercard" style={{ minHeight: 0, padding: '10px 14px' }} onClick={() => nav('/gas')}>
-          <Icon name="box" size={22} stroke={1.6} /><span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block', fontSize: 15 }}>Weigh gas</span><span className="small muted">Cylinders tonight</span></span>
-        </button>
-      )}
+      })()}
 
       <div className="hsec">My week</div>
       <WeekCard week={week} place={myLocations.length === 1 ? (cur?.name ?? '') : ''} />
