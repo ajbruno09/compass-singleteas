@@ -613,7 +613,7 @@ tr.click { cursor: pointer; }
 @media (max-width: 900px) { .gs-kpis { grid-template-columns: 1fr 1fr; } .gs-tr { grid-template-columns: 1fr 1fr; } .gs-th { display: none; } }
 
 /* Counter home: My Compass opened up, and the floating Messages pill */
-.msgfab { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: calc(206px + env(safe-area-inset-bottom)); z-index: 30; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font: 500 15px/1 var(--font); box-shadow: var(--shadow-2); cursor: pointer; }
+.msgfab { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: calc(98px + env(safe-area-inset-bottom)); z-index: 30; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--line-strong) 60%, transparent); background: color-mix(in srgb, var(--surface) 60%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: var(--ink); font: 500 15px/1 var(--font); box-shadow: var(--shadow-2); cursor: pointer; }
 .msgfab em { font-style: normal; background: var(--brand); color: var(--on-brand); border-radius: 999px; font-size: 11.5px; padding: 2px 7px; min-width: 18px; text-align: center; }
 .mcbars { display: flex; align-items: flex-end; gap: 4px; position: relative; margin-top: 4px; }
 .mccol { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; justify-content: flex-end; height: 104px; border: 0; background: transparent; padding: 0; cursor: pointer; }

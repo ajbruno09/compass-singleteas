@@ -4,7 +4,6 @@ import { money } from '../lib/format';
 import { Icon } from './Icon';
 
 interface Sales { has_data: boolean; as_of?: string; day_mine?: number; day_share?: number; month_mine?: number; month_share?: number }
-interface Pack { food: number; stay: number }
 interface Day { d: string; amt: number; has: boolean }
 
 const when = (d: string) => new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(d + 'T00:00:00'));
@@ -12,12 +11,10 @@ const when = (d: string) => new Intl.DateTimeFormat('en-IN', { weekday: 'short',
 // My Compass, opened up on the counter home. Cards with real data show it, the rest stay as placeholders until their data exists.
 export function MyCounter({ counters }: { counters: string }) {
   const [s, setS] = useState<Sales | null>(null);
-  const [p, setP] = useState<Pack | null>(null);
   const [days, setDays] = useState<Day[]>([]);
   const [sel, setSel] = useState<number | null>(null);
   useEffect(() => {
     void supabase.rpc('my_sales').then(({ data }) => setS((data as Sales) ?? { has_data: false }));
-    void supabase.rpc('my_package').then(({ data }) => setP((data as Pack) ?? { food: 0, stay: 0 }));
     void supabase.rpc('my_sales_daily', { p_days: 14 }).then(({ data }) => setDays((data as Day[]) ?? []));
   }, []);
   const any = days.some((x) => x.has);
@@ -70,13 +67,7 @@ export function MyCounter({ counters }: { counters: string }) {
         ))}
       </div>
 
-      <div className="card" style={{ display: 'grid', gap: 4 }}>
-        <p className="label">What the cafe spends on you every month</p>
-        <div className="row" style={{ justifyContent: 'space-between' }}><span>Salary</span><span>XXXXX</span></div>
-        <div className="row" style={{ justifyContent: 'space-between' }}><span>Food</span><span>{p && p.food > 0 ? money(p.food) : 'XXXXX'}</span></div>
-        <div className="row" style={{ justifyContent: 'space-between' }}><span>Stay</span><span>{p && p.stay > 0 ? money(p.stay) : 'XXXXX'}</span></div>
-        <p className="small muted">Only for you. Your salary is kept private and never shown here.</p>
-      </div>
+      <div className="soonbox"><div style={{ color: 'var(--brand)', display: 'grid', placeItems: 'center', marginBottom: 2 }}><Icon name="coin" size={22} stroke={1.6} /></div><b style={{ fontWeight: 500, fontSize: 13 }}>Your cost to the company</b><div className="small muted">Coming soon</div></div>
     </>
   );
 }
