@@ -259,18 +259,19 @@ export function Buying() {
               </div>
               {partyNew.length > 0 && (
                 <div style={{ marginTop: 10 }}>
-                  <p className="small"><b>Step 1.</b> Choose where each item comes from, then tap OK. Usual vendors are filled in for planned items.</p>
+                  <p className="small"><b>Step 1.</b> Choose for each item: give it from your store or buy it outside, then tap OK. Usual vendors are filled in for planned items.</p>
                   <div className="tablewrap" style={{ border: 0, boxShadow: 'none' }}>
                     <table>
-                      <thead><tr><th>Item</th><th className="r">Asked</th><th>Buy from</th><th>To buy</th></tr></thead>
+                      <thead><tr><th>Item</th><th className="r">Asked</th><th className="r">In store</th><th>Source</th><th>Quantity</th></tr></thead>
                       <tbody>{partyNew.map((r) => { const q = pQty(r); const step = r.item.purchase_factor ? Number(r.item.purchase_factor) : stepOf(r.item.unit); const v = pVendor(r); return (
                         <tr key={r.item.id}>
                           <td><b>{r.item.name}</b>{r.p && r.p.approved_asked > 0 && <div className="muted small">Added after the first OK</div>}</td>
                           <td className="r num">{packText(r.item, r.pend)}</td>
-                          <td><select aria-label={`Buy ${r.item.name} from`} value={v} onChange={(e) => setPdraft((d) => ({ ...d, [r.item.id]: { ...d[r.item.id], vendor: e.target.value } }))} style={{ minWidth: 180, borderColor: !v && q > 0 ? 'var(--bad)' : undefined }}>
+                          <td className="r num muted">{n2(Math.max(0, onHand[r.item.id] ?? 0))} {r.item.unit}</td>
+                          <td><select aria-label={`Source for ${r.item.name}`} value={v} onChange={(e) => setPdraft((d) => ({ ...d, [r.item.id]: { ...d[r.item.id], vendor: e.target.value } }))} style={{ minWidth: 180, borderColor: !v && q > 0 ? 'var(--bad)' : undefined }}>
                             <option value="">Choose</option>
-                            {vendors.map((x) => <option key={x.id} value={x.id}>{x.name}{x.id === r.item.default_vendor_id ? ' (usual)' : ''}</option>)}
-                          </select></td>
+                            {vendors.map((x) => <option key={x.id} value={x.id}>{x.is_store ? 'From our store (In House)' : x.name}{x.id === r.item.default_vendor_id ? ' (usual)' : ''}</option>)}
+                          </select>{vendorMap.get(v)?.is_store && q > (onHand[r.item.id] ?? 0) && <div className="small" style={{ color: 'var(--bad)', marginTop: 3 }}>Store has only {n2(Math.max(0, onHand[r.item.id] ?? 0))} {r.item.unit}. Lower the quantity or buy the rest outside.</div>}</td>
                           <td><div className="stepper">
                             <button aria-label="Less" onClick={() => setPdraft((d) => ({ ...d, [r.item.id]: { ...d[r.item.id], qty: Math.max(0, q - step) } }))}>−</button>
                             <span className="num">{packText(r.item, q)}</span>
@@ -281,7 +282,7 @@ export function Buying() {
                   </div>
                   <div className="row" style={{ justifyContent: 'space-between', marginTop: 8 }}>
                     <div className="row" style={{ gap: 6 }}><span className="muted small">Set all empty to</span>
-                      <select aria-label="Set all empty to" value="" onChange={(e) => setAllEmpty(e.target.value)}><option value="">Choose</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></div>
+                      <select aria-label="Set all empty to" value="" onChange={(e) => setAllEmpty(e.target.value)}><option value="">Choose</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.is_store ? 'From our store (In House)' : x.name}</option>)}</select></div>
                     <button className="btn primary" disabled={pbusy || partyBlocked} onClick={partyOk}>{pbusy ? 'Saving…' : 'OK, send to buying'}</button>
                   </div>
                   {partyBlocked && <p className="small muted" style={{ marginTop: 6 }}>Choose a source for every item you are buying. Set an item to 0 if it is not needed.</p>}
