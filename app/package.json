@@ -1,7 +1,7 @@
 {
   "name": "compass",
   "private": true,
-  "version": "5.34",
+  "version": "5.35",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "@supabase/supabase-js": "2.45.4",
     "exceljs": "^4.4.0",
     "jszip": "^3.10.2",

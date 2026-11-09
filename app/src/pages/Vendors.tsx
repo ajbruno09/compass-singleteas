@@ -135,7 +135,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
   return (
     <Sheet title={vendor ? vendor.name : 'Add vendor'} onClose={onClose}
       footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save vendor'}</button></>}>
-      <label className="row" style={{ gap: 10, fontWeight: 700 }}><input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} />Send POs to this vendor on WhatsApp</label>
+      <label className="row" style={{ gap: 10, fontWeight: 600 }}><input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} />Send POs to this vendor on WhatsApp</label>
       {!wa && <p className="small muted" style={{ margin: 0 }}>This vendor is ordered another way (app, shop, in house). No WhatsApp number or payment details are needed.</p>}
       <div className="form-grid">
         {FIELDS.filter(([k]) => wa || !['whatsapp', 'bank_name', 'bank_account', 'ifsc', 'upi'].includes(k)).map(([k, label, type]) => (

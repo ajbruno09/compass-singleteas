@@ -122,7 +122,7 @@ export function SosPage() {
               <div key={a.id} className="card stack" style={{ borderColor: c.late ? 'var(--bad, #B42335)' : undefined }}>
                 <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div><b style={{ fontSize: 18 }}>{where(a)}</b><div className="muted small">sent {timeOf(a.created_at)}{a.note ? ` · ${a.note}` : ''}</div></div>
-                  {c.text ? <div style={{ textAlign: 'right' }}><div className="num" style={{ fontSize: 26, fontWeight: 800, color: c.late ? 'var(--bad, #B42335)' : undefined }}>{c.text}</div><div className="muted small">{c.label}</div></div>
+                  {c.text ? <div style={{ textAlign: 'right' }}><div className="num" style={{ fontSize: 26, fontWeight: 600, color: c.late ? 'var(--bad, #B42335)' : undefined }}>{c.text}</div><div className="muted small">{c.label}</div></div>
                     : <span className="chip done">{c.label}</span>}
                 </div>
                 {!a.issued_at && !a.acked_at && canIssue && (

@@ -9,7 +9,7 @@ import { Icon } from '../components/Icon';
 import { StatusStrip } from '../components/StatusStrip';
 import { AvatarButton } from '../components/AvatarButton';
 import { NoticeStack } from '../components/NoticeStack';
-import { getCounter, setCounter } from '../components/StaffNav';
+import { getCounter } from '../components/StaffNav';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -84,7 +84,6 @@ export function StaffHome() {
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const first = profile?.full_name?.split(' ')[0] ?? '';
   const cur = myLocations.find((l) => l.id === loc);
-  const pick = (id: number) => { setCounter(id); setLoc(id); };
   const sun = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay() === 0;
 
   return (
@@ -106,9 +105,6 @@ export function StaffHome() {
           <Icon name="box" size={30} stroke={1.6} /><span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>Party order: {party.label}</span><span className="small muted">Order what the party needs. Any number of items{party.until ? ', until ' + new Date(party.until).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }) : ''}.</span></span><span className="chip due">Open</span>
         </button>
       )}
-      {myLocations.length > 1 && (
-        <div className="countersw" role="group" aria-label="Counter">{myLocations.map((l) => <button key={l.id} className={l.id === loc ? 'on' : ''} onClick={() => pick(l.id)}>{l.name}</button>)}</div>
-      )}
 
       {!profile?.photo && <button className="banner warn" style={{ textAlign: 'left', width: '100%' }} onClick={() => nav('/profile')}>Please add your photo. Tap here.</button>}
       <StatusStrip />
@@ -117,7 +113,7 @@ export function StaffHome() {
       <NoticeStack />
 
       <div className="hsec">My week</div>
-      <WeekCard week={week} place={cur?.name ?? ''} />
+      <WeekCard week={week} place={myLocations.length === 1 ? (cur?.name ?? '') : ''} />
 
       <div className="hsec">To do</div>
       {myLocations.length === 0 && <p className="banner warn">No counter has been given to you yet. Please tell Admin, so they can set it up.</p>}
@@ -140,7 +136,6 @@ export function StaffHome() {
             <Line e="calbars" label="Daily closing done" done={dailyDone.length} all={n} chip={dailyDone.length === n ? 'done' : 'late'} left={names(dailyDone)} go={() => nav('/closing')} />
             <Line e="cal" label="Weekly closing done" done={weeklyDone.length} all={n} chip={weeklyDone.length === n ? 'done' : sun ? 'late' : 'due'} left={sun ? names(weeklyDone) : 'Due Sunday'} go={() => nav('/closing')} />
             {toConfirm > 0 && <button className="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }} onClick={() => nav(`/received?loc=${loc}`)}><span className="lbl"><Icon name="inbox" size={20} /> Items from the store</span><span className="chip late">{toConfirm} to confirm</span></button>}
-            <p className="small muted">Indent and Closing open the counter picked at the top ({myLocations.find((l) => l.id === loc)?.name}).</p>
           </div>
         );
       })() : (
@@ -200,7 +195,7 @@ export function StaffHome() {
       </div>
       <button className="countercard" onClick={() => nav('/mine')}>
         <Icon name="scale" size={34} stroke={1.6} />
-        <span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>My Compass</span><span className="small muted" style={{ fontWeight: 700 }}>My sales, targets and incentives</span></span>
+        <span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>My Compass</span><span className="small muted" style={{ fontWeight: 600 }}>My sales, targets and incentives</span></span>
       </button>
     </div>
   );

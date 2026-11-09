@@ -20,7 +20,7 @@ export function Scorecard() {
     if (list.length) { const p = await supabase.from('profiles').select('id, full_name').in('id', [...new Set(list.map((x) => x.profile_id))]); setNames(Object.fromEntries(((p.data as { id: string; full_name: string }[]) ?? []).map((x) => [x.id, x.full_name]))); }
   }, [days]);
   useEffect(() => { void load(); }, [load]);
-  const bad = (n: number) => (n > 0 ? { color: 'var(--bad, #B42335)', fontWeight: 700 } : undefined);
+  const bad = (n: number) => (n > 0 ? { color: 'var(--bad, #B42335)', fontWeight: 600 } : undefined);
   return (
     <>
       <div className="pagehead">

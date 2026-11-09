@@ -140,11 +140,11 @@ export function SosWatcher() {
             {ringing.slice(0, 3).map((a) => (
               <div key={a.id} className="stack" style={{ textAlign: 'left' }}>
                 <h1>{where(a)}</h1>
-                <p style={{ fontSize: 22, fontWeight: 800 }}>{what(a, 'Needs something right now')}</p>
+                <p style={{ fontSize: 22, fontWeight: 600 }}>{what(a, 'Needs something right now')}</p>
                 {a.note && <p style={{ fontSize: 18 }}>{a.note}</p>}
                 <p className="small">Waiting {Math.floor(age(a) / 60)}:{String(age(a) % 60).padStart(2, '0')} · sent {timeOf(a.created_at)}{role !== 'store' ? ' · the store did not answer' : ''}</p>
                 {a.acked_at
-                  ? <p style={{ fontWeight: 800 }}>Overdue. You said {a.eta_minutes} min. Please issue now.</p>
+                  ? <p style={{ fontWeight: 600 }}>Overdue. You said {a.eta_minutes} min. Please issue now.</p>
                   : <div className="seg">{[10, 20, 30, 60].map((m) => <button key={m} className="sosbtn" onClick={() => void ack(a, m)}>On it, {m} min</button>)}</div>}
                 {role !== 'manager' && <button className="btn floor" onClick={() => nav('/sos')}>Open SOS page and issue</button>}
               </div>

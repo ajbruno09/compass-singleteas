@@ -298,7 +298,7 @@ export function IndentPage() {
               </div>
               {flagged(i, lines[i.id]) && (<>
                 <Reasons value={lines[i.id].reason} onPick={(r) => save(i, { qty: lines[i.id].qty, reason: r })} list={moreReasons} />
-                <label className="row" style={{ gap: 8, marginTop: 8, fontWeight: 700 }}>
+                <label className="row" style={{ gap: 8, marginTop: 8, fontWeight: 600 }}>
                   <input type="checkbox" checked={!!accepted[i.id]} onChange={(e) => setAccepted((a) => ({ ...a, [i.id]: e.target.checked }))} />
                   {t('Yes, I really need {q}. My usual is {u}.', { q: fmtQty(lines[i.id].qty, i.unit).replace(i.unit, u(i.unit)), u: fmtQty(usual[i.id]?.usual ?? 0, i.unit).replace(i.unit, u(i.unit)) })}
                 </label></>)}
@@ -360,7 +360,7 @@ function Reasons({ value, onPick, list }: { value: string; onPick: (r: string) =
   const { t } = useLang();
   return (
     <div className="reasons" role="group" aria-label={t('Why more than usual')}>
-      <span className="small" style={{ fontWeight: 700 }}>{t('More than your usual. Why?')}</span>
+      <span className="small" style={{ fontWeight: 600 }}>{t('More than your usual. Why?')}</span>
       <div className="seg">{(list.length ? list : REASONS).map((r) => <button key={r} aria-pressed={value === r} onClick={() => onPick(r)}>{t(r)}</button>)}</div>
     </div>
   );

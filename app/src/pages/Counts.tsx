@@ -48,7 +48,7 @@ export function Counts() {
             </div>
           </div>
           {open && diffs.length > 0 && <div className="tablewrap" style={{ marginTop: 10 }}><table><thead><tr><th>Item</th><th className="r">Books said</th><th className="r">Counted</th><th className="r">Difference</th></tr></thead>
-            <tbody>{diffs.map((d) => { const it = items[d.item_id]; const df = Number(d.qty) - Number(d.expected); return <tr key={d.item_id}><td>{it?.name}</td><td className="r num">{fmtQty(Number(d.expected), it?.unit)}</td><td className="r num">{fmtQty(Number(d.qty), it?.unit)}</td><td className="r num" style={{ color: df < 0 ? '#A35405' : '#1C7A53', fontWeight: 700 }}>{df > 0 ? '+' : ''}{fmtQty(df, it?.unit)}</td></tr>; })}</tbody></table></div>}
+            <tbody>{diffs.map((d) => { const it = items[d.item_id]; const df = Number(d.qty) - Number(d.expected); return <tr key={d.item_id}><td>{it?.name}</td><td className="r num">{fmtQty(Number(d.expected), it?.unit)}</td><td className="r num">{fmtQty(Number(d.qty), it?.unit)}</td><td className="r num" style={{ color: df < 0 ? '#A35405' : '#1C7A53', fontWeight: 600 }}>{df > 0 ? '+' : ''}{fmtQty(df, it?.unit)}</td></tr>; })}</tbody></table></div>}
         </div>; })}</div>
     </>
   );

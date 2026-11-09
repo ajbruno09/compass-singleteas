@@ -62,7 +62,7 @@ function Count({ rows, canEdit, onSaved }: { rows: D[]; canEdit: boolean; onSave
       <tbody>{rows.map((r) => { const x = v[r.id]; const exp = r.qty + Number(x?.a || 0) - Number(x?.b || 0); const miss = x?.c !== undefined && x.c !== '' ? exp - Number(x.c) : null;
         return <tr key={r.id}><td><b>{r.name}</b><div className="small muted">{r.category}</div></td><td className="r num">{r.qty}</td>
           {(['a', 'b', 'c'] as const).map((k) => <td key={k} className="r"><input inputMode="numeric" className="num" style={{ textAlign: 'right', width: 76 }} aria-label={`${k === 'a' ? 'Added' : k === 'b' ? 'Broken' : 'Counted'} ${r.name}`} value={x?.[k] ?? ''} onChange={(e) => set(r.id, k, e.target.value)} /></td>)}
-          <td className="r num" style={{ fontWeight: 700, color: miss && miss > 0 ? '#B42335' : miss && miss < 0 ? '#1C7A53' : undefined }}>{miss == null ? '' : miss}</td></tr>; })}</tbody></table></div>
+          <td className="r num" style={{ fontWeight: 600, color: miss && miss > 0 ? '#B42335' : miss && miss < 0 ? '#1C7A53' : undefined }}>{miss == null ? '' : miss}</td></tr>; })}</tbody></table></div>
     <label className="field"><span>Note (optional)</span><input value={note} onChange={(e) => setNote(e.target.value)} /></label>
     {err && <p className="banner bad" role="alert">{err}</p>}
     <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn primary" disabled={busy || filled.length === 0} onClick={save}>{busy ? 'Saving…' : `Save count (${filled.length} types)`}</button></div></>;

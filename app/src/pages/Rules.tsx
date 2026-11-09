@@ -36,7 +36,7 @@ export function Rules() {
               {list.map((r) => (
                 <tr key={r.key} className={isOwner ? 'click' : ''} onClick={() => isOwner && setEditing(r)}>
                   <td style={{ width: '48%' }}><strong>{r.label}</strong><div className="small muted">{r.description}</div></td>
-                  <td className="num" style={{ fontWeight: 650, fontSize: 16 }}>{show(r, r.value)}</td>
+                  <td className="num" style={{ fontWeight: 600, fontSize: 16 }}>{show(r, r.value)}</td>
                   <td>{r.wired ? <span className="chip done">Live</span> : <span className="chip off">Not live yet</span>}{r.money && <span className="chip late" style={{ marginLeft: 6 }}>Pay</span>}</td>
                 </tr>
               ))}

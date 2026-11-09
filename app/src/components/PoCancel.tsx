@@ -42,7 +42,7 @@ export function PoCancelInbox({ onChanged }: { onChanged: () => void }) {
         return (
           <div key={r.id} className="stack" style={{ gap: 6 }}>
             <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
-              <span><button className="linkbtn" style={{ font: 'inherit', fontWeight: 700, textDecoration: 'underline', background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'inherit' }} onClick={() => void view(r)}>{r.purchase_orders?.po_number ?? 'Order'} {open === r.id ? '▲' : '▼'}</button> · asked at {timeOf(r.requested_at)} · {r.reason}</span>
+              <span><button className="linkbtn" style={{ font: 'inherit', fontWeight: 600, textDecoration: 'underline', background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'inherit' }} onClick={() => void view(r)}>{r.purchase_orders?.po_number ?? 'Order'} {open === r.id ? '▲' : '▼'}</button> · asked at {timeOf(r.requested_at)} · {r.reason}</span>
               <span className="row" style={{ gap: 6 }}>
                 <button className="btn" onClick={() => void view(r)}>{open === r.id ? 'Hide order' : 'See order'}</button>
                 <button className="btn" onClick={() => void decide(r, false)}>Keep order</button>
