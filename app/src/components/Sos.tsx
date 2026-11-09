@@ -69,15 +69,19 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
   const toast = useToast();
   const { t, local } = useLang();
   const nm = (i: DeptItem) => (local && i.local_names?.hi) || i.name;
-  const [locationId, setLocationId] = useState(defaultId);
+  const [chosenLoc, setChosenLoc] = useState<number | null>(locations.length > 1 ? null : defaultId);
+  const locationId = chosenLoc ?? 0;
+  const setLocationId = (id: number) => setChosenLoc(id);
+  const [reason, setReason] = useState('');
   const [items, setItems] = useState<DeptItem[]>([]);
-  useEffect(() => { supabase.rpc('department_items', { p_location_id: locationId }).then(({ data }) => setItems((data as DeptItem[]) ?? [])); }, [locationId]);
+  useEffect(() => { if (!chosenLoc) { setItems([]); return; } supabase.rpc('department_items', { p_location_id: locationId }).then(({ data }) => setItems((data as DeptItem[]) ?? [])); }, [locationId]);
   const [q, setQ] = useState('');
   const [picked, setPicked] = useState<(DeptItem & { loc: number })[]>([]);
   const [qtys, setQtys] = useState<Record<number, string>>({});
   const [left, setLeft] = useState<number | null>(null);
   const [extra, setExtra] = useState<{ status: string; used_at: string | null } | null>(null);
   const loadLeft = useCallback(async (quiet?: boolean) => {
+    if (!chosenLoc) { setLeft(null); setExtra(null); return; }
     if (!quiet) setLeft(null);
     const [l, e] = await Promise.all([
       supabase.rpc('sos_left', { p_location_id: locationId }),
@@ -85,7 +89,7 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
     ]);
     setLeft(typeof l.data === 'number' ? l.data : null);
     setExtra(((e.data as { status: string; used_at: string | null }[]) ?? [])[0] ?? null);
-  }, [locationId]);
+  }, [locationId, chosenLoc]);
   useEffect(() => { void loadLeft(); }, [loadLeft]);
   // While the counter waits for Admin, keep checking, and check again the moment the phone comes back to the screen.
   useEffect(() => {
@@ -106,18 +110,36 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
   const found = useMemo(() => { const t = q.trim().toLowerCase(); return t ? items.filter((i) => i.name.toLowerCase().includes(t) || (i.local_names?.hi ?? '').includes(t)).slice(0, 8) : []; }, [q, items]);
   function choose(i: DeptItem) { setPicked((p) => (p.length >= MAX_ITEMS || p.some((x) => x.id === i.id) ? p : [...p, { ...i, loc: locationId }])); setQtys((p) => ({ ...p, [i.id]: String(i.quick_amounts?.[0] ?? 1) })); setQ(''); }
   async function send() {
+    if (!chosenLoc) { toast(t('Choose your counter first.')); return; }
+    if (!reason) { toast(t('Choose the reason first.')); return; }
     if (picked.length === 0) { toast(t('Choose the item you need to send an SOS.')); return; }
     setBusy(true);
-    const { data, error } = await supabase.rpc('raise_sos', { p_location_id: picked[0]?.loc ?? locationId, p_item_ids: picked.map((i) => i.id), p_qtys: Object.fromEntries(picked.map((i) => [String(i.id), Number(qtys[i.id] ?? 1) || 1])), p_note: note });
+    const { data, error } = await supabase.rpc('raise_sos', { p_location_id: picked[0]?.loc ?? locationId, p_item_ids: picked.map((i) => i.id), p_qtys: Object.fromEntries(picked.map((i) => [String(i.id), Number(qtys[i.id] ?? 1) || 1])), p_note: [reason, note.trim()].filter(Boolean).join(': ') });
     setBusy(false);
     if (error) { toast(errText(error)); return; }
     try { const ids: number[] = JSON.parse(localStorage.getItem(recentKey) ?? '[]'); if (picked.length) localStorage.setItem(recentKey, JSON.stringify([...picked.map((i) => i.id), ...ids.filter((x) => !picked.some((i) => i.id === x))].slice(0, 8))); } catch { /* ignore */ }
     onSent(data as SosAlert);
   }
+  const head = (
+    <>
+      <div className={'sosleft' + (left != null && left <= 1 ? ' low' : '')}>
+        <span className="dots">{[0, 1, 2].map((n) => <span key={n} className={'dot' + (left != null && n >= left ? ' used' : '') + (left == null ? ' used' : '')} />)}</span>
+        <span><b>{left == null ? t('3 SOS per counter, per day') : left === 0 ? t('No SOS left today') : left === 1 ? t('Last SOS for today') : t('{n} of 3 SOS left today', { n: left })}</b>
+          <small>{left == null ? (locations.length > 1 ? t('Choose your counter to see how many are left') : '') : locations.find((l) => l.id === locationId)?.name}</small></span>
+      </div>
+      {locations.length > 1 && (
+        <div className="stack" style={{ gap: 6 }}>
+          <div className="sosstep"><span className={'n' + (chosenLoc ? '' : ' todo')}>1</span><b>{t('Which counter?')}</b><span className={chosenLoc ? 'ok' : 'req'}>{chosenLoc ? '✓' : t('Required')}</span></div>
+          <div className="sosgrid" role="group" aria-label="Which counter">{locations.map((l) => <button key={l.id} className="sosopt" aria-pressed={l.id === locationId} onClick={() => setLocationId(l.id)}>{l.name}</button>)}</div>
+        </div>
+      )}
+    </>
+  );
   const grant = extra?.status === 'approved' && !extra.used_at;
   if (left === 0 && !grant) {
     return (
       <>
+        {head}
         <p className="banner warn">{t('You have used all your SOS for today.')}</p>
         {extra?.status === 'pending'
           ? <p className="banner">{t('You asked Admin for one more. Please wait for the answer.')}</p>
@@ -129,10 +151,12 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
   }
   return (
     <>
-      <p className="muted">{t('This makes a loud alarm on the store phone. Use it only when you really cannot wait.')}</p>
-      {locations.length > 1 && (
-        <div className="seg" role="group" aria-label="Which counter">{locations.map((l) => <button key={l.id} aria-pressed={l.id === locationId} onClick={() => setLocationId(l.id)}>{l.name}</button>)}</div>
-      )}
+      <p className="muted" style={{ margin: 0 }}>{t('This makes a loud alarm on the store phone. Use it only when you really cannot wait.')}</p>
+      {head}
+      <div className="stack" style={{ gap: 6 }}>
+        <div className="sosstep"><span className={'n' + (reason ? '' : ' todo')}>{locations.length > 1 ? 2 : 1}</span><b>{t('What is the reason?')}</b><span className={reason ? 'ok' : 'req'}>{reason ? '✓' : t('Required')}</span></div>
+        <div className="sosgrid" role="group" aria-label="Reason">{QUICK_NOTES.map((n) => <button key={n} className="sosopt reason" aria-pressed={reason === n} onClick={() => setReason(n)}>{t(n)}</button>)}</div>
+      </div>
       {picked.length > 0 && (
         <div className="stack" aria-label={t('Chosen items')}>
           {picked.map((i) => {
@@ -161,19 +185,17 @@ function Form({ contacts, locations, defaultId, onSent }: { contacts: Contact[];
       )}
       {picked.length < MAX_ITEMS ? (
         <div className="stack">
-          <label className="field"><span>{picked.length ? t('Add another item (up to 3)') : t('Which item do you need? Choose at least 1 (up to 3)')}</span>
-            <div className="searchbox"><Icon name="search" size={18} /><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && found[0]) choose(found[0]); }} placeholder={t('Type a few letters')} /></div>
+          <label className="field"><span className="sosstep" style={{ marginBottom: 6 }}><span className={'n' + (picked.length ? '' : ' todo')}>{locations.length > 1 ? 3 : 2}</span><b>{picked.length ? t('Add another item (up to 3)') : t('Which item do you need? Choose at least 1 (up to 3)')}</b></span>
+            <div className="searchbox"><Icon name="search" size={18} /><input autoFocus={!!chosenLoc} disabled={!chosenLoc} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && found[0]) choose(found[0]); }} placeholder={chosenLoc ? t('Type a few letters') : t('Choose your counter first.')} /></div>
           </label>
           {!q && recent.length > 0 && <div className="chips" aria-label={t('Often needed')}>{recent.filter((i) => !picked.some((x) => x.id === i.id)).map((i) => <button key={i.id} className="btn secondary" onClick={() => choose(i)}>{nm(i)}</button>)}</div>}
           {found.filter((i) => !picked.some((x) => x.id === i.id)).map((i) => <button key={i.id} className="btn secondary" style={{ justifyContent: 'flex-start' }} onClick={() => choose(i)}>{nm(i)}</button>)}
         </div>
       ) : <p className="small muted">{t('That is 3 items, the most for one SOS.')}</p>}
-      <div className="seg">{QUICK_NOTES.map((n) => <button key={n} aria-pressed={note === n} onClick={() => setNote(note === n ? '' : n)}>{t(n)}</button>)}</div>
-      <label className="field"><span>{t('Anything else to tell the store?')}</span><input value={QUICK_NOTES.includes(note) ? '' : note} onChange={(e) => setNote(e.target.value)} placeholder={t('Optional')} /></label>
+      <label className="field"><span>{t('Anything else to tell the store?')}</span><input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('Optional')} /></label>
       {grant && left === 0 && <p className="banner ok">{t('Admin allowed one more SOS.')}</p>}
-      {left != null && left <= 2 && left > 0 && <p className="small muted">{left === 1 ? t('This is your last SOS for today.') : t('{n} SOS left today', { n: left })}</p>}
-      {picked.length === 0 && <p className="small" style={{ color: 'var(--bad, #b3261e)' }}>{t('Choose the item you need to send an SOS.')}</p>}
-      <button className="btn floor sosgo" disabled={busy || picked.length === 0} onClick={() => void send()}>{busy ? t('Sending…') : t('Send SOS to the store')}</button>
+      {(!chosenLoc || !reason || picked.length === 0) && <p className="small" style={{ color: 'var(--bad, #b3261e)', textAlign: 'center' }}>{t('Still needed')}: {[!chosenLoc && t('a counter'), !reason && t('a reason'), picked.length === 0 && t('at least 1 item')].filter(Boolean).join(', ')}</p>}
+      <button className="btn floor sosgo" disabled={busy || !chosenLoc || !reason || picked.length === 0} onClick={() => void send()}>{busy ? t('Sending…') : t('Send SOS to the store')}</button>
     </>
   );
 }

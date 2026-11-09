@@ -420,3 +420,20 @@ tr.click { cursor: pointer; }
 .gas .two > div { display: grid; gap: 4px; min-width: 0; }
 .gas .two input { width: 100%; }
 .gas .two .btn { width: 100%; justify-content: center; }
+
+.sosleft { display: flex; align-items: center; gap: 10px; background: #FFF7F6; border: 1px solid #F3C9C4; border-radius: 12px; padding: 8px 12px; }
+.sosleft.low { background: #FDECEA; }
+.sosleft small { display: block; color: var(--muted, #5C6B63); font-size: 12px; }
+.sosleft .dots { display: flex; gap: 6px; }
+.sosleft .dot { width: 16px; height: 16px; border-radius: 50%; background: #B3261E; }
+.sosleft .dot.used { background: #fff; border: 2px solid #D9A9A4; }
+.sosstep { display: flex; align-items: center; gap: 8px; }
+.sosstep .n { width: 24px; height: 24px; border-radius: 50%; background: var(--green, #1F6B4A); color: #fff; display: grid; place-items: center; font: 700 13px/1 var(--font); }
+.sosstep .n.todo { background: #fff; color: #B3261E; border: 2px solid #B3261E; }
+.sosstep .req { margin-left: auto; color: #B3261E; font-size: 12px; font-weight: 600; }
+.sosstep .ok { margin-left: auto; color: var(--green, #1F6B4A); font-size: 12px; font-weight: 600; }
+.sosgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sosopt { min-height: 50px; padding: 8px; border-radius: 12px; border: 2px solid var(--line, #E3E8E5); background: #fff; color: var(--ink); font: 600 15px/1.2 var(--font); cursor: pointer; }
+.sosopt[aria-pressed=true] { border-color: var(--green, #1F6B4A); background: #E6F0EB; color: var(--green, #1F6B4A); }
+.sosopt.reason[aria-pressed=true] { border-color: #B3261E; background: #FDECEA; color: #B3261E; }
+.sosgo:disabled { background: #E4E8E6; color: #8A9791; }
