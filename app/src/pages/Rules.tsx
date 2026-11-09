@@ -23,31 +23,41 @@ export function Rules() {
   const [editing, setEditing] = useState<Rule | null>(null);
   const load = async () => { const { data } = await supabase.from('rules').select('*').order('sort'); setRules((data as Rule[]) ?? []); };
   useEffect(() => { void load(); }, []);
-  const groups = useMemo(() => { const m = new Map<string, Rule[]>(); for (const r of rules) m.set(r.group_name, [...(m.get(r.group_name) ?? []), r]); return [...m.entries()]; }, [rules]);
+  const [q, setQ] = useState('');
+  const MERGE: Record<string, string> = { Wastage: 'Wastage, buying and alerts', Buying: 'Wastage, buying and alerts', Alerts: 'Wastage, buying and alerts' };
+  const groups = useMemo(() => {
+    const m = new Map<string, Rule[]>();
+    for (const r of rules) { if (q && !r.label.toLowerCase().includes(q.toLowerCase())) continue; const g = MERGE[r.group_name] ?? r.group_name; m.set(g, [...(m.get(g) ?? []), r]); }
+    return [...m.entries()];
+  }, [rules, q]);
+
+  const line = (r: Rule) => (
+    <div key={r.key} className={'rl-row' + (isOwner ? ' click' : '')} onClick={() => isOwner && setEditing(r)}>
+      <span className="rl-n">{r.label}<span className="rl-i" data-t={r.description}>i</span>{r.money && <span className="rl-pay">Pay</span>}</span>
+      <span className="rl-v">{show(r, r.value)}</span>
+      <i className={'rl-dot ' + (r.wired ? 'on' : 'off')} title={r.wired ? 'Live' : 'Not live yet'} />
+    </div>
+  );
 
   return (
     <>
-      <div className="pagehead"><div><p className="label">How Compass decides</p><h1>Rules</h1></div></div>
-      <p className="muted">Every number and time that Compass uses is here, so nothing is hidden in the code. {isOwner ? 'Tap a rule to change it. Each change keeps a history.' : 'Only the owner can change rules.'} “Live” rules already run today. “Not live yet” rules are saved and start working when their feature is switched on.</p>
-      {groups.map(([g, list]) => (
-        <section key={g} className="tablewrap">
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}><h2>{g}</h2></div>
-          <table>
-            <tbody>
-              {list.map((r) => (
-                <tr key={r.key} className={isOwner ? 'click' : ''} onClick={() => isOwner && setEditing(r)}>
-                  <td style={{ width: '48%' }}><strong>{r.label}</strong><div className="small muted">{r.description}</div></td>
-                  <td className="num" style={{ fontWeight: 600, fontSize: 16 }}>{show(r, r.value)}</td>
-                  <td>{r.wired ? <span className="chip done">Live</span> : <span className="chip off">Not live yet</span>}{r.money && <span className="chip late" style={{ marginLeft: 6 }}>Pay</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      ))}
-      {isOwner && <SharedCosts />}
-      {isOwner && <AdminContact />}
-      {isOwner && <StartFresh />}
+      <div className="pagehead"><div><p className="label">How Compass decides</p><h1>Rules</h1></div>
+        <div className="rl-tools"><span className="rl-legend"><span><i className="rl-dot on" />Live</span><span><i className="rl-dot off" />Not live yet</span><span><span className="rl-pay">Pay</span>affects pay</span></span>
+          <input className="rl-search" placeholder="Find a rule" value={q} onChange={(e) => setQ(e.target.value)} /></div></div>
+      <p className="muted small">{isOwner ? 'Click any row to change it. Each change keeps a history.' : 'Only the owner can change rules.'} Hover the small i to see what a rule does.</p>
+      <div className="rl-grid">
+        {groups.map(([g, list]) => {
+          const wide = list.length > 6;
+          return (
+            <section key={g} className={'tablewrap rl-card' + (wide ? ' full' : '')}>
+              <h2>{g}{list.every((r) => !r.wired) && <span>Not live yet</span>}</h2>
+              <div className={wide ? 'rl-two' : ''}>{list.map(line)}</div>
+            </section>
+          );
+        })}
+      </div>
+      {isOwner && !q && <SharedCosts />}
+      {isOwner && !q && <div className="rl-grid" style={{ marginTop: 12 }}><AdminContact /><StartFresh /></div>}
       {editing && <RuleForm rule={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void load(); }} />}
     </>
   );
@@ -115,7 +125,7 @@ function StartFresh() {
     toast(`Cleared ${d.indents} indents and ${d.stock_rows} test stock entries`); setOpen(false); setTxt('');
   }
   return (
-    <section className="card" style={{ display: 'grid', gap: 10, maxWidth: 640, marginTop: 24 }}>
+    <section className="card" style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
       <h2>Start fresh</h2>
       <p className="muted">Removes every test indent, purchase order, urgent request and alert, so the real work starts clean. Your items, people, vendors, rules and opening stock stay exactly as they are. This cannot be undone.</p>
       {!open ? <button className="btn secondary" style={{ justifySelf: 'start' }} onClick={() => setOpen(true)}>Start fresh…</button> : (
@@ -140,7 +150,7 @@ function AdminContact() {
     toast(error ? errText(error) : 'Admin number saved');
   }
   return (
-    <section className="card" style={{ display: 'grid', gap: 10, maxWidth: 640, marginTop: 24 }}>
+    <section className="card" style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
       <h2>Admin contact number</h2>
       <p className="muted">The Contact Admin link on the sign in page opens WhatsApp to this number. Change it here whenever Admin changes.</p>
       <label className="field"><span>WhatsApp number</span><input id="admin-number" className="num" inputMode="numeric" maxLength={10} value={num} onChange={(e) => setNum(e.target.value.replace(/\D/g, ''))} /></label>
@@ -191,7 +201,7 @@ function SharedCosts() {
   );
   const pool = month[0]?.cyl_pool ?? 0;
   return (
-    <section className="tablewrap sc" style={{ marginTop: 24 }}>
+    <section className="tablewrap sc" style={{ marginTop: 12 }}>
       <div className="sc-head"><h2>Shared kitchen costs</h2><span className="small muted">Split by percentage and shown on each counter's monthly cost, apart from what it ordered. They never change the indent cart value.</span></div>
       <div className="sc-calc">
         <label><span>Water per day (litres)</span><input className="sc-in w" inputMode="decimal" value={litres} onChange={(e) => { setLitres(e.target.value); setDirty(true); }} /></label>
