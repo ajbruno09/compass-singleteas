@@ -154,3 +154,4 @@
 .te .mtd .btn,.te .msheet .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 12px;font:500 13px var(--fh);cursor:pointer}
 .te .mtd .btn.p,.te .msheet .btn.p{background:var(--acc);border-color:var(--acc);color:#fff}
 @media(max-width:800px){.te .mtd .four{grid-template-columns:1fr 1fr}.te .mtd .mrow{grid-template-columns:1fr}}
+.te .mtd .mlog{margin-top:12px}

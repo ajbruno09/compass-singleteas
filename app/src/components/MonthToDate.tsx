@@ -15,12 +15,29 @@ interface Cost { id: number; name: string; section: string; amount: number; freq
 interface Day { d: string; status: string; net: number }
 interface Mtd { month_start: string; dim: number; done: number; days: Day[]; pastries: number; staff_qty: number; costs: Cost[]; last_ingest: { received_at: string; result: string; message: string | null; report_date: string | null } | null }
 
+interface LogRow { id: number; received_at: string; sender: string | null; filename: string | null; report_date: string | null; items: number | null; net_total: number | null; result: string; message: string | null; replaced: boolean }
+
 const eff = (c: Cost) => (c.actual != null ? Number(c.actual) : Number(c.amount) * (FACTOR[c.frequency] ?? 1));
 
 export function MonthToDate() {
   const toast = useToast();
   const [m, setM] = useState<Mtd | null>(null);
   const [open, setOpen] = useState(false);
+  const [log, setLog] = useState<LogRow[]>([]);
+  const [showLog, setShowLog] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const loadLog = useCallback(async () => { const { data } = await supabase.rpc('pos_log'); setLog((data as LogRow[]) ?? []); }, []);
+  useEffect(() => { void loadLog(); }, [loadLog]);
+  async function upload(f: File) {
+    setBusy(true);
+    try {
+      const buf = new Uint8Array(await f.arrayBuffer()); let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      const { data: sess } = await supabase.auth.getSession();
+      const r = await fetch((import.meta.env.VITE_SUPABASE_URL as string) + '/functions/v1/pos-inbox', { method: 'POST', headers: { Authorization: 'Bearer ' + sess.session?.access_token, 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: f.name, b64: btoa(bin) }) });
+      const j = await r.json();
+      if (j.ok) toast(`Loaded ${j.date}: ${inr(j.net)}${j.replaced ? ' (replaced the earlier one)' : ''}`); else toast(j.message ?? 'Could not read that file');
+    } catch (e) { toast(errText(e)); } finally { setBusy(false); void load(); void loadLog(); }
+  }
   const load = useCallback(async () => { const { data, error } = await supabase.rpc('owner_mtd'); if (!error) setM(data as Mtd); }, []);
   useEffect(() => { void load(); }, [load]);
 
@@ -124,6 +141,14 @@ export function MonthToDate() {
           <div><b>Staff tea:</b> {Math.round(Number(m.staff_qty))} cups logged this month by the POS.</div>
           {m.last_ingest && <div><b>Last report:</b> {m.last_ingest.result}{m.last_ingest.report_date ? ` for ${pretty(m.last_ingest.report_date)}` : ''}.</div>}
         </div></div>
+      </div>
+      <div className="card mlog">
+        <div className="mrh"><div><h2>Sales reports</h2><div className="sm mut">{log[0] ? `Last one: ${log[0].result}${log[0].report_date ? ' for ' + pretty(log[0].report_date) : ''}, ${new Date(log[0].received_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : 'The nightly POS email will show up here.'}</div></div>
+          <div className="mbtns"><label className="btn p" style={{ cursor: 'pointer' }}>{busy ? 'Reading…' : "Upload a day's report"}<input type="file" accept=".xlsx,.xls" hidden disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void upload(f); }} /></label><button className="btn" onClick={() => setShowLog(!showLog)}>{showLog ? 'Hide the log' : 'See the log'}</button></div></div>
+        {showLog && <table style={{ marginTop: 8 }}><thead><tr><th>Arrived</th><th>From</th><th>File</th><th>Day</th><th className="r">Net sales</th><th>Result</th></tr></thead><tbody>
+          {log.map((x) => <tr key={x.id}><td>{new Date(x.received_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</td><td className="mut">{x.sender ?? ''}</td><td className="mut">{x.filename ?? ''}</td><td>{x.report_date ? pretty(x.report_date) : ''}</td><td className="r num">{x.net_total != null ? inr(Number(x.net_total)) : ''}</td><td><span className={'chip ' + (x.result === 'rejected' ? 'crit' : x.result === 'replaced' ? 'att' : 'ok')}>{x.result}</span>{x.message ? <div className="sm mut">{x.message}</div> : null}</td></tr>)}
+          {!log.length && <tr><td colSpan={6} className="mut">Nothing yet.</td></tr>}
+        </tbody></table>}
       </div>
       {open && <CostsSheet m={m} c={c} onClose={() => { setOpen(false); void load(); }} reload={load} />}
     </div>
