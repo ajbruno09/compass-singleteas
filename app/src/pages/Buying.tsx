@@ -10,7 +10,7 @@ import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 
 interface ItemRow { id: number; name: string; unit: string; group_id: number | null; default_vendor_id: string | null; last_cost: number | null; rate_varies: boolean; purchase_factor: number | null; purchase_unit: string | null }
-interface VendorRow { id: string; name: string; order_channel: string; whatsapp_group: string; phone: string | null }
+interface VendorRow { id: string; name: string; order_channel: string; whatsapp_group: string; phone: string | null; is_store?: boolean }
 interface VItem { vendor_id: string; item_id: number; agreed_rate: number | null }
 interface IndentRow { id: string; location_id: number; status: string; indent_lines: { item_id: number; qty: number }[] }
 interface PoLine { item_id: number; qty: number; unit_rate: number | null }
@@ -19,8 +19,8 @@ interface PoRow {
   required_date: string | null; required_time: string | null; delivery: boolean; channel: string; for_date: string | null; po_lines: PoLine[]; party?: boolean;
 }
 interface PS { item_id: number; vendor_id: string | null; approved_asked: number; buy_qty: number; ordered_qty: number }
-type Kind = 'wa' | 'phone' | 'app' | 'bought';
-const kindOf = (v: VendorRow): Kind => (v.order_channel === 'whatsapp_group' ? 'wa' : v.order_channel === 'phone' ? 'phone' : v.order_channel === 'app' ? 'app' : 'bought');
+type Kind = 'wa' | 'phone' | 'app' | 'bought' | 'store';
+const kindOf = (v: VendorRow): Kind => (v.is_store ? 'store' : v.order_channel === 'whatsapp_group' ? 'wa' : v.order_channel === 'phone' ? 'phone' : v.order_channel === 'app' ? 'app' : 'bought');
 
 const STORE_ID = 1;
 const BASE_NAMES = ['Kerala Market', 'Hyperpure', 'Sri Manjunatha Traders'];
@@ -87,7 +87,7 @@ export function Buying() {
   const loadStatic = useCallback(async () => {
     const [it, vd, vi] = await Promise.all([
       supabase.from('items').select('id, name, unit, group_id, default_vendor_id, last_cost, rate_varies, purchase_factor, purchase_unit').eq('active', true),
-      supabase.from('vendors').select('id, name, order_channel, whatsapp_group, phone').eq('active', true).order('name'),
+      supabase.from('vendors').select('id, name, order_channel, whatsapp_group, phone, is_store').eq('active', true).order('name'),
       supabase.from('vendor_items').select('vendor_id, item_id, agreed_rate')
     ]);
     setItems((it.data as ItemRow[]) ?? []); setVendors((vd.data as VendorRow[]) ?? []); setVitems((vi.data as VItem[]) ?? []);
@@ -157,9 +157,9 @@ export function Buying() {
   const loose = toBuy.filter((r) => !vOf(r));
   const byVendor = useMemo(() => {
     const m = new Map<string, Row[]>();
-    for (const r of toBuy) { const v = moved[r.item.id] ?? r.item.default_vendor_id; if (v) m.set(v, [...(m.get(v) ?? []), r]); }
+    for (const r of rows) { const v = moved[r.item.id] ?? r.item.default_vendor_id; if (v && (r.qty > 0 || vendorMap.get(v)?.is_store)) m.set(v, [...(m.get(v) ?? []), r]); }
     return m;
-  }, [toBuy, moved]);
+  }, [rows, moved, vendorMap]);
   const vendorIds = useMemo(() => {
     const ids = new Set<string>([...byVendor.keys(), ...pos.filter((p) => !p.party).map((p) => p.vendor_id)]);
     return [...ids].filter((id) => vendorMap.has(id)).sort((a, b) => vendorMap.get(a)!.name.localeCompare(vendorMap.get(b)!.name));
@@ -175,13 +175,14 @@ export function Buying() {
     const m = new Map<string, Row[]>();
     for (const x of ps) {
       const rem = Number(x.buy_qty) - Number(x.ordered_qty); const item = itemMap.get(x.item_id);
-      if (rem <= 1e-9 || !x.vendor_id || !item) continue;
+      if (rem <= 1e-9 || !x.vendor_id || !item || vendorMap.get(x.vendor_id)?.is_store) continue;
       const rate = rateMap.get(`${x.vendor_id}:${x.item_id}`) ?? (item.last_cost != null ? Number(item.last_cost) : null);
       const step = item.purchase_factor ? Number(item.purchase_factor) : stepOf(item.unit);
       m.set(x.vendor_id, [...(m.get(x.vendor_id) ?? []), { item, asked: partyAsked.get(x.item_id) ?? rem, by: [{ loc: 'Party', qty: rem }], inStore: 0, ordered: 0, sug: rem, qty: rem, rate, step }]);
     }
     return m;
-  }, [ps, itemMap, rateMap, partyAsked]);
+  }, [ps, itemMap, rateMap, partyAsked, vendorMap]);
+  const partyFromStore = ps.filter((x) => Number(x.buy_qty) > 0 && x.vendor_id && vendorMap.get(x.vendor_id)?.is_store).map((x) => itemMap.get(x.item_id)?.name).filter(Boolean) as string[];
   const partyPos = pos.filter((p) => p.party);
   const partyBlocked = partyNew.some((r) => pQty(r) > 0 && !pVendor(r));
   async function partyOk() {
@@ -195,8 +196,9 @@ export function Buying() {
   function setAllEmpty(v: string) { if (!v) return; setPdraft((d) => { const n = { ...d }; for (const r of partyNew) if (!pVendor(r)) n[r.item.id] = { ...n[r.item.id], vendor: v }; return n; }); }
 
   const estimate = (list: Row[]) => list.reduce((t, r) => t + (r.rate != null ? r.qty * r.rate : 0), 0);
-  const grand = vendorIds.reduce((t, id) => t + estimate(byVendor.get(id) ?? []), 0);
-  const itemCount = toBuy.length;
+  const grand = vendorIds.reduce((t, id) => t + (vendorMap.get(id)?.is_store ? 0 : estimate(byVendor.get(id) ?? [])), 0);
+  const isStoreV = (r: Row) => !!vendorMap.get(vOf(r) ?? '')?.is_store;
+  const itemCount = toBuy.filter((r) => !isStoreV(r)).length;
   const ordersSent = pos.length;
 
   async function usual(itemId: number, vendorId: string, label: string) {
@@ -297,6 +299,7 @@ export function Buying() {
                   </div>
                 </div>
               )}
+              {partyFromStore.length > 0 && <p className="small muted" style={{ marginTop: 8 }}>From the store (no order): {partyFromStore.join(', ')}. Issue these from the store on the Issue screen.</p>}
               {partyPos.length > 0 && (
                 <div className="row" style={{ marginTop: 10, gap: 8 }}>
                   <span className="muted small">Placed:</span>
@@ -338,20 +341,34 @@ export function Buying() {
               const vpos = pos.filter((p) => p.vendor_id === vid && !p.party);
               const open = openV === vid;
               const allDone = list.length === 0;
-              const chip = allDone ? <span className="chip done">{kind === 'bought' ? 'Bought' : 'Sent'}</span> : vpos.length ? <span className="chip late">New items to order</span> : <span className="chip late">{kind === 'bought' ? 'To buy' : 'Not sent'}</span>;
-              const channel = kind === 'wa' ? `WhatsApp group: ${v.whatsapp_group}` : kind === 'phone' ? `Phone call${v.phone ? ': ' + v.phone : ''}` : kind === 'app' ? `Order in the ${v.name} app` : 'Bought by the store, not ordered';
+              const chip = kind === 'store' ? <span className="chip due">From store</span> : allDone ? <span className="chip done">{kind === 'bought' ? 'Bought' : 'Sent'}</span> : vpos.length ? <span className="chip late">New items to order</span> : <span className="chip late">{kind === 'bought' ? 'To buy' : 'Not sent'}</span>;
+              const channel = kind === 'store' ? 'Supplied from your store. No order needed.' : kind === 'wa' ? `WhatsApp group: ${v.whatsapp_group}` : kind === 'phone' ? `Phone call${v.phone ? ': ' + v.phone : ''}` : kind === 'app' ? `Order in the ${v.name} app` : 'Bought by the store, not ordered';
               return (
                 <div key={vid} className="card" style={{ padding: 0 }}>
                   <button className="vhead" onClick={() => setOpenV(open ? null : vid)} aria-expanded={open}>
                     <span style={{ transform: open ? 'none' : 'rotate(-90deg)', display: 'inline-flex', transition: 'transform .12s' }}><Icon name="chev" /></span>
                     <span style={{ flex: 1, textAlign: 'left' }}><b>{v.name}</b><span className="muted small" style={{ display: 'block' }}>{channel}</span></span>
                     <span className="muted small">{list.length} {list.length === 1 ? 'item' : 'items'}</span>
-                    <span className="num" style={{ minWidth: 80, textAlign: 'right' }}>{money(estimate(list))}</span>
+                    <span className="num" style={{ minWidth: 80, textAlign: 'right' }}>{kind === 'store' ? '' : money(estimate(list))}</span>
                     {chip}
                   </button>
                   {open && (
                     <div style={{ padding: '0 0 14px' }}>
-                      {list.length > 0 && (
+                      {kind === 'store' && (
+                        <div style={{ padding: '4px 16px' }}>
+                          <p className="small muted">These come from your own store, so no purchase order is made. Issue them on the Issue to counters screen and the store stock goes down then.</p>
+                          {list.length > 0 && (
+                            <table>
+                              <thead><tr><th>Item</th><th className="r">Counters asked</th><th className="r">In store now</th><th className="r">Short by</th></tr></thead>
+                              <tbody>{rows.filter((r) => vOf(r) === vid).map((r) => { const short = Math.max(0, r.asked - r.inStore); return (
+                                <tr key={r.item.id}><td><b>{r.item.name}</b></td><td className="r num">{n2(r.asked)} {r.item.unit}</td><td className="r num muted">{n2(r.inStore)} {r.item.unit}</td>
+                                  <td className="r num" style={{ color: short > 0 ? 'var(--bad)' : undefined }}>{short > 0 ? `${n2(short)} ${r.item.unit}` : 'None'}</td></tr>); })}</tbody>
+                            </table>
+                          )}
+                          {list.some((r) => r.asked > r.inStore) && <p className="banner warn" style={{ marginTop: 8 }}>The store is short on some In House items. Move those items to a vendor to buy them, or restock the store.</p>}
+                        </div>
+                      )}
+                      {kind !== 'store' && list.length > 0 && (
                         <div className="tablewrap" style={{ border: 0, borderRadius: 0, boxShadow: 'none' }}>
                           <table>
                             <thead><tr><th>Item</th><th>Asked by counters</th><th className="r">Asked</th><th className="r">In store</th><th className="r">Suggested</th><th>Order</th><th className="r">Estimate</th><th /></tr></thead>
@@ -394,8 +411,8 @@ export function Buying() {
                         </div>
                       )}
                       <div className="row" style={{ padding: '10px 16px 0', justifyContent: 'space-between' }}>
-                        <span className="muted small">Change any quantity, then review. Values are estimates to plan cash, at the last rate available until the exact rate is entered. The order message never carries a price. Nothing is sent until you tap the button.</span>
-                        {list.length > 0 && <button className="btn primary" onClick={() => setDlg({ vendorId: vid })}>{kind === 'bought' ? 'Open shopping list' : 'Review order'}</button>}
+                        <span className="muted small">{kind === 'store' ? '' : 'Change any quantity, then review. Values are estimates to plan cash, at the last rate available until the exact rate is entered. The order message never carries a price. Nothing is sent until you tap the button.'}</span>
+                        {kind !== 'store' && list.length > 0 && <button className="btn primary" onClick={() => setDlg({ vendorId: vid })}>{kind === 'bought' ? 'Open shopping list' : 'Review order'}</button>}
                       </div>
                     </div>
                   )}
