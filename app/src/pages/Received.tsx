@@ -15,7 +15,7 @@ interface Line { item_id: number; name: string; local_names: Record<string, stri
 export function ReceivedPage() {
   const [sp] = useSearchParams();
   const loc = Number(sp.get('loc'));
-  const { allLocations: locations, profile } = useSession();
+  const { allLocations: locations, profile, party } = useSession();
   const nav = useNavigate();
   const toast = useToast();
   const { t, hi } = useLang();
@@ -28,7 +28,7 @@ export function ReceivedPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const office = profile?.role === 'owner' || profile?.role === 'store' || profile?.role === 'manager';
-  const place = locations.find((l) => l.id === loc)?.name ?? '';
+  const place = party && loc === party.loc.id ? `Party: ${party.label}` : (locations.find((l) => l.id === loc)?.name ?? '');
 
   const load = useCallback(async () => {
     const { data } = await supabase.rpc('pending_issues', { p_location_id: loc });

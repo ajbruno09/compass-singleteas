@@ -101,9 +101,9 @@ export function StaffHome() {
         </div>
       </div>
 
-      {party && (
+      {party?.open && (
         <button className="countercard" onClick={() => nav(`/indent?loc=${party.loc.id}`)} style={{ borderColor: '#F3B48E', background: '#FFF1E8' }}>
-          <Icon name="box" size={30} stroke={1.6} /><span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>Party order: {party.label}</span><span className="small muted">Order what the party needs. Any number of items.</span></span><span className="chip due">Open</span>
+          <Icon name="box" size={30} stroke={1.6} /><span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>Party order: {party.label}</span><span className="small muted">Order what the party needs. Any number of items{party.until ? ', until ' + new Date(party.until).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }) : ''}.</span></span><span className="chip due">Open</span>
         </button>
       )}
       {myLocations.length > 1 && (

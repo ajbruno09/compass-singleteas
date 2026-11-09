@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { Location, Profile } from './types';
 
-interface Ctx { loadError: boolean; session: Session | null; profile: Profile | null; locations: Location[]; allLocations: Location[]; myLocations: Location[]; party: { loc: Location; label: string } | null; loading: boolean; recovery: boolean; clearRecovery: () => void; reload: () => Promise<void>; signOut: () => Promise<void>; }
+interface Ctx { loadError: boolean; session: Session | null; profile: Profile | null; locations: Location[]; allLocations: Location[]; myLocations: Location[]; party: { loc: Location; label: string; open: boolean; until: string | null } | null; loading: boolean; recovery: boolean; clearRecovery: () => void; reload: () => Promise<void>; signOut: () => Promise<void>; }
 const SessionCtx = createContext<Ctx | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -12,7 +12,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [allLocations, setAllLocations] = useState<Location[]>([]);
   const [myLocations, setMyLocations] = useState<Location[]>([]);
-  const [partyStat, setPartyStat] = useState<{ active: boolean; label?: string; location_id?: number } | null>(null);
+  const [partyStat, setPartyStat] = useState<{ active: boolean; label?: string; location_id?: number; open_until?: string | null; ordering_open?: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const [recovery, setRecovery] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -60,7 +60,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (!partyStat?.active) return null;
     const pl = allLocations.find((l) => l.id === partyStat.location_id);
     const kitchen = myLocations.some((l) => [8, 9, 10, 11].includes(l.id));
-    return pl && kitchen ? { loc: { ...pl, active: true }, label: partyStat.label ?? 'Party' } : null;
+    return pl && kitchen ? { loc: { ...pl, active: true }, label: partyStat.label ?? 'Party', open: partyStat.ordering_open !== false, until: partyStat.open_until ?? null } : null;
   })();
 
   useEffect(() => {

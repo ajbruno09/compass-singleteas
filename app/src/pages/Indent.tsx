@@ -28,13 +28,13 @@ const CAT_PHOTO: Record<number, string> = { 1: 'veg', 2: 'dairy', 3: 'chicken', 
 
 export function IndentPage() {
   const { myLocations, party } = useSession();
-  const pickLocs = party ? [...myLocations, party.loc] : myLocations;
+  const pickLocs = party?.open ? [...myLocations, party.loc] : myLocations;
   const toast = useToast();
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
   const locId = Number(sp.get('loc')) || myLocations[0]?.id || null;
   const where = pickLocs.find((l) => l.id === locId)?.name ?? '';
-  const isParty = !!party && locId === party.loc.id;
+  const isParty = !!party?.open && locId === party.loc.id;
   const gate = useReceiveGate(locId ? [locId] : []);
   const blocked = !!(locId && gate.gates[locId]?.blocked);
 
@@ -212,7 +212,7 @@ export function IndentPage() {
         <AvatarButton />
       </div>
 
-      <div className={`notice ${isParty || win === 'open' ? 'ok' : win === 'early' ? 'info' : 'warn'}`}>{isParty ? <span className="chip done">{t('Party order')}: {party!.label}</span> : winChip}</div>
+      <div className={`notice ${isParty || win === 'open' ? 'ok' : win === 'early' ? 'info' : 'warn'}`}>{isParty ? <span className="chip done">{t('Party order')}: {party!.label}{party!.until ? ` · ${t('until')} ${new Date(party!.until).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}` : ''}</span> : winChip}</div>
       {pickLocs.length > 1 && (
         <div className="cpills" role="group" aria-label="Counter">
           {pickLocs.map((l) => <button key={l.id} aria-pressed={l.id === locId} onClick={() => setSp({ loc: String(l.id) })}>{party && l.id === party.loc.id ? `${t('Party')}: ${party.label}` : l.name}</button>)}

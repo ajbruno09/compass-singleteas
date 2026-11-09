@@ -24,11 +24,12 @@ export function Issue() {
   const [today, setToday] = useState<IssueRow[]>([]);
   const [forDate, setForDate] = useState('');
   const [lpgDone, setLpgDone] = useState(false);
-  const [pStat, setPStat] = useState<{ active: boolean; label?: string } | null>(null);
+  const [pStat, setPStat] = useState<{ active: boolean; label?: string; open_until?: string | null; ordering_open?: boolean } | null>(null);
   const [pLabel, setPLabel] = useState('');
+  const [pUntil, setPUntil] = useState('');
   const loadParty = useCallback(async () => { const { data } = await supabase.rpc('party_status'); setPStat((data as typeof pStat) ?? null); }, []);
   useEffect(() => { void loadParty(); }, [loadParty]);
-  async function partyOn() { const { error } = await supabase.rpc('party_switch_on', { p_label: pLabel }); if (error) return toast(errText(error)); setPLabel(''); toast('Party order is on'); void loadParty(); window.dispatchEvent(new Event('compass:party')); setTimeout(() => window.location.reload(), 600); }
+  async function partyOn() { const { error } = await supabase.rpc('party_switch_on', { p_label: pLabel, p_until: new Date(pUntil + ':00+05:30').toISOString() }); if (error) return toast(errText(error)); setPLabel(''); setPUntil(''); toast('Party order is on'); void loadParty(); window.dispatchEvent(new Event('compass:party')); setTimeout(() => window.location.reload(), 600); }
   async function partyOff() { const { error } = await supabase.rpc('party_close'); if (error) return toast(errText(error)); toast('Party order closed'); void loadParty(); window.dispatchEvent(new Event('compass:party')); setTimeout(() => window.location.reload(), 600); }
   const [blockedList, setBlockedList] = useState<{ location_id: number; name: string; old: number }[]>([]);
   const loadBlocked = useCallback(async () => { const { data } = await supabase.rpc('receive_blocked_list'); setBlockedList((data as typeof blockedList) ?? []); }, []);
@@ -97,12 +98,13 @@ export function Issue() {
       <div className="card" style={{ display: 'grid', gap: 8 }}>
         <b>Party order</b>
         {pStat?.active ? (<>
-          <span className="small muted">On now: <b>{pStat.label}</b>. Kitchen counters can place the party indent. When the party is done, close it.</span>
+          <span className="small muted">On now: <b>{pStat.label}</b>. {pStat.ordering_open ? 'Kitchen counters can place the party indent' : 'Ordering has closed'}{pStat.open_until ? ` until ${new Date(pStat.open_until).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}` : ''}. Issue the items, and close it when the party is done.</span>
           <button className="btn secondary" onClick={() => void partyOff()}>Close party order</button>
         </>) : (<>
           <span className="small muted">Off. Switch it on for a party and the kitchen counters can order any items for it.</span>
           <input value={pLabel} onChange={(e) => setPLabel(e.target.value)} placeholder="Party name, for example Sharma wedding" style={{ minHeight: 44 }} />
-          <button className="btn primary" disabled={!pLabel.trim()} onClick={() => void partyOn()}>Switch on party order</button>
+          <label className="field"><span>Open for ordering until</span><input type="datetime-local" value={pUntil} onChange={(e) => setPUntil(e.target.value)} style={{ minHeight: 44 }} /></label>
+          <button className="btn primary" disabled={!pLabel.trim() || !pUntil} onClick={() => void partyOn()}>Switch on party order</button>
         </>)}
       </div>
       {blockedList.length > 0 && (
