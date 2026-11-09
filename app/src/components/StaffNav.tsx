@@ -21,7 +21,7 @@ export function StaffShell() {
     (async () => {
       if (!ids.length) return;
       const bd = await supabase.rpc('business_date', { p_at: new Date().toISOString() });
-      const { data } = await supabase.from('stock_counts').select('location_id').in('location_id', ids).eq('business_date', String(bd.data)).eq('frequency', 'daily').eq('status', 'submitted');
+      const { data } = await supabase.from('stock_counts').select('location_id').in('location_id', ids).eq('business_date', String(bd.data)).in('frequency', ['daily', 'weekly']).eq('status', 'submitted');
       const done = new Set(((data as { location_id: number }[]) ?? []).map((r) => r.location_id));
       setDue(ids.filter((i) => !done.has(i)).length);
     })();

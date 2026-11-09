@@ -63,18 +63,15 @@ export function StaffHome() {
   useEffect(() => {
     (async () => {
       const bd = String((await supabase.rpc('business_date', { p_at: new Date().toISOString() })).data);
-      const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-      const mon = new Date(today); mon.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-      const monStr = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
       const w: Record<number, number> = {}; const dd: Record<number, string> = {}; const ww: Record<number, string> = {};
       for (const l of myLocations) {
         const p = await supabase.rpc('pending_issues', { p_location_id: l.id });
         w[l.id] = ((p.data as unknown[]) ?? []).length;
         const k = await supabase.from('stock_counts').select('status').eq('location_id', l.id).eq('business_date', bd).eq('frequency', 'daily').maybeSingle();
         if (k.data) dd[l.id] = (k.data as { status: string }).status;
-        const k2 = await supabase.from('stock_counts').select('status').eq('location_id', l.id).eq('frequency', 'weekly').gte('business_date', monStr).order('business_date', { ascending: false }).limit(1);
+        const k2 = await supabase.from('stock_counts').select('status').eq('location_id', l.id).eq('frequency', 'weekly').eq('business_date', bd).limit(1);
         const r2 = ((k2.data as { status: string }[]) ?? [])[0];
-        if (r2) ww[l.id] = r2.status;
+        if (r2) { ww[l.id] = r2.status; if (r2.status === 'submitted') dd[l.id] = 'submitted'; }
       }
       setWaiting(w); setDaily(dd); setWeekly(ww);
     })();
