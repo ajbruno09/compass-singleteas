@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { useHealth } from '../components/StoreCheck';
+import { MonthToDate } from '../components/MonthToDate';
 import '../te.css';
 
 // Owner dashboard: Tea Estate v2, as approved in the mock. Live data where it exists, "Waiting" where it does not yet.
@@ -61,8 +62,10 @@ export function OwnerDashboard() {
     const today = istDate(0);
     const dayTot = (d: string) => sales.filter((x) => x.business_date === d).reduce((a, x) => a + Number(x.amount), 0);
     const S = days.map(dayTot); const hasSales = S.some((v) => v > 0);
-    const todayTot = S[6]; const lw = dayTot(istDate(-7)); const delta = lw > 0 && todayTot > 0 ? (todayTot - lw) / lw * 100 : null;
-    const wk = new Date().toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+    const latest = [...days].reverse().find((d) => dayTot(d) > 0) ?? today;
+    const todayTot = dayTot(latest); const lwDate = (() => { const d = new Date(latest + 'T00:00:00'); d.setDate(d.getDate() - 7); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(); const lw = dayTot(lwDate); const delta = lw > 0 && todayTot > 0 ? (todayTot - lw) / lw * 100 : null;
+    const latestLabel = latest === today ? 'today' : new Date(latest + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' });
+    const wk = new Date(latest + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long' });
     const owed = bills.reduce((a, b) => a + b.balance, 0); const overdue = bills.filter((b) => b.due_date && b.due_date < today).reduce((a, b) => a + b.balance, 0);
     const due7 = bills.filter((b) => b.due_date && b.due_date >= today && b.due_date <= istDate(7)); const due7amt = due7.reduce((a, b) => a + b.balance, 0);
     const stockVal = (loc?: number) => stock.filter((x) => (loc ? x.location_id === loc : true) && cost[x.item_id] != null && x.qty > 0).reduce((a, x) => a + x.qty * cost[x.item_id], 0);
@@ -88,7 +91,7 @@ export function OwnerDashboard() {
     (window as unknown as { __depts: Dept[] }).__depts = D;
 
     const K: [string, string, string, string, Tag, number[] | null, string][] = [
-      ['Net sales', hasSales && todayTot > 0 ? inr(todayTot) : '—', delta != null ? `${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}% on last ${wk}` : '', delta == null ? '' : delta >= 0 ? 'up' : 'dn', hasSales ? 'part' : 'wait', hasSales ? S : null, hasSales ? 'Entered by hand for now' : 'Waiting for today\'s sales'],
+      ['Net sales', hasSales && todayTot > 0 ? inr(todayTot) : '—', delta != null ? `${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}% on last ${wk}` : '', delta == null ? '' : delta >= 0 ? 'up' : 'dn', hasSales ? 'part' : 'wait', hasSales ? S : null, hasSales ? `Counter sales for ${latestLabel}` : 'Waiting for sales'],
       ['Food cost', '—', '', '', 'wait', null, 'Needs sales and prices'],
       ['Food cost %', '—', '', '', 'wait', null, 'Needs sales and prices'],
       ['7 day average', '—', '', '', 'wait', null, 'Needs food cost'],
@@ -97,7 +100,7 @@ export function OwnerDashboard() {
       ['Vendor payables', lakh(owed), overdue > 0 ? `${inr(overdue)} overdue` : 'Nothing overdue', overdue > 0 ? 'dn' : 'up', 'live', null, ''],
       ['Open alerts', String(alerts.length), urgent ? `${urgent} urgent` : '', urgent ? 'dn' : '', 'live', null, '']];
     const kpis = K.map((k) => `<div class="card kpi"><div class="l"><span class="kl">${ic(k[0])}${k[0]}</span>${chip(k[4])}</div><div class="kb"><div><div class="v ${k[1] === '—' ? 'mut' : ''}">${k[1]}</div><div class="d" style="color:${col(k[3])}">${esc(k[2])}</div></div>${k[5] ? spark(k[5], col(k[3]) === 'var(--mut)' ? 'var(--acc)' : col(k[3]), 96, 34) : ''}</div>${k[6] ? `<div class="need">${k[6]}</div>` : ''}</div>`).join('');
-    const bigA = [['Net sales so far', hasSales && todayTot > 0 ? inr(todayTot) : 'Waiting', delta != null ? `${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}% on last ${wk}` : 'Entered by hand for now', delta != null && delta < 0 ? 'dn' : ''], ['Food cost', 'Soon', 'Needs sales and prices', ''], ['Owed to vendors', lakh(owed), overdue > 0 ? `${inr(overdue)} overdue` : 'Nothing overdue', overdue > 0 ? 'dn' : ''], ['Open alerts', String(alerts.length), urgent ? `${urgent} urgent` : 'None urgent', urgent ? 'dn' : '']].map((x) => `<div><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="d ${x[3]}">${x[2]}</div></div>`).join('');
+    const bigA = [[`Net sales, ${latestLabel}`, hasSales && todayTot > 0 ? inr(todayTot) : 'Waiting', delta != null ? `${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}% on last ${wk}` : 'Counters only', delta != null && delta < 0 ? 'dn' : ''], ['Food cost', 'Soon', 'Needs sales and prices', ''], ['Owed to vendors', lakh(owed), overdue > 0 ? `${inr(overdue)} overdue` : 'Nothing overdue', overdue > 0 ? 'dn' : ''], ['Open alerts', String(alerts.length), urgent ? `${urgent} urgent` : 'None urgent', urgent ? 'dn' : '']].map((x) => `<div><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="d ${x[3]}">${x[2]}</div></div>`).join('');
     const depts = D.map((d, i) => { const [k, l] = lab(d.score); return `<div class="card dept" data-dept="${i}">${ring(d.score, d.score == null ? 'var(--line)' : d.score < 65 ? 'var(--bad)' : d.score < 80 ? 'var(--warn)' : 'var(--good)')}<div><div class="t">${d.name}</div><span class="chip ${k}" style="margin:4px 0 2px">${l}</span><div class="s">${d.sub}</div></div></div>`; }).join('');
     // trend
     const W = 520; const x = (i: number) => 34 + i * (W - 60) / 6; const mx = Math.max(...S, 1); const ys = (v: number) => 150 - (v / mx) * 110;
@@ -106,7 +109,7 @@ export function OwnerDashboard() {
     const trend = `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--acc)" stop-opacity=".28"/><stop offset="1" stop-color="var(--acc)" stop-opacity="0"/></linearGradient></defs>` + [0, 1, 2, 3].map((i) => `<line x1="34" x2="${W - 26}" y1="${30 + i * 40}" y2="${30 + i * 40}" stroke="var(--line)"/>`).join('') + (hasSales ? `<polygon points="34,150 ${area} ${x(6)},150" fill="url(#g)"/><polyline points="${area}" fill="none" stroke="var(--acc)" stroke-width="3" stroke-linejoin="round"/>` : `<text x="${W / 2}" y="95" text-anchor="middle">Waiting for sales</text>`) + dn.map((d, i) => `<text x="${x(i)}" y="176" text-anchor="middle">${d}</text>`).join('') + `<text x="34" y="14">Sales ₹</text><text x="${W - 26}" y="14" text-anchor="end">Food cost %</text>`;
     const tleg = `<span style="color:var(--acc);font-weight:700">■</span> Net sales &nbsp; <span style="color:var(--acc2);font-weight:700">●</span> Food cost % (coming soon). Today is provisional.`;
     // counter sales
-    const byLoc = new Map(sales.filter((x2) => x2.business_date === today).map((r) => [r.location_id, Number(r.amount)]));
+    const byLoc = new Map(sales.filter((x2) => x2.business_date === latest).map((r) => [r.location_id, Number(r.amount)]));
     const MAIN: [string, string][] = [['South Indian', 'South Indian'], ['Indian', 'Indian'], ['Snacks', 'Snacks Frozen'], ['Tandoor', 'Tandoor'], ['Continental', 'Continental'], ['Hot Brew', 'Hot Brew'], ['Cold Beverages', 'Cold Beverages']];
     const rows = MAIN.map(([label, loc]) => [label, byLoc.get(counters.find((c) => c.name === loc)?.id ?? -1) ?? 0] as [string, number]);
     const tot = rows.reduce((a, r) => a + r[1], 0);
@@ -119,7 +122,7 @@ export function OwnerDashboard() {
       ...alerts.map((a) => ({ id: a.id, cls: ['urgent', 'critical', 'sos'].includes(a.level) ? 'c' : 'm', t: a.title, b: a.body ?? '' }))];
     const al = AL.length ? AL.map((a) => `<div class="al ${a.cls === 'm' ? 'm' : ''}"><span class="sev"></span><div><b>${esc(a.t)}</b><div class="sm mut">${esc(a.b)}</div></div><div class="go">${a.id ? `<button class="btn p" data-done="${a.id}">Mark done</button>` : ''}</div></div>`).join('') : '<div class="sm mut">Nothing is waiting for you.</div>';
     const head = need ? `${hasSales && delta != null ? (delta >= 0 ? 'Sales are up' : 'Sales are down') + ', and ' : ''}${need} ${need === 1 ? 'thing needs' : 'things need'} you now.` : 'Nothing needs you right now.';
-    return { kpis, bigA, depts, trend, tleg, cs, dots, money, al, head, dim: tot === 0, hasTot: tot > 0 };
+    return { latestLabel, kpis, bigA, depts, trend, tleg, cs, dots, money, al, head, dim: tot === 0, hasTot: tot > 0 };
   }, [sales, inds, bills, alerts, stock, cost, pos, issues, counters, days, health]);
 
   const when = (() => { const n = new Date(); const o = { timeZone: 'Asia/Kolkata' } as const; return `${n.toLocaleDateString('en-IN', { weekday: 'long', ...o })} ${n.toLocaleDateString('en-IN', { day: 'numeric', ...o })} ${n.toLocaleDateString('en-IN', { month: 'short', ...o })}, ${n.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, ...o }).replace('am', 'am').replace('pm', 'pm')}`; })();
@@ -134,6 +137,7 @@ export function OwnerDashboard() {
   return (
     <div className="te" onClick={onClick}>
       <section className="hero a"><div className="hl"><div className="sub">Single Teas, Bilekahalli · {when}</div><h1>{html.head}</h1></div><div className="big4" dangerouslySetInnerHTML={{ __html: html.bigA }} /></section>
+      <MonthToDate />
       <div className="sec kpisec"><h2>Key numbers</h2><div className="grid kpis" dangerouslySetInnerHTML={{ __html: html.kpis }} /></div>
       <div className="sec grid dd2">
         <div><h2>Department performance</h2><div className="grid depts" dangerouslySetInnerHTML={{ __html: html.depts }} /></div>
@@ -141,7 +145,7 @@ export function OwnerDashboard() {
       </div>
       <div className="sec grid two">
         <div className="card"><div style={{ display: 'flex', justifyContent: 'space-between' }}><h2>Sales and food cost, last 7 days</h2><span className="chip part">Partial</span></div><svg className="chart" viewBox="0 0 520 190" width="100%" dangerouslySetInnerHTML={{ __html: html.trend }} /><div className="sm mut" dangerouslySetInnerHTML={{ __html: html.tleg }} /></div>
-        <div className="card"><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h2>Sales by counter, today</h2><span className={'chip ' + (html.hasTot ? 'part' : 'wait')}>{html.hasTot ? 'Partial' : 'Waiting'}</span></div><table className={'cs' + (html.dim ? ' dim' : '')} dangerouslySetInnerHTML={{ __html: html.cs }} /><div className="sm mut" style={{ marginTop: 8 }}>Food cost % per counter needs recipes and prices, so it shows a dash for now.</div></div>
+        <div className="card"><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h2>Sales by counter, {html.latestLabel}</h2><span className={'chip ' + (html.hasTot ? 'part' : 'wait')}>{html.hasTot ? 'Partial' : 'Waiting'}</span></div><table className={'cs' + (html.dim ? ' dim' : '')} dangerouslySetInnerHTML={{ __html: html.cs }} /><div className="sm mut" style={{ marginTop: 8 }}>Food cost % per counter needs recipes and prices, so it shows a dash for now.</div></div>
       </div>
       <div className="sec"><h2>Money</h2><div className="grid money" dangerouslySetInnerHTML={{ __html: html.money }} /></div>
       <div className="sec"><div className="card"><h2>Needs you now</h2><div dangerouslySetInnerHTML={{ __html: html.al }} /></div></div>
