@@ -1,144 +1,146 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
-import { money } from '../lib/format';
-import { AlertsPanel } from '../components/AlertsPanel';
 import { useHealth } from '../components/StoreCheck';
+import '../te.css';
 
+// Owner dashboard: Tea Estate v2, as approved in the mock. Live data where it exists, "Waiting" where it does not yet.
+const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 const istDate = (off = 0) => { const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); d.setDate(d.getDate() + off); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const lakh = (n: number) => (n >= 1e5 ? `₹${(n / 1e5).toFixed(2)}L` : money(n));
+const inr = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
+const lakh = (n: number) => (n >= 1e5 ? `₹${(n / 1e5).toFixed(2)}L` : inr(n));
 type Tag = 'live' | 'part' | 'wait';
-const TagChip = ({ t }: { t: Tag }) => <span className={'tag2 ' + t}>{t === 'live' ? 'Live' : t === 'part' ? 'Partial' : 'Waiting'}</span>;
-interface Sale { location_id: number; amount: number }
-interface Ind { location_id: number; for_date: string; outcome: string | null; late: boolean; status: string }
+const chip = (k: Tag) => `<span class="chip ${k}">${k === 'live' ? 'Live' : k === 'part' ? 'Partial' : 'Waiting'}</span>`;
+const spark = (a: number[], c: string, w = 120, h = 28) => { const mn = Math.min(...a), mx = Math.max(...a), r = mx - mn || 1; const p = a.map((v, i) => `${(i / (a.length - 1) * w).toFixed(1)},${(h - 3 - (v - mn) / r * (h - 6)).toFixed(1)}`).join(' '); return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${p}" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`; };
+const ring = (p: number | null, c: string) => { const R = 26, C = 2 * Math.PI * R; return `<div class="ring"><svg width="62" height="62" viewBox="0 0 62 62"><circle cx="31" cy="31" r="${R}" fill="none" stroke="var(--line)" stroke-width="6"/>${p == null ? '' : `<circle cx="31" cy="31" r="${R}" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${C * p / 100} ${C}" transform="rotate(-90 31 31)"/>`}</svg><b>${p == null ? '—' : p}</b></div>`; };
+const col = (k: string) => (k === 'dn' ? 'var(--bad)' : k === 'up' ? 'var(--good)' : 'var(--mut)');
+interface Ind { location_id: number; for_date: string; outcome: string | null; late: boolean }
+interface Al { id: string; level: string; title: string; body: string | null; created_at: string }
+interface Dept { name: string; score: number | null; sub: string; rows: [string, string, string][] }
 
 export function OwnerDashboard() {
   const { profile, locations } = useSession();
   const counters = useMemo(() => locations.filter((l) => l.kind === 'department' && l.active), [locations]);
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [salesLW, setSalesLW] = useState(0);
-  const [inds, setInds] = useState<Ind[]>([]);
-  const [owed, setOwed] = useState(0);
-  const [alerts, setAlerts] = useState(0);
-  const [priced, setPriced] = useState({ n: 0, total: 0 });
-  const [flow, setFlow] = useState({ pos_waiting: 0, issues_unconfirmed: 0, counts_done: 0, counters: 0 });
-  const [todo, setTodo] = useState({ reopen: 0, sosAsk: 0, noClose: 0, flagged: 0 });
-  const { items: health } = useHealth();
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => istDate(i - 6)), []);
+  const [sales, setSales] = useState<{ business_date: string; location_id: number; amount: number }[]>([]);
+  const [inds, setInds] = useState<Ind[]>([]);
+  const [bills, setBills] = useState<{ balance: number; due_date: string | null }[]>([]);
+  const [alerts, setAlerts] = useState<Al[]>([]);
+  const [stock, setStock] = useState<{ location_id: number; qty: number; item_id: number }[]>([]);
+  const [cost, setCost] = useState<Record<number, number>>({});
+  const [pos, setPos] = useState<{ status: string; po_lines: { qty: number; unit_rate: number | null }[] }[]>([]);
+  const [issues, setIssues] = useState<string[]>([]);
+  const [sheet, setSheet] = useState<{ title: string; html: string } | null>(null);
+  const { items: health } = useHealth();
 
+  const loadAlerts = async () => { const { data } = await supabase.from('alerts').select('id, level, title, body, created_at').is('done_at', null).order('created_at', { ascending: false }).limit(8); setAlerts((data as Al[]) ?? []); };
   useEffect(() => {
     (async () => {
       const today = istDate(0);
-      const [s, slw, ind, bal, al, pb, fl, ro, sa, nc, fg] = await Promise.all([
-        supabase.from('daily_sales').select('location_id, amount').eq('business_date', today),
-        supabase.from('daily_sales').select('amount').eq('business_date', istDate(-7)),
-        supabase.from('indents').select('location_id, for_date, outcome, late, status').gte('for_date', days[0]).lte('for_date', today),
-        supabase.from('vendor_bill_balances').select('balance').gt('balance', 0),
-        supabase.from('alerts').select('id', { count: 'exact', head: true }).is('done_at', null),
-        supabase.from('item_price_book').select('unit_cost'),
-        supabase.rpc('flow_status'),
-        supabase.from('indent_reopen_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('sos_extra_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.rpc('closing_missing_last_night'),
-        supabase.from('vendor_bills').select('id', { count: 'exact', head: true }).like('remarks', '%Check:%'),
+      const [s, ind, bal, pr, so, po, iss] = await Promise.all([
+        supabase.from('daily_sales').select('business_date, location_id, amount').gte('business_date', istDate(-13)).lte('business_date', today),
+        supabase.from('indents').select('location_id, for_date, outcome, late').gte('for_date', days[0]).lte('for_date', today),
+        supabase.from('vendor_bill_balances').select('balance, due_date').gt('balance', 0),
+        supabase.from('items').select('id, last_cost').not('last_cost', 'is', null),
+        supabase.from('stock_on_hand').select('location_id, item_id, qty'),
+        supabase.from('purchase_orders').select('status, po_lines(qty, unit_rate)').gte('created_at', new Date(Date.now() - 14 * 864e5).toISOString()).neq('status', 'draft'),
+        supabase.from('issues').select('status').gte('issued_at', new Date(Date.now() - 14 * 864e5).toISOString()),
       ]);
-      setSales((s.data as Sale[]) ?? []);
-      setSalesLW(((slw.data as { amount: number }[]) ?? []).reduce((a, x) => a + Number(x.amount), 0));
-      setInds((ind.data as Ind[]) ?? []);
-      setOwed(((bal.data as { balance: number }[]) ?? []).reduce((a, x) => a + Number(x.balance), 0));
-      setAlerts(al.count ?? 0);
-      const pr = (pb.data as { unit_cost: number | null }[]) ?? [];
-      setPriced({ n: pr.filter((x) => x.unit_cost != null).length, total: pr.length });
-      if (fl.data) setFlow(fl.data as typeof flow);
-      setTodo({ reopen: ro.count ?? 0, sosAsk: sa.count ?? 0, noClose: ((nc.data as unknown[] | null) ?? []).length, flagged: fg.count ?? 0 });
+      setSales((s.data as typeof sales) ?? []); setInds((ind.data as Ind[]) ?? []);
+      setBills(((bal.data as typeof bills) ?? []).map((b) => ({ balance: Number(b.balance), due_date: b.due_date })));
+      setCost(Object.fromEntries(((pr.data as { id: number; last_cost: number }[]) ?? []).map((x) => [x.id, Number(x.last_cost)])));
+      setStock(((so.data as typeof stock) ?? []).map((x) => ({ ...x, qty: Number(x.qty) })));
+      setPos((po.data as typeof pos) ?? []); setIssues(((iss.data as { status: string }[]) ?? []).map((x) => x.status));
+      void loadAlerts();
     })();
   }, [days]);
 
-  const total = sales.reduce((a, x) => a + Number(x.amount), 0);
-  const delta = salesLW > 0 ? ((total - salesLW) / salesLW) * 100 : null;
-  const byLoc = new Map(sales.map((x) => [x.location_id, Number(x.amount)]));
-  const rowsSales = counters.map((c) => ({ id: c.id, name: c.name, amt: byLoc.get(c.id) ?? 0 })).filter((r) => r.amt > 0).sort((a, b) => b.amt - a.amt);
-  const stat = (locId: number, d: string) => {
-    const x = inds.find((i) => i.location_id === locId && i.for_date === d);
-    if (!x) return 'x';
-    if (x.outcome === 'missed') return 'm';
-    if (x.outcome === 'late' || x.late) return 'l';
-    if (x.outcome === 'on_time' || x.outcome === 'nothing') return 'o';
-    return 'x';
+  const html = useMemo(() => {
+    const today = istDate(0);
+    const dayTot = (d: string) => sales.filter((x) => x.business_date === d).reduce((a, x) => a + Number(x.amount), 0);
+    const S = days.map(dayTot); const hasSales = S.some((v) => v > 0);
+    const todayTot = S[6]; const lw = dayTot(istDate(-7)); const delta = lw > 0 && todayTot > 0 ? (todayTot - lw) / lw * 100 : null;
+    const wk = new Date().toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+    const owed = bills.reduce((a, b) => a + b.balance, 0); const overdue = bills.filter((b) => b.due_date && b.due_date < today).reduce((a, b) => a + b.balance, 0);
+    const due7 = bills.filter((b) => b.due_date && b.due_date >= today && b.due_date <= istDate(7)); const due7amt = due7.reduce((a, b) => a + b.balance, 0);
+    const stockVal = (loc?: number) => stock.filter((x) => (loc ? x.location_id === loc : true) && cost[x.item_id] != null && x.qty > 0).reduce((a, x) => a + x.qty * cost[x.item_id], 0);
+    const storeVal = stockVal(1);
+    const urgent = alerts.filter((a) => ['urgent', 'critical', 'sos'].includes(a.level)).length;
+    const openPos = pos.filter((p) => ['sent', 'partly_received'].includes(p.status)); const openVal = openPos.reduce((a, p) => a + p.po_lines.reduce((b, l) => b + Number(l.qty) * Number(l.unit_rate ?? 0), 0), 0);
+    const overdueHealth = (health ?? []).filter((h) => h.age_days >= 2);
+    const need = alerts.length + overdueHealth.length;
+
+    const stat = (id: number, d: string) => { const x = inds.find((i) => i.location_id === id && i.for_date === d); if (!x) return 'x'; if (x.outcome === 'missed') return 'm'; if (x.outcome === 'late' || x.late) return 'l'; if (x.outcome === 'on_time' || x.outcome === 'nothing') return 'o'; return 'x'; };
+    const dotRows = counters.map((c) => { const st = days.map((d) => stat(c.id, d)); const live = st.filter((x) => x !== 'x'); const pct = live.length ? Math.round(live.filter((x) => x === 'o').length / live.length * 100) : null; return { name: c.name, st, pct }; });
+    const allLive = dotRows.flatMap((r) => r.st).filter((x) => x !== 'x'); const counterScore = allLive.length ? Math.round(allLive.filter((x) => x === 'o').length / allLive.length * 100) : null;
+    const posDone = pos.length ? Math.round(pos.filter((p) => ['received', 'closed', 'complete'].includes(p.status)).length / pos.length * 100) : null;
+    const issDone = issues.length ? Math.round(issues.filter((x) => x === 'confirmed').length / issues.length * 100) : null;
+    const lab = (p: number | null): [string, string] => (p == null ? ['wait', 'Not scored yet'] : p < 65 ? ['crit', 'Critical'] : p < 80 ? ['att', 'Needs attention'] : ['ok', 'On track']);
+    const D: Dept[] = [
+      { name: 'Main store', score: issDone, sub: 'Issues confirmed by counters', rows: [['Issues confirmed by counters', '100%', issDone == null ? 'Waiting' : issDone + '%']] },
+      { name: 'Kitchen', score: null, sub: 'Needs production and wastage data', rows: [] },
+      { name: 'Service counters', score: counterScore, sub: 'Indents on time, last 7 days', rows: [['Indents on time', '100%', counterScore == null ? 'Waiting' : counterScore + '%']] },
+      { name: 'Purchase', score: null, sub: 'Needs order turnaround data', rows: [] },
+      { name: 'Receiving', score: posDone, sub: 'Orders received, last 14 days', rows: [['Orders received', '100%', posDone == null ? 'Waiting' : posDone + '%']] },
+      { name: 'Accounts', score: null, sub: 'Needs bill approval data', rows: [] }];
+    (window as unknown as { __depts: Dept[] }).__depts = D;
+
+    const K: [string, string, string, string, Tag, number[] | null, string][] = [
+      ['Net sales', hasSales && todayTot > 0 ? inr(todayTot) : '—', delta != null ? `${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}% on last ${wk}` : '', delta == null ? '' : delta >= 0 ? 'up' : 'dn', hasSales ? 'part' : 'wait', hasSales ? S : null, hasSales ? 'Entered by hand for now' : 'Waiting for today\'s sales'],
+      ['Food cost', '—', '', '', 'wait', null, 'Needs sales and prices'],
+      ['Food cost %', '—', '', '', 'wait', null, 'Needs sales and prices'],
+      ['7 day average', '—', '', '', 'wait', null, 'Needs food cost'],
+      ['Contribution margin', '—', '', '', 'wait', null, 'Needs recipes and other costs'],
+      ['Stock value', storeVal > 0 ? lakh(storeVal) : '—', '', '', storeVal > 0 ? 'part' : 'wait', null, storeVal > 0 ? 'Only items that have a price' : 'Needs prices and stock'],
+      ['Vendor payables', lakh(owed), overdue > 0 ? `${inr(overdue)} overdue` : 'Nothing overdue', overdue > 0 ? 'dn' : 'up', 'live', null, ''],
+      ['Open alerts', String(alerts.length), urgent ? `${urgent} urgent` : '', urgent ? 'dn' : '', 'live', null, '']];
+    const kpis = K.map((k) => `<div class="card kpi"><div class="l"><span>${k[0]}</span>${chip(k[4])}</div><div class="v ${k[1] === '—' ? 'mut' : ''}">${k[1]}</div><div class="d" style="color:${col(k[3])}">${esc(k[2])}</div>${k[5] ? spark(k[5], col(k[3]) === 'var(--mut)' ? 'var(--acc)' : col(k[3])) : ''}${k[6] ? `<div class="need">${k[6]}</div>` : ''}</div>`).join('');
+    const bigA = [['Net sales so far', hasSales && todayTot > 0 ? inr(todayTot) : 'Waiting', delta != null ? `${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}% on last ${wk}` : 'Entered by hand for now', delta != null && delta < 0 ? 'dn' : ''], ['Food cost', 'Soon', 'Needs sales and prices', ''], ['Owed to vendors', lakh(owed), overdue > 0 ? `${inr(overdue)} overdue` : 'Nothing overdue', overdue > 0 ? 'dn' : ''], ['Open alerts', String(alerts.length), urgent ? `${urgent} urgent` : 'None urgent', urgent ? 'dn' : '']].map((x) => `<div><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="d ${x[3]}">${x[2]}</div></div>`).join('');
+    const depts = D.map((d, i) => { const [k, l] = lab(d.score); return `<div class="card dept" data-dept="${i}">${ring(d.score, d.score == null ? 'var(--line)' : d.score < 65 ? 'var(--bad)' : d.score < 80 ? 'var(--warn)' : 'var(--good)')}<div><div class="t">${d.name}</div><span class="chip ${k}" style="margin:4px 0 2px">${l}</span><div class="s">${d.sub}</div></div></div>`; }).join('');
+    // trend
+    const W = 520; const x = (i: number) => 34 + i * (W - 60) / 6; const mx = Math.max(...S, 1); const ys = (v: number) => 150 - (v / mx) * 110;
+    const area = S.map((v, i) => `${x(i)},${ys(v)}`).join(' ');
+    const dn = days.map((d) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' }));
+    const trend = `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--acc)" stop-opacity=".28"/><stop offset="1" stop-color="var(--acc)" stop-opacity="0"/></linearGradient></defs>` + [0, 1, 2, 3].map((i) => `<line x1="34" x2="${W - 26}" y1="${30 + i * 40}" y2="${30 + i * 40}" stroke="var(--line)"/>`).join('') + (hasSales ? `<polygon points="34,150 ${area} ${x(6)},150" fill="url(#g)"/><polyline points="${area}" fill="none" stroke="var(--acc)" stroke-width="3" stroke-linejoin="round"/>` : `<text x="${W / 2}" y="95" text-anchor="middle">Waiting for sales</text>`) + dn.map((d, i) => `<text x="${x(i)}" y="176" text-anchor="middle">${d}</text>`).join('') + `<text x="34" y="14">Sales ₹</text><text x="${W - 26}" y="14" text-anchor="end">Food cost %</text>`;
+    const tleg = `<span style="color:var(--acc);font-weight:700">■</span> Net sales &nbsp; <span style="color:var(--acc2);font-weight:700">●</span> Food cost % (coming soon). Today is provisional.`;
+    // counter sales
+    const byLoc = new Map(sales.filter((x2) => x2.business_date === today).map((r) => [r.location_id, Number(r.amount)]));
+    const rows = counters.map((c) => [c.name, byLoc.get(c.id) ?? 0] as [string, number]).sort((a, b) => b[1] - a[1]); const tot = rows.reduce((a, r) => a + r[1], 0);
+    const cs = `<tr><th>Counter</th><th class="r">Sales</th><th>Share</th><th class="r">Food cost</th></tr>` + rows.map((c) => `<tr><td>${esc(c[0])}</td><td class="r num">${inr(c[1])}</td><td><div class="sb"><i style="width:${tot ? c[1] / tot * 100 : 0}%"></i></div></td><td class="r num">—</td></tr>`).join('') + `<tr><td><b>All counters</b></td><td class="r num"><b>${inr(tot)}</b></td><td></td><td class="r num">—</td></tr>`;
+    const dots = dotRows.map((c) => `<div class="dr"><span class="n">${esc(c.name)}</span><span class="dd">${c.st.map((ch, i) => `<i class="${ch}" title="${days[i]}: ${ch === 'o' ? 'On time' : ch === 'l' ? 'Late' : ch === 'm' ? 'Missed' : 'No indent'}"></i>`).join('')}</span><span class="p" style="color:${c.pct == null ? 'var(--mut)' : c.pct < 70 ? 'var(--bad)' : c.pct < 90 ? 'var(--warn)' : 'var(--good)'}">${c.pct == null ? '' : c.pct + '%'}</span></div>`).join('');
+    const money = ([['Store stock', storeVal > 0 ? lakh(storeVal) : '—', storeVal > 0 ? 'Only items that have a price' : 'Needs prices and stock', storeVal > 0 ? 'part' : 'wait'], ['Counter stock', '—', 'Needs counters to count', 'wait'], ['Open purchase orders', lakh(openVal), `${openPos.length} orders. Not yet an expense`, 'live'], ['Due in 7 days', inr(due7amt), `${due7.length} bills`, 'live'], ['Wastage today', '—', 'Needs wastage entries', 'wait']] as [string, string, string, Tag][]).map((m) => `<div class="card"><div class="sm mut" style="display:flex;justify-content:space-between">${m[0]}${chip(m[3])}</div><div class="v">${m[1]}</div><div class="sm mut">${m[2]}</div></div>`).join('');
+    const AL = [
+      ...overdueHealth.map((h) => ({ id: '', cls: 'm', t: `Store has not fixed: ${h.title.toLowerCase()}`, b: `Open ${h.age_days + 1} days.` })),
+      ...alerts.map((a) => ({ id: a.id, cls: ['urgent', 'critical', 'sos'].includes(a.level) ? 'c' : 'm', t: a.title, b: a.body ?? '' }))];
+    const al = AL.length ? AL.map((a) => `<div class="al ${a.cls === 'm' ? 'm' : ''}"><span class="sev"></span><div><b>${esc(a.t)}</b><div class="sm mut">${esc(a.b)}</div></div><div class="go">${a.id ? `<button class="btn p" data-done="${a.id}">Mark done</button>` : ''}</div></div>`).join('') : '<div class="sm mut">Nothing is waiting for you.</div>';
+    const head = need ? `${hasSales && delta != null ? (delta >= 0 ? 'Sales are up' : 'Sales are down') + ', and ' : ''}${need} ${need === 1 ? 'thing needs' : 'things need'} you now.` : 'Nothing needs you right now.';
+    return { kpis, bigA, depts, trend, tleg, cs, dots, money, al, head, dim: tot === 0, hasTot: tot > 0 };
+  }, [sales, inds, bills, alerts, stock, cost, pos, issues, counters, days, health]);
+
+  const when = new Date().toLocaleString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+  const onClick = (e: React.MouseEvent) => {
+    const t = e.target as HTMLElement;
+    const dep = t.closest('[data-dept]') as HTMLElement | null;
+    if (dep) { const d = ((window as unknown as { __depts: Dept[] }).__depts)[Number(dep.dataset.dept)]; setSheet({ title: `${d.name}, how the score is made`, html: d.rows.length ? `<table><tr><th>Measure</th><th class="r">Target</th><th class="r">Result</th></tr>${d.rows.map((r) => `<tr><td>${r[0]}</td><td class="r">${r[1]}</td><td class="r">${r[2]}</td></tr>`).join('')}</table><p class="sm mut" style="margin-top:10px">Only delays this department caused count against it. More measures and reasons follow as the data comes in.</p>` : `<p class="sm mut">${d.sub}. This score starts once that data is coming in.</p>` }); return; }
+    const done = t.closest('[data-done]') as HTMLElement | null;
+    if (done) void supabase.rpc('finish_alert', { p_id: done.dataset.done }).then(() => loadAlerts());
   };
-  const overdue = (health ?? []).filter((h) => h.age_days >= 2);
-  const need = overdue.length + (todo.reopen ? 1 : 0) + (todo.sosAsk ? 1 : 0) + (todo.flagged ? 1 : 0);
-  const first = profile?.full_name?.split(' ')[0] ?? '';
-  const hour = new Date().getHours();
-  const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const Line = ({ to, label, n, bad }: { to: string; label: string; n: string | number; bad?: boolean }) => (
-    <Link to={to} className="row needrow" style={{ justifyContent: 'space-between', color: 'inherit', textDecoration: 'none', padding: '8px 10px', margin: '0 -10px', borderRadius: 10 }}>
-      <span>{label}</span><span className="row" style={{ gap: 6 }}><span className={'chip ' + (bad ? 'late' : 'done')}>{n}</span><span aria-hidden className="muted">›</span></span>
-    </Link>
-  );
 
   return (
-    <>
-      <section className="hero2">
-        <p className="small muted">Single Teas, Bilekahalli · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-        <h1>{greet}{first ? `, ${first}` : ''}. {need ? `${need} ${need === 1 ? 'thing needs' : 'things need'} you now.` : 'Nothing needs you right now.'}</h1>
-        <div className="big4">
-          <div><span className="l">Net sales today</span><span className="v">{total > 0 ? money(total) : 'Waiting'}</span><span className={'d' + (delta != null && delta < 0 ? ' dn' : '')}>{delta != null ? `${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}% on last ${new Date().toLocaleDateString('en-IN', { weekday: 'long' })}` : 'Entered by hand for now'}</span></div>
-          <div><span className="l">Food cost</span><span className="v muted">Coming soon</span><span className="d" style={{ color: 'var(--ink-3)' }}>Needs sales and prices</span></div>
-          <div><span className="l">Owed to vendors</span><span className="v">{lakh(owed)}</span><span className="d" style={{ color: 'var(--ink-3)' }}><Link to="/bills" style={{ color: 'inherit' }}>Open bills</Link></span></div>
-          <div><span className="l">Open alerts</span><span className={'v'}>{alerts}</span><span className="d" style={{ color: 'var(--ink-3)' }}>Shown below</span></div>
-        </div>
-      </section>
-
-      <AlertsPanel />
-
-      <div className="dash2o">
-        <section className="card" style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
-          <div className="row" style={{ justifyContent: 'space-between' }}><h2>Sales by counter, today</h2><TagChip t={rowsSales.length ? 'part' : 'wait'} /></div>
-          {rowsSales.length === 0 ? <p className="small muted">Waiting for today's sales to be entered. Counters will show here, with their share of the day.</p> : (
-            <table className="mini"><thead><tr><th>Counter</th><th className="r">Sales</th><th>Share</th></tr></thead><tbody>
-              {rowsSales.map((r) => <tr key={r.id}><td>{r.name}</td><td className="r num">{money(r.amt)}</td><td><div className="sb"><i style={{ width: `${Math.round((r.amt / total) * 100)}%` }} /></div></td></tr>)}
-            </tbody></table>)}
-          <p className="small muted">Food cost per counter comes later, once sales and prices are both in.</p>
-        </section>
-
-        <section className="card" style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
-          <div className="row" style={{ justifyContent: 'space-between' }}><h2>Money</h2><TagChip t="live" /></div>
-          <Line to="/bills" label="Owed to vendors" n={lakh(owed)} bad={owed > 0} />
-          <Line to="/receive" label="Orders waiting to be received" n={flow.pos_waiting} bad={flow.pos_waiting > 0} />
-          <Line to="/issue" label="Issues not yet confirmed by counters" n={flow.issues_unconfirmed} bad={flow.issues_unconfirmed > 0} />
-          <Line to="/buying-setup" label="Items with a price" n={`${priced.n} of ${priced.total}`} bad={priced.n < priced.total} />
-        </section>
+    <div className="te" onClick={onClick}>
+      <section className="hero a"><div className="sub">Single Teas, Bilekahalli · {when}</div><h1>{html.head}</h1><div className="big4" dangerouslySetInnerHTML={{ __html: html.bigA }} /></section>
+      <div className="sec kpisec"><h2>Key numbers</h2><div className="grid kpis" dangerouslySetInnerHTML={{ __html: html.kpis }} /></div>
+      <div className="sec"><h2>Departments</h2><div className="grid depts" dangerouslySetInnerHTML={{ __html: html.depts }} /></div>
+      <div className="sec grid two">
+        <div className="card"><div style={{ display: 'flex', justifyContent: 'space-between' }}><h2>Sales and food cost, last 7 days</h2><span className="chip part">Partial</span></div><svg className="chart" viewBox="0 0 520 190" width="100%" dangerouslySetInnerHTML={{ __html: html.trend }} /><div className="sm mut" dangerouslySetInnerHTML={{ __html: html.tleg }} /></div>
+        <div className="card"><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h2>Sales by counter, today</h2><span className={'chip ' + (html.hasTot ? 'part' : 'wait')}>{html.hasTot ? 'Partial' : 'Waiting'}</span></div><table className={'cs' + (html.dim ? ' dim' : '')} dangerouslySetInnerHTML={{ __html: html.cs }} /><div className="sm mut" style={{ marginTop: 8 }}>Food cost % per counter needs recipes and prices, so it shows a dash for now.</div></div>
       </div>
-
-      <section className="card" style={{ display: 'grid', gap: 6 }}>
-        <div className="row" style={{ justifyContent: 'space-between' }}><h2>Who raised their indent on time</h2><span className="small muted">Last 7 days, oldest to latest</span></div>
-        <div className="dots2">
-          {counters.map((c) => {
-            const st = days.map((d) => stat(c.id, d)); const live = st.filter((x) => x !== 'x'); const pct = live.length ? Math.round((live.filter((x) => x === 'o').length / live.length) * 100) : null;
-            return <div className="dr2" key={c.id}><span className="n">{c.name}</span><span className="dd2">{st.map((x, i) => <i key={i} className={x} title={`${days[i]}: ${x === 'o' ? 'On time' : x === 'l' ? 'Late' : x === 'm' ? 'Missed' : 'No indent'}`} />)}</span><span className="p">{pct == null ? '' : pct + '%'}</span></div>;
-          })}
-        </div>
-        <div className="lg2"><span><i className="o" /> On time</span><span><i className="l" /> Late</span><span><i className="m" /> Missed</span><span><i className="x" /> No indent</span></div>
-      </section>
-
-      <section className="card" style={{ display: 'grid', gap: 6 }}>
-        <h2>Needs you now</h2>
-        {need === 0 && <p className="small muted">Nothing is waiting for you.</p>}
-        {overdue.map((h) => <Line key={h.key} to={h.route} label={`Store has not fixed: ${h.title.toLowerCase()}`} n={`Day ${h.age_days + 1}`} bad />)}
-        {todo.reopen > 0 && <Line to="/indents" label="Indents waiting for you to open" n={todo.reopen} bad />}
-        {todo.sosAsk > 0 && <Line to="/sos" label="Counters asking for one more SOS" n={todo.sosAsk} bad />}
-        {todo.flagged > 0 && <Line to="/bills" label="Bills waiting for a check" n={todo.flagged} bad />}
-        {todo.noClose > 0 && <Line to="/counts" label="Counters with no closing count last night" n={todo.noClose} bad />}
-      </section>
-
-      <section className="card" style={{ display: 'grid', gap: 8 }}>
-        <h2>How much of this is real data</h2>
-        <div className="rd2">
-          {([['Indents, issues, receiving, SOS, closing counts', 'live'], ['Vendor bills and what is owed', 'live'], ['Prices (price book is being filled)', 'part'], ['Daily sales (entered by hand)', 'part'], ['Sales by counter from the POS', 'wait'], ['Food cost and recipe costing', 'wait']] as [string, Tag][]).map(([l, t]) => <div key={l} className="row" style={{ justifyContent: 'space-between' }}><span>{l}</span><TagChip t={t} /></div>)}
-        </div>
-      </section>
-    </>
+      <div className="sec"><div className="card"><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h2>Who raised their indent on time</h2><span className="sm mut">Last 7 days, oldest to latest</span></div><div className="dots" dangerouslySetInnerHTML={{ __html: html.dots }} /><div className="lg"><span><i style={{ background: 'var(--good)' }} />On time</span><span><i style={{ background: 'var(--warn)' }} />Late</span><span><i style={{ background: 'var(--bad)' }} />Missed</span><span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--line)' }} />No indent</span></div></div></div>
+      <div className="sec"><h2>Money</h2><div className="grid money" dangerouslySetInnerHTML={{ __html: html.money }} /></div>
+      <div className="sec"><div className="card"><h2>Needs you now</h2><div dangerouslySetInnerHTML={{ __html: html.al }} /></div></div>
+      <div className="sec"><div className="card"><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h2>How much of this is real data</h2><button className="btn" onClick={() => setSheet({ title: 'Data readiness', html: `<table>${[['live', 'Indents, Store issues, Receive, SOS, closing counts, bills, alerts'], ['part', 'Daily sales (by hand), stock value (items with a price), prices'], ['wait', 'Food cost, contribution margin, wastage, counter stock, sales by counter from the POS']].map((r) => `<tr><td>${chip(r[0] as Tag)}</td><td>${r[1]}</td></tr>`).join('')}</table>` })}>See the list</button></div><div className="rd"><i style={{ width: '39%', background: 'var(--good)' }} /><i style={{ width: '26%', background: 'var(--warn)' }} /><i style={{ width: '35%', background: 'var(--line)' }} /></div><div className="sm mut">Green is live, amber is partly there, grey is still waiting.</div></div></div>
+      {sheet && <div className="back on" onClick={(e) => { if (e.target === e.currentTarget) setSheet(null); }}><div className="sheet"><div style={{ display: 'flex', justifyContent: 'space-between' }}><h2>{sheet.title}</h2><button className="btn" onClick={() => setSheet(null)}>Close</button></div><div dangerouslySetInnerHTML={{ __html: sheet.html }} /></div></div>}
+      <span hidden>{profile?.id}</span>
+    </div>
   );
 }
