@@ -63,6 +63,7 @@ export function IndentPage() {
 
   const [lpg, setLpg] = useState<{ gas_left_kg: number | null; in_use: number; issued_today: boolean } | null>(null);
   useEffect(() => { if (locId == null) return; supabase.rpc('lpg_status', { p_location: locId }).then(({ data }) => setLpg((data as typeof lpg) ?? null)); }, [locId]);
+  const lpgNote = lpg?.gas_left_kg != null ? t('About {n} kg of gas left in your cylinder.', { n: String(lpg.gas_left_kg) }) : lpg?.issued_today ? t('A cylinder was already issued to you today.') : undefined;
   const label = useCallback((i: DeptItem) => (local && lang && i.local_names?.[lang]) || i.name, [local, lang]);
   void hi;
 
@@ -242,11 +243,9 @@ export function IndentPage() {
             <>
               {visible.length === 0 ? <p className="empty card">{view.kind === 'search' ? t('No item with that name on your counter.') : t('Nothing here yet.')}</p> : (
                 <div className="stack">
-                  {visible.map((i) => i.id === 658 ? (
-                    <LpgRow key={i.id} name={label(i)} on={(lines[i.id]?.qty ?? 0) > 0} lpg={lpg} onChange={(on) => setQty(i, on ? 1 : 0)} />
-                  ) : (
+                  {visible.map((i) => (
                     <ItemRow key={i.id} item={i} name={label(i)} line={lines[i.id]} usual={usual[i.id]} flag={flagged(i, lines[i.id])} night={lastNight?.[i.id]}
-                      onQty={(n) => setQty(i, n)} onReason={(r) => lines[i.id] && save(i, { qty: lines[i.id].qty, reason: r })} reasonList={moreReasons} />
+                      extra={i.id === 658 ? lpgNote : undefined} onQty={(n) => setQty(i, n)} onReason={(r) => lines[i.id] && save(i, { qty: lines[i.id].qty, reason: r })} reasonList={moreReasons} />
                   ))}
                 </div>
               )}
@@ -295,23 +294,8 @@ export function IndentPage() {
   );
 }
 
-function LpgRow({ name, on, lpg, onChange }: { name: string; on: boolean; lpg: { gas_left_kg: number | null; in_use: number; issued_today: boolean } | null; onChange: (on: boolean) => void }) {
-  const { t } = useLang();
-  return (
-    <div className={'irow' + (on ? ' has' : '')}>
-      <div className="irow-top">
-        <div className="pic">{name.slice(0, 1)}</div>
-        <div className="irow-name"><b>{name}</b>
-          <div className="small muted">{lpg?.gas_left_kg != null ? t('About {n} kg of gas left in your cylinder.', { n: String(lpg.gas_left_kg) }) : t('One full cylinder, issued by the store.')}</div>
-          {lpg?.issued_today && <div className="small" style={{ color: '#2F7D4F' }}>{t('A cylinder was already issued to you today.')}</div>}</div>
-        <button className={'btn ' + (on ? 'primary' : 'secondary')} aria-pressed={on} onClick={() => onChange(!on)}>{on ? t('Requested') : t('Request 1 cylinder')}</button>
-      </div>
-    </div>
-  );
-}
-
-function ItemRow({ item, name, line, usual, flag, night, onQty, onReason, reasonList }: {
-  item: DeptItem; name: string; line?: Line; usual?: Usual; flag: boolean; night?: { qty: number; issued: number }; onQty: (n: number) => void; onReason: (r: string) => void; reasonList: string[];
+function ItemRow({ item, name, line, usual, flag, night, extra, onQty, onReason, reasonList }: {
+  extra?: string; item: DeptItem; name: string; line?: Line; usual?: Usual; flag: boolean; night?: { qty: number; issued: number }; onQty: (n: number) => void; onReason: (r: string) => void; reasonList: string[];
 }) {
   const { t, unit: u } = useLang();
   const step = stepOf(item);
@@ -343,6 +327,7 @@ function ItemRow({ item, name, line, usual, flag, night, onQty, onReason, reason
           {usual.runs >= 2 ? t('Usual {q}', { q: fmtQty(usual.usual, item.unit).replace(item.unit, u(item.unit)) }) : t('Last {q}', { q: fmtQty(usual.last_qty, item.unit).replace(item.unit, u(item.unit)) })}</button>}
         {cur > 0 && <button className="qchip" style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, color: '#B3261E' }} onClick={() => { setTyping(false); onQty(0); }} aria-label={`${t('Clear')} ${name}`}><Icon name="trash" size={14} />{t('Clear')}</button>}
       </div>
+      {extra && <p className="small muted" style={{ margin: '6px 0 0' }}>{extra}</p>}
       {night && <p className="small" style={{ margin: '6px 0 0', color: 'var(--muted, #5C6B63)' }}>{t('Last night you counted')} <b>{fmtQty(night.qty, item.unit).replace(item.unit, u(item.unit))}</b>{night.issued > 0 ? ` · ${t('store issued')} ${fmtQty(night.issued, item.unit).replace(item.unit, u(item.unit))}` : ''}.{night.qty > 0 && (line?.qty ?? 0) > 0 && usual && usual.usual > 0 && night.qty + night.issued >= usual.usual ? <b style={{ color: '#B3541E' }}> {t('That may already be enough. Check before you order.')}</b> : null}</p>}
       {flag && <Reasons value={line?.reason ?? ''} onPick={onReason} list={reasonList} />}
     </div>

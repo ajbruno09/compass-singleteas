@@ -96,7 +96,7 @@ export function Issue() {
         <thead><tr><th>Item</th><th className="r">Asked</th><th className="r">In store</th><th className="r" style={{ width: 130 }}>Issue now</th></tr></thead>
         <tbody>{ids.map((id) => { const it = items[id]; const f = packFactor(it); const have = store[id] ?? 0; const want = Number(vals[id] ?? 0) * (f || 1); const short = want > have; const show = (n: number) => (f ? `${Math.round((n / f) * 10) / 10} ${it.show_as}` : fmtQty(n, it.unit));
           if (id === 658) return <tr key={id}><td><b>{it.name}</b> <span className="muted small">cylinder</span></td>
-            <td className="r num">{asked[id] != null ? '1 cylinder' : <span className="muted small">extra</span>}</td>
+            <td className="r num">{asked[id] != null ? show(asked[id]) : <span className="muted small">extra</span>}</td>
             <td className="r" colSpan={2}>{lpgDone ? <span className="chip done">Cylinder issued today</span> : <Link className="btn secondary" to="/gas">Issue on the Gas screen</Link>}</td></tr>;
           return <tr key={id}><td><b>{it.name}</b> <span className="muted small">{f ? it.show_as : it.unit}</span></td>
             <td className="r num">{asked[id] != null ? show(asked[id]) : <span className="muted small">extra</span>}</td>
