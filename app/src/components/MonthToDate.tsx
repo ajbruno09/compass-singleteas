@@ -74,7 +74,11 @@ export function MonthToDate() {
   const gapCol = ok ? 'var(--good)' : 'var(--bad)';
   const grid = Array.from({ length: mx / 200000 + 1 }, (_, i) => 200000 * i).map((v) => <g key={v}><line x1={l} x2={W - r} y1={Y(v)} y2={Y(v)} stroke="var(--line)" /><text x={l - 6} y={Y(v) + 3} textAnchor="end">{v ? lk(v) : 0}</text></g>);
 
-  const fl = [...m.costs].map((x) => [x.name, eff(x) * c.done / c.dim] as [string, number]).sort((a, b2) => b2[1] - a[1]);
+  // Staff costs are grouped into one line each, as in the approved mock. Everything else is listed on its own.
+  const GROUP: Record<string, string> = { Salaries: 'Salaries, all staff', 'Staff living': 'Staff accommodation and living' };
+  const flMap = new Map<string, number>();
+  for (const x of m.costs) { const k = GROUP[x.section] ?? x.name; flMap.set(k, (flMap.get(k) ?? 0) + eff(x) * c.done / c.dim); }
+  const fl = [...flMap.entries()].sort((a, b2) => b2[1] - a[1]);
   const pctOf = (v: number) => (c.sales > 0 ? (v / c.sales * 100).toFixed(1) + '%' : '—');
   const tiles: [string, string, string, string][] = [
     ['MTD sales', inr(c.sales), noData ? 'No sales report yet' : `${c.openDays} open days. Average ${inr(c.avgOpen)} a day`, ''],
