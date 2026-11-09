@@ -10,13 +10,14 @@ import { StatusStrip } from '../components/StatusStrip';
 import { AvatarButton } from '../components/AvatarButton';
 import { NoticeStack } from '../components/NoticeStack';
 import { getCounter } from '../components/StaffNav';
+import { MyCounter } from '../components/MyCounter';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 interface Week { weekly_off: number | null; shift_start: string | null; shift_end: string | null }
 
 // First screen for every staff member. Order follows the approved mock:
-// message board, my week, to do, coming soon, get to work.
+// message board, to do, my week, then My Compass opened up (sales, placeholders, cost to the cafe, record).
 export function StaffHome() {
   const { profile, myLocations, party, signOut } = useSession();
   const nav = useNavigate();
@@ -112,9 +113,6 @@ export function StaffHome() {
       <div className="hsec">Message board</div>
       <NoticeStack />
 
-      <div className="hsec">My week</div>
-      <WeekCard week={week} place={myLocations.length === 1 ? (cur?.name ?? '') : ''} />
-
       <div className="hsec">To do</div>
       {myLocations.length === 0 && <p className="banner warn">No counter has been given to you yet. Please tell Admin, so they can set it up.</p>}
       {myLocations.length > 1 ? (() => {
@@ -167,9 +165,20 @@ export function StaffHome() {
       </div>
       )}
 
+      {gasDuty && (
+        <button className="countercard" style={{ minHeight: 0, padding: '10px 14px' }} onClick={() => nav('/gas')}>
+          <Icon name="box" size={22} stroke={1.6} /><span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block', fontSize: 15 }}>Weigh gas</span><span className="small muted">Cylinders tonight</span></span>
+        </button>
+      )}
+
+      <div className="hsec">My week</div>
+      <WeekCard week={week} place={myLocations.length === 1 ? (cur?.name ?? '') : ''} />
+
+      <MyCounter counters={myLocations.length > 3 ? 'your counters' : myLocations.map((l) => l.name).join(' and ')} />
+
       {myLocations.length > 0 && (
         <div className="card">
-          <b>Your record, last 30 days</b>
+          <b style={{ fontWeight: 500 }}>Your record, last 30 days</b>
           <div className="row" style={{ gap: 16, marginTop: 6, flexWrap: 'wrap' }}>
             <span><b className="num">{rec.on_time}</b> <span className="muted small">indents on time</span></span>
             <span><b className="num" style={{ color: rec.late ? 'var(--bad)' : undefined }}>{rec.late}</b> <span className="muted small">late</span></span>
@@ -178,25 +187,7 @@ export function StaffHome() {
           </div>
         </div>
       )}
-
-      <div className="hsec">Coming soon</div>
-      {[['target', 'Your targets', 'Coming soon. Look out for your targets here.'], ['coin', 'Your incentives', 'Coming soon. Look out for your incentives here.'], ['trenddown', 'Food cost control', 'Coming soon. See how we are doing on wastage and cost.']].map(([e, h, b]) => (
-        <div key={h} className="soonbox"><div style={{ color: 'var(--brand)', display: 'grid', placeItems: 'center', marginBottom: 2 }}><Icon name={e} size={26} stroke={1.6} /></div><b>{h}</b><div className="small muted">{b}</div></div>
-      ))}
-
-      <div className="hsec">Get to work</div>
-      <div className="tiles2">
-        <button className="tile2" onClick={() => nav(`/indent?loc=${loc}`)}><span className="i"><Icon name="note" size={26} /></span><b>Indent</b><span className="small muted">Order for tomorrow</span></button>
-        <button className="tile2" onClick={() => nav('/closing')}><span className="i"><Icon name="calbars" size={26} /></span><b>Closing stock</b><span className="small muted">Daily or weekly</span></button>
-        <button className="tile2" onClick={() => window.dispatchEvent(new Event('compass:sos'))}><span className="i"><Icon name="siren2" size={26} /></span><b>SOS</b><span className="small muted">Need something now</span></button>
-        {myLocations.some((l) => l.code === 'snacks_production') && <button className="tile2" onClick={() => nav('/production')}><span className="i"><Icon name="box" size={26} /></span><b>Production</b><span className="small muted">Today's snacks</span></button>}
-        {gasDuty && <button className="tile2" onClick={() => nav('/gas')}><span className="i"><Icon name="box" size={26} /></span><b>Weigh gas</b><span className="small muted">Cylinders tonight</span></button>}
-        <button className="tile2" onClick={() => nav('/messages')}><span className="i"><Icon name="chat" size={26} /></span><b>Messages</b><span className="small muted">Older notices</span></button>
-      </div>
-      <button className="countercard" onClick={() => nav('/mine')}>
-        <Icon name="scale" size={34} stroke={1.6} />
-        <span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>My Compass</span><span className="small muted" style={{ fontWeight: 600 }}>My sales, targets and incentives</span></span>
-      </button>
+      <div style={{ height: 120 }} aria-hidden />
     </div>
   );
 }

@@ -227,6 +227,7 @@ export function IndentPage() {
       {pickLocs.length > 1 && (
         <div className="cpills" role="group" aria-label="Counter">
           {pickLocs.map((l) => <button key={l.id} aria-pressed={l.id === locId} onClick={() => setSp({ loc: String(l.id) })}>{party && l.id === party.loc.id ? `${t('Party')}: ${party.label}` : l.name}</button>)}
+          {myLocations.some((l) => l.code === 'snacks_production') && <button aria-pressed={false} onClick={() => nav('/production')}>Production</button>}
         </div>
       )}
 
