@@ -4,10 +4,10 @@ import { useSession } from '../lib/session';
 import { errText, qty as fmtQty } from '../lib/format';
 import { useToast } from '../components/Toast';
 import type { Group } from '../lib/types';
+import '../mock-levels.css';
 
 interface Item { id: number; name: string; unit: string; group_id: number | null }
-const FILTERS = [['all', 'All items'], ['na', 'Not set'], ['low', 'Low'], ['neg', 'Below zero'], ['ok', 'OK']] as const;
-type F = typeof FILTERS[number][0];
+type F = 'all' | 'na' | 'low' | 'neg' | 'ok';
 
 export function StoreLevels() {
   const { profile } = useSession();
@@ -18,7 +18,7 @@ export function StoreLevels() {
   const [hand, setHand] = useState<Map<number, number>>(new Map());
   const [par, setPar] = useState<Map<number, number>>(new Map());
   const [edits, setEdits] = useState<Record<number, string>>({});
-  const [filter, setFilter] = useState<F>('all');
+  const [flt, setFlt] = useState<F>('all');
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -37,11 +37,10 @@ export function StoreLevels() {
 
   const level = (id: number): number | null => { const e = edits[id]; if (e !== undefined) return e === '' || isNaN(Number(e)) ? null : Number(e); return par.get(id) ?? null; };
   const status = (i: Item): F => { const h = hand.get(i.id) ?? 0; const l = level(i.id); if (h < -0.0004) return 'neg'; if (l == null) return 'na'; return h < l ? 'low' : 'ok'; };
-  const counts = useMemo(() => { const c: Record<F, number> = { all: items.length, na: 0, low: 0, neg: 0, ok: 0 }; for (const i of items) c[status(i)]++; return c; }, [items, hand, par, edits]); // eslint-disable-line react-hooks/exhaustive-deps
-  const setCount = items.filter((i) => level(i.id) != null).length;
-  const rows = items.filter((i) => i.name.toLowerCase().includes(q.trim().toLowerCase()) && (filter === 'all' || status(i) === filter));
+  const cnt = useMemo(() => { const c: Record<F, number> = { all: items.length, na: 0, low: 0, neg: 0, ok: 0 }; for (const i of items) c[status(i)]++; return c; }, [items, hand, par, edits]); // eslint-disable-line react-hooks/exhaustive-deps
+  const setN = items.filter((i) => level(i.id) != null).length;
+  const ql = q.trim().toLowerCase();
   const changed = Object.keys(edits).length;
-
   const onEdit = (i: Item, raw: string) => {
     const v = raw.replace(/[^0-9.]/g, '');
     const same = v === (par.has(i.id) ? String(par.get(i.id)) : '');
@@ -55,41 +54,31 @@ export function StoreLevels() {
     if (error) { toast(errText(error)); return; }
     setEdits({}); toast(`Saved ${out.length} ${out.length === 1 ? 'level' : 'levels'}`); void load();
   }
-  const chip = (s: F) => s === 'ok' ? <span className="chip done">OK</span> : s === 'low' ? <span className="chip late">Low</span> : s === 'neg' ? <span className="chip flag">Below zero</span> : <span className="chip off">Not set</span>;
-
+  const F: [F, string][] = [['all', 'All items'], ['na', 'Not set'], ['low', 'Low'], ['neg', 'Below zero'], ['ok', 'OK']];
+  const chip = (s: F) => s === 'ok' ? ['sl-c-ok', 'OK'] : s === 'low' ? ['sl-c-low', 'Low'] : s === 'neg' ? ['sl-c-bad', 'Below zero'] : ['sl-c-na', 'Not set'];
+  const shelves = [...groups, { id: null as unknown as number, name: 'No shelf group yet', icon: '' } as Group];
+  let any = false;
+  const body = shelves.map((g) => {
+    const rows = items.filter((i) => (g.id == null ? !groups.some((x) => x.id === i.group_id) : i.group_id === g.id) && (!ql || i.name.toLowerCase().includes(ql)) && (flt === 'all' || status(i) === flt));
+    if (!rows.length) return null; any = true;
+    return (<tbody key={g.id ?? 'none'}>
+      <tr className="sl-grp"><td colSpan={4}>{g.name}</td></tr>
+      {rows.map((i) => { const h = hand.get(i.id) ?? 0; const e = edits[i.id]; const c = chip(status(i)); return (
+        <tr key={i.id}><td>{i.name}</td><td className={`sl-r sl-num ${h < -0.0004 ? 'sl-neg' : ''}`}>{fmtQty(h, i.unit)}</td>
+          <td className="sl-r">{can ? <input className={e !== undefined ? 'sl-ch' : ''} inputMode="decimal" placeholder="Not set" value={e !== undefined ? e : par.has(i.id) ? String(par.get(i.id)) : ''} onChange={(ev) => onEdit(i, ev.target.value)} /> : <span>{par.has(i.id) ? par.get(i.id) : ''}</span>}<span className="sl-u">{i.unit}</span></td>
+          <td className="sl-hide-s"><span className={`sl-chip ${c[0]}`}>{c[1]}</span></td></tr>); })}
+    </tbody>);
+  });
   return (
-    <div className="page">
-      <div className="pagehead"><div><p className="label">Items</p><h1>Store levels</h1><p className="muted small">How much of each item the Store should always keep. When the stock in hand falls below this, the item shows as Low. Counters keep their own usual levels on the item.</p></div></div>
-      <div className="card" style={{ display: 'grid', gap: 8 }}>
-        <div className="row" style={{ justifyContent: 'space-between' }}><span><b>{setCount} of {items.length}</b> items have a level</span><span className="muted small">{items.length - setCount} still to set</span></div>
-        <div style={{ height: 8, background: 'var(--sunken)', borderRadius: 99, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: `${items.length ? (setCount / items.length) * 100 : 0}%`, background: 'var(--brand)' }} /></div>
+    <div className="sl-root"><div className="sl-wrap">
+      <div><div className="sl-lab">Items</div><h1>Store levels</h1><div className="sl-sm sl-mut">How much of each item the Store should always keep. When the stock in hand falls below this, the item shows as Low. Counters keep their own usual levels on the item.</div></div>
+      <div className="sl-prog"><div className="sl-t"><span><b style={{ fontWeight: 600 }}>{setN} of {items.length}</b> items have a level</span><span className="sl-sm sl-mut">{items.length - setN} still to set</span></div><div className="sl-pb"><i style={{ width: `${items.length ? (setN / items.length) * 100 : 0}%` }} /></div></div>
+      <div className="sl-bar"><input type="search" placeholder="Find an item" value={q} onChange={(e) => setQ(e.target.value)} /><div className="sl-seg">{F.map(([k, l]) => <button key={k} className={k === flt ? 'sl-on' : ''} onClick={() => setFlt(k)}>{l}<span className="sl-n">{cnt[k]}</span></button>)}</div></div>
+      <div className="sl-card">{any || items.length === 0 ? null : null}
+        {(() => { const t = body.filter(Boolean); return t.length ? <table><thead><tr><th>Item</th><th className="sl-r">In hand</th><th className="sl-r">Level to keep</th><th className="sl-hide-s">Status</th></tr></thead>{body}</table> : <div className="sl-empty">Nothing to show with these filters.</div>; })()}
       </div>
-      <div className="row" style={{ gap: 8, margin: '14px 0 10px', flexWrap: 'wrap' }}>
-        <div className="seg">{FILTERS.map(([k, l]) => <button key={k} aria-pressed={filter === k} onClick={() => setFilter(k)}>{l} ({counts[k]})</button>)}</div>
-        <input placeholder="Find an item" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginLeft: 'auto', width: 220 }} />
-      </div>
-      {[...groups, { id: null as unknown as number, name: 'No shelf group yet', icon: '📦' } as Group].map((g) => {
-        const list = rows.filter((i) => (g.id == null ? !groups.some((x) => x.id === i.group_id) : i.group_id === g.id));
-        if (!list.length) return null;
-        return (
-          <div key={g.id ?? 'none'} style={{ marginBottom: 14 }}><h2 style={{ marginBottom: 8 }}>{g.icon} {g.name}</h2>
-            <div className="tablewrap"><table className="table"><thead><tr><th>Item</th><th className="r">In hand</th><th className="r">Level to keep</th><th>Status</th></tr></thead>
-              <tbody>{list.map((i) => { const h = hand.get(i.id) ?? 0; const e = edits[i.id]; return (
-                <tr key={i.id} style={e !== undefined ? { background: 'var(--warn-bg)' } : undefined}>
-                  <td>{i.name}</td>
-                  <td className="r num" style={{ color: h < -0.0004 ? 'var(--bad)' : undefined, fontWeight: h < -0.0004 ? 600 : 400 }}>{fmtQty(h, i.unit)}</td>
-                  <td className="r">{can ? <span className="row" style={{ gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap' }}><input className="num" inputMode="decimal" placeholder="Not set" style={{ width: 90, textAlign: 'right' }} value={e !== undefined ? e : par.has(i.id) ? String(par.get(i.id)) : ''} onChange={(ev) => onEdit(i, ev.target.value)} /><span className="muted small" style={{ width: 40, textAlign: 'left' }}>{i.unit}</span></span> : <span className="num">{par.has(i.id) ? fmtQty(par.get(i.id), i.unit) : '—'}</span>}</td>
-                  <td>{chip(status(i))}</td>
-                </tr>); })}</tbody></table></div></div>);
-      })}
-      {rows.length === 0 && <p className="empty card">Nothing to show with these filters.</p>}
-      {can && changed > 0 && (
-        <div className="stickybar" style={{ position: 'sticky', bottom: 12, display: 'flex', gap: 10, justifyContent: 'center', alignItems: 'center', background: 'var(--ink)', color: '#fff', borderRadius: 12, padding: '10px 14px', width: 'fit-content', margin: '14px auto 0' }}>
-          <span>{changed} {changed === 1 ? 'change' : 'changes'} not saved</span>
-          <button className="btn secondary" onClick={() => setEdits({})}>Discard</button>
-          <button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save changes'}</button>
-        </div>
-      )}
+    </div>
+    {can && changed > 0 && <div className="sl-save sl-on"><span>{changed} {changed === 1 ? 'change' : 'changes'} not saved</span><button className="sl-btn" onClick={() => setEdits({})}>Discard</button><button className="sl-btn sl-p" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save changes'}</button></div>}
     </div>
   );
 }

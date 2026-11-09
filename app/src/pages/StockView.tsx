@@ -1,17 +1,20 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { qty as fmtQty, packFactor } from '../lib/format';
 import type { Group } from '../lib/types';
+import '../mock-levels.css';
 
 interface Item { id: number; name: string; unit: string; group_id: number | null; show_as?: string | null; purchase_factor?: number | null }
 interface OnHand { location_id: number; item_id: number; qty: number }
-type V = 'in' | 'neg' | 'all';
+type V = 'stock' | 'neg' | 'all';
 const EPS = 0.0004;
+const icon = (s: string) => { try { return [...new (Intl as unknown as { Segmenter: new () => { segment: (x: string) => Iterable<{ segment: string }> } }).Segmenter().segment(s)][0]?.segment ?? s; } catch { return Array.from(s)[0] ?? s; } };
 
 export function StockView() {
   const { locations } = useSession();
+  const nav = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
   const [oh, setOh] = useState<OnHand[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -19,9 +22,9 @@ export function StockView() {
   const [links, setLinks] = useState<Set<string>>(new Set());
   const [pars, setPars] = useState<Map<number, number>>(new Map());
   const [q, setQ] = useState('');
-  const [view, setView] = useState<V>('in');
-  const [open, setOpen] = useState<Set<string>>(new Set());
-  const [openRow, setOpenRow] = useState<number | null>(null);
+  const [view, setView] = useState<V>('stock');
+  const [shut, setShut] = useState<Set<string>>(new Set());
+  const [openRow, setOpenRow] = useState<Set<number>>(new Set());
   useEffect(() => {
     supabase.from('items').select('id, name, unit, group_id, show_as, purchase_factor').eq('active', true).order('name').limit(2000).then(({ data }) => setItems((data as Item[]) ?? []));
     supabase.from('stock_on_hand').select('*').then(({ data }) => setOh((data as OnHand[]) ?? []));
@@ -43,59 +46,46 @@ export function StockView() {
   const nIn = scope.filter((i) => Math.abs(qtyOf.get(i.id) ?? 0) > EPS).length;
   const placeCount = (id: number) => { const s = new Set<number>(); for (const r of oh) if (r.location_id === id && Math.abs(Number(r.qty)) > EPS) s.add(r.item_id); return s.size; };
   const placeNeg = (id: number) => oh.some((r) => r.location_id === id && Number(r.qty) < -EPS);
-  const holding = new Set(oh.filter((r) => Math.abs(Number(r.qty)) > EPS).map((r) => r.location_id)).size;
-  const rows = scope.filter((i) => {
-    if (!i.name.toLowerCase().includes(q.trim().toLowerCase())) return false;
-    const v = qtyOf.get(i.id) ?? 0;
-    return view === 'all' || (view === 'neg' ? v < -EPS : Math.abs(v) > EPS);
-  });
-  const lowAt = (i: Item) => loc === 1 && pars.has(i.id) && (qtyOf.get(i.id) ?? 0) >= -EPS && (qtyOf.get(i.id) ?? 0) < (pars.get(i.id) ?? 0);
-  const nLow = loc === 1 ? scope.filter(lowAt).length : 0;
-  const tile = (n: number | string, l: string, on?: () => void, tone?: string) => (
-    <button className="card" onClick={on} style={{ textAlign: 'left', cursor: on ? 'pointer' : 'default', padding: '10px 14px' }}>
-      <div className="muted small">{l}</div><div className="num" style={{ fontSize: 22, fontWeight: 500, color: tone }}>{n}</div></button>);
-  const fmt = (i: Item, v: number) => (loc === 0 || loc === 1) && packFactor(i) ? <>{Math.round((v / packFactor(i)) * 10) / 10} {i.show_as}<span className="muted small"> ({fmtQty(v, i.unit)})</span></> : fmtQty(v, i.unit);
+  const placesHolding = new Set(oh.filter((r) => Math.abs(Number(r.qty)) > EPS).map((r) => r.location_id)).size;
+  const active = locations.filter((l) => l.active);
+  const ql = q.trim().toLowerCase();
+  const fmt = (i: Item, v: number) => (loc === 0 || loc === 1) && packFactor(i) ? `${Math.round((v / packFactor(i)) * 10) / 10} ${i.show_as} (${fmtQty(v, i.unit)})` : fmtQty(v, i.unit);
   const shelves = [...groups, { id: null as unknown as number, name: 'No shelf group yet', icon: '📦' } as Group];
+  const groupRows = shelves.map((g) => ({ g, rows: scope.filter((i) => (g.id == null ? !groups.some((x) => x.id === i.group_id) : i.group_id === g.id) && (!ql || i.name.toLowerCase().includes(ql)) && (view === 'neg' ? (qtyOf.get(i.id) ?? 0) < -EPS : view === 'stock' ? Math.abs(qtyOf.get(i.id) ?? 0) > EPS : true)) })).filter((x) => x.rows.length);
+  const anyOpen = groupRows.some((x) => !shut.has(String(x.g.id ?? 'none')));
+  const lowAt = (i: Item) => loc === 1 && pars.has(i.id) && (qtyOf.get(i.id) ?? 0) >= -EPS && (qtyOf.get(i.id) ?? 0) < (pars.get(i.id) ?? 0);
+  const tog = <T,>(s: Set<T>, k: T) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; };
 
   return (
-    <div className="page">
-      <div className="pagehead"><div><p className="label">Store</p><h1>Stock in hand</h1><p className="muted small" style={{ marginTop: 2 }}>What the system believes is at each place right now.</p></div></div>
-      <div className="seg" role="group" aria-label="Place">
-        <button aria-pressed={loc === 0} onClick={() => setLoc(0)}>All places</button>
-        {locations.filter((l) => l.active).map((l) => <button key={l.id} aria-pressed={loc === l.id} onClick={() => setLoc(l.id)}>{l.name} <span style={{ opacity: .65 }}>{placeCount(l.id)}</span>{placeNeg(l.id) && <i style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 9, background: 'var(--bad)', marginLeft: 5 }} />}</button>)}
+    <div className="sx-root"><div className="sx-wrap">
+      <div className="sx-top"><div><div className="sx-lab">Store</div><h1>Stock in hand</h1><div className="sx-sm sx-mut">What the system believes is at each place right now.</div></div></div>
+      <div className="sx-places">
+        <button className={`sx-pl ${loc === 0 ? 'sx-on' : ''}`} onClick={() => setLoc(0)}>All places</button>
+        {active.map((l) => <button key={l.id} className={`sx-pl ${loc === l.id ? 'sx-on' : ''}`} onClick={() => setLoc(l.id)}>{l.name}<span className="sx-n">{placeCount(l.id)}</span>{placeNeg(l.id) && <span className="sx-dot" />}</button>)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, margin: '12px 0' }}>
-        {tile(nIn, 'Items in hand', () => setView('in'))}
-        {tile(nNeg, 'Below zero', nNeg ? () => setView('neg') : undefined, nNeg ? 'var(--bad)' : undefined)}
-        {loc === 1 ? tile(nLow, 'Low against Store levels') : tile(holding, 'Places holding stock')}
+      <div className="sx-tiles">
+        <div className="sx-tile"><div className="sx-l">Items in hand</div><div className="sx-v sx-num">{nIn}</div><div className="sx-d">in {groupRows.length} groups</div></div>
+        <button className="sx-tile sx-bad sx-btn" onClick={() => setView('neg')}><div className="sx-l">Below zero</div><div className="sx-v sx-num">{nNeg}</div><div className="sx-d">Tap to see them. These need a count.</div></button>
+        <div className="sx-tile"><div className="sx-l">Places holding stock</div><div className="sx-v sx-num">{placesHolding}</div><div className="sx-d">Store and {Math.max(placesHolding - 1, 0)} counters</div></div>
       </div>
-      <div className="row" style={{ gap: 8, margin: '0 0 10px', flexWrap: 'wrap' }}>
-        <div className="seg"><button aria-pressed={view === 'in'} onClick={() => setView('in')}>In stock ({nIn})</button><button aria-pressed={view === 'neg'} onClick={() => setView('neg')}>Below zero ({nNeg})</button><button aria-pressed={view === 'all'} onClick={() => setView('all')}>Everything ({scope.length})</button></div>
-        <input placeholder="Find an item" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginLeft: 'auto', width: 220 }} />
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(340px,1fr))', gap: 12, alignItems: 'start' }}>
-        {shelves.map((g) => {
-          const list = rows.filter((i) => (g.id == null ? !groups.some((x) => x.id === i.group_id) : i.group_id === g.id));
-          if (!list.length) return null;
-          const key = String(g.id ?? 'none'); const closed = open.has(key); const gneg = list.filter((i) => (qtyOf.get(i.id) ?? 0) < -EPS).length;
+      <div className="sx-bar"><input type="search" placeholder="Find an item" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="sx-seg">{([['stock', 'In stock'], ['neg', 'Below zero'], ['all', 'Everything']] as [V, string][]).map(([k, l]) => <button key={k} className={view === k ? 'sx-on' : ''} onClick={() => setView(k)}>{l}</button>)}</div>
+        <span className="sx-sp" /><button className="sx-link" onClick={() => setShut(anyOpen ? new Set(groupRows.map((x) => String(x.g.id ?? 'none'))) : new Set())}>{anyOpen ? 'Collapse all' : 'Expand all'}</button></div>
+      <div className="sx-cols">
+        {groupRows.length === 0 ? <div className="sx-empty">Nothing to show with these filters.</div> : groupRows.map(({ g, rows }) => {
+          const key = String(g.id ?? 'none'); const neg = rows.filter((i) => (qtyOf.get(i.id) ?? 0) < -EPS).length;
           return (
-            <div key={key} className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <button onClick={() => setOpen((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; })} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '10px 14px', border: 0, background: 'var(--sunken)', cursor: 'pointer', font: 'inherit' }}>
-                <span>{g.icon}</span><span style={{ fontWeight: 500 }}>{g.name}</span><span className="muted small">{list.length}</span>
-                {gneg > 0 && <span className="chip flag" style={{ marginLeft: 'auto' }}>{gneg} below zero</span>}<span className="muted" style={{ marginLeft: gneg ? 6 : 'auto' }}>{closed ? '▸' : '▾'}</span>
-              </button>
-              {!closed && <table className="table" style={{ margin: 0 }}><tbody>{list.map((i) => { const v = qtyOf.get(i.id) ?? 0; const neg = v < -EPS; const low = lowAt(i); return (
-                <Fragment key={i.id}>
-                  <tr onClick={() => neg && setOpenRow(openRow === i.id ? null : i.id)} style={{ cursor: neg ? 'pointer' : undefined }}>
-                    <td>{i.name}{low && <span className="chip late" style={{ marginLeft: 8 }}>Low</span>}</td>
-                    <td className="r num" style={{ color: neg ? 'var(--bad)' : undefined, fontWeight: neg ? 600 : 400 }}>{neg && <span className="chip flag" style={{ marginRight: 8 }}>needs a count</span>}{fmt(i, v)}</td>
-                  </tr>
-                  {neg && openRow === i.id && <tr><td colSpan={2} className="small" style={{ background: 'var(--bad-bg)' }}>Stock was issued before it was received or counted, so the record went below zero. A closing count at the Store sets it right. <Link to="/counts">Go to Closing counts</Link></td></tr>}
-                </Fragment>); })}</tbody></table>}
+            <div key={key} className={`sx-g ${shut.has(key) ? 'sx-shut' : ''}`}>
+              <button className="sx-gh" onClick={() => setShut((s) => tog(s, key))}><span className="sx-ic">{icon(g.icon ?? '📦')}</span><span><span className="sx-t">{g.name}</span> <span className="sx-c">{rows.length} {rows.length === 1 ? 'item' : 'items'}</span></span><span className="sx-sp" />{neg > 0 && <span className="sx-chip">{neg} below zero</span>}<span className="sx-chev">▾</span></button>
+              <div className="sx-rows">{rows.map((i) => { const v = qtyOf.get(i.id) ?? 0; const isNeg = v < -EPS; return (
+                <div key={i.id} className={`sx-row ${isNeg ? 'sx-neg' : ''} ${openRow.has(i.id) ? 'sx-open' : ''}`} onClick={(e) => { if (isNeg && !(e.target as HTMLElement).closest('.sx-btn')) setOpenRow((s) => tog(s, i.id)); }}>
+                  <span className="sx-nm">{i.name}{lowAt(i) && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--warn)', background: 'var(--warns)', borderRadius: 99, padding: '1px 8px' }}>Low</span>}</span><span className="sx-q">{fmt(i, v)}</span>
+                  {isNeg && <div className="sx-more"><span>More went out than came in. A closing count fixes it.</span><button className="sx-btn sx-p" onClick={() => nav('/counts')}>Recount</button></div>}
+                </div>); })}</div>
             </div>);
         })}
       </div>
-      {rows.length === 0 && <p className="empty card">Nothing to show here. {view === 'in' ? 'Choose Everything to see every item for this place, or enter opening stock first.' : view === 'neg' ? 'Nothing is below zero.' : 'No items are set up for this place yet.'}</p>}
-    </div>
+      <div className="sx-note">{view === 'stock' ? 'Items with nothing in hand are hidden. Choose Everything to see them.' : ''}</div>
+    </div></div>
   );
 }
