@@ -214,9 +214,8 @@ export function IndentPage() {
           </div>
 
           {editable && lastNight && (
-            <p className={'banner ' + (closedAt ? 'warn' : 'bad')}>
-              {t('Please check your stock before you order. Do not over order, and do not run short.')}
-              {closedAt ? ` ${t('Lunch has used some since last night. Your last closing count was')} ${timeOf(closedAt)}.` : ` ${t('No closing count was sent last night, so we cannot show what you had.')}`}
+            <p className={'banner ' + (closedAt ? 'warn' : 'bad')} style={{ fontSize: 13, fontWeight: 400, margin: 0, padding: '8px 12px' }}>
+              {closedAt ? t('Check your stock before ordering. Last count: {time}.', { time: timeOf(closedAt) }) : t('Check your stock before ordering. No count was sent last night.')}
             </p>
           )}
 
