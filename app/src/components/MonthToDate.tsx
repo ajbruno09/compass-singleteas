@@ -94,6 +94,7 @@ export function MonthToDate() {
     ['Needed a day for the rest of the month', `${inr(c.need)}${c.avgOpen ? ` (${c.need > c.avgOpen ? 'more' : 'less'} than the ${inr(c.avgOpen)} so far)` : ''}`]];
 
   async function closedDay(d: string) { const { error } = await supabase.rpc('mark_closed', { p_date: d, p_closed: true }); if (error) toast(errText(error)); else { toast('Marked as closed'); void load(); } }
+  const when = (t: string) => new Date(t).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
   const pretty = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
   return (
@@ -137,23 +138,30 @@ export function MonthToDate() {
             <tr className="tot"><td>All expenses to date</td><td className="r num">{inr(c.exp)}</td><td className="r num">{pctOf(c.exp)}</td></tr>
           </tbody></table>
         </div>
-        <div className="card"><h2>How these are worked out</h2><div className="sm mut mhow">
-          <div><b>Sales</b> are net of tax, from the nightly POS report, with container charges and round off included.</div>
-          <div><b>Running costs</b> (food, gas, packaging) are assumptions of {RUN.food}%, {RUN.gas}% and {RUN.pack}% until recipes and gas weights feed in. Cakes By M is their real 70% of pastry sales.</div>
-          <div><b>Fixed costs</b> (salary, rent, electricity and the rest) are spread evenly across the month.</div>
-          <div><b>Break even</b> is the sales where what is left after running costs covers the fixed costs.</div>
-          <div><b>Staff tea:</b> {Math.round(Number(m.staff_qty))} cups logged this month by the POS.</div>
-          {m.last_ingest && <div><b>Last report:</b> {m.last_ingest.result}{m.last_ingest.report_date ? ` for ${pretty(m.last_ingest.report_date)}` : ''}.</div>}
+        <div className="rcol">
+          <div className="card"><h2>How these are worked out</h2><div className="sm mut mhow">
+            <div><b>Sales</b> are net of tax, from the nightly POS report, with container charges and round off included.</div>
+            <div><b>Running costs</b> (food, gas, packaging) are assumptions of {RUN.food}%, {RUN.gas}% and {RUN.pack}% until recipes and gas weights feed in. Cakes By M is their real 70% of pastry sales.</div>
+            <div><b>Fixed costs</b> (salary, rent, electricity and the rest) are spread evenly across the month.</div>
+            <div><b>Break even</b> is the sales where what is left after running costs covers the fixed costs.</div>
+            <div><b>Staff tea:</b> {Math.round(Number(m.staff_qty))} cups logged this month by the POS.</div>
+          </div></div>
+          <div className="card" id="sr">
+            <div><h2>Sales reports</h2><div className="sm mut">{log[0] ? `Last one: ${log[0].result}${log[0].report_date ? ' for ' + pretty(log[0].report_date) : ''}, ${when(log[0].received_at)}` : 'The nightly POS email will show up here.'}</div></div>
+            <div className="srl">{log.slice(0, 3).map((x) => <div key={x.id}><span>{x.report_date ? pretty(x.report_date) : 'No date'} <span className="mut">· {when(x.received_at)}, {x.sender === 'manual upload' ? 'manual upload' : 'POS'}</span></span><span>{x.net_total != null && <b>{inr(Number(x.net_total))} </b>}<span className={'chip ' + (x.result === 'rejected' ? 'crit' : x.result === 'replaced' ? 'att' : 'ok')}>{x.result}</span></span></div>)}</div>
+            <div className="mbtns srb"><label className="btn p" style={{ cursor: 'pointer' }}>{busy ? 'Reading…' : "Upload a day's report"}<input type="file" accept=".xlsx,.xls" hidden disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void upload(f); }} /></label><button className="btn" onClick={() => setShowLog(true)}>See the full log</button></div>
+          </div>
+        </div>
+      </div>
+      {showLog && (
+        <div className="mback" onClick={(e) => { if (e.target === e.currentTarget) setShowLog(false); }}><div className="msheet">
+          <div className="mrh"><div><h2>Sales report log</h2><div className="sm mut">Every email the POS sends lands here, with the original file kept.</div></div><button className="btn" onClick={() => setShowLog(false)}>Close</button></div>
+          <div className="mscroll"><table><thead><tr><th>Arrived</th><th>From</th><th>File</th><th>Day</th><th className="r">Net sales</th><th>Result</th></tr></thead><tbody>
+            {log.map((x) => <tr key={x.id}><td>{when(x.received_at)}</td><td className="mut">{x.sender ?? ''}</td><td className="mut">{x.filename ?? ''}</td><td>{x.report_date ? pretty(x.report_date) : ''}</td><td className="r num">{x.net_total != null ? inr(Number(x.net_total)) : ''}</td><td><span className={'chip ' + (x.result === 'rejected' ? 'crit' : x.result === 'replaced' ? 'att' : 'ok')}>{x.result}</span>{x.message ? <div className="sm mut">{x.message}</div> : null}</td></tr>)}
+            {!log.length && <tr><td colSpan={6} className="mut">Nothing yet.</td></tr>}
+          </tbody></table></div>
         </div></div>
-      </div>
-      <div className="card mlog">
-        <div className="mrh"><div><h2>Sales reports</h2><div className="sm mut">{log[0] ? `Last one: ${log[0].result}${log[0].report_date ? ' for ' + pretty(log[0].report_date) : ''}, ${new Date(log[0].received_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : 'The nightly POS email will show up here.'}</div></div>
-          <div className="mbtns"><label className="btn p" style={{ cursor: 'pointer' }}>{busy ? 'Reading…' : "Upload a day's report"}<input type="file" accept=".xlsx,.xls" hidden disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void upload(f); }} /></label><button className="btn" onClick={() => setShowLog(!showLog)}>{showLog ? 'Hide the log' : 'See the log'}</button></div></div>
-        {showLog && <table style={{ marginTop: 8 }}><thead><tr><th>Arrived</th><th>From</th><th>File</th><th>Day</th><th className="r">Net sales</th><th>Result</th></tr></thead><tbody>
-          {log.map((x) => <tr key={x.id}><td>{new Date(x.received_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</td><td className="mut">{x.sender ?? ''}</td><td className="mut">{x.filename ?? ''}</td><td>{x.report_date ? pretty(x.report_date) : ''}</td><td className="r num">{x.net_total != null ? inr(Number(x.net_total)) : ''}</td><td><span className={'chip ' + (x.result === 'rejected' ? 'crit' : x.result === 'replaced' ? 'att' : 'ok')}>{x.result}</span>{x.message ? <div className="sm mut">{x.message}</div> : null}</td></tr>)}
-          {!log.length && <tr><td colSpan={6} className="mut">Nothing yet.</td></tr>}
-        </tbody></table>}
-      </div>
+      )}
       {open && <CostsSheet m={m} c={c} onClose={() => { setOpen(false); void load(); }} reload={load} />}
     </div>
   );

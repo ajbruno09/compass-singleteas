@@ -155,3 +155,10 @@
 .te .mtd .btn.p,.te .msheet .btn.p{background:var(--acc);border-color:var(--acc);color:#fff}
 @media(max-width:800px){.te .mtd .four{grid-template-columns:1fr 1fr}.te .mtd .mrow{grid-template-columns:1fr}}
 .te .mtd .mlog{margin-top:12px}
+.te .mtd .rcol{display:grid;gap:12px;grid-template-rows:1fr 1fr}
+.te .mtd .rcol>.card{display:flex;flex-direction:column}
+.te .mtd #sr .srl{display:grid;margin-top:8px;flex:1;align-content:start}
+.te .mtd #sr .srl>div{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.te .mtd #sr .srb{margin-top:auto;padding-top:10px}
+@media(max-width:800px){.te .mtd .rcol{grid-template-rows:auto}}
+.te table.cs td:first-child{white-space:nowrap}

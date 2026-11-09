@@ -39,9 +39,9 @@ export function OwnerDashboard() {
   const loadAlerts = async () => { const { data } = await supabase.from('alerts').select('id, level, title, body, created_at').is('done_at', null).order('created_at', { ascending: false }).limit(8); setAlerts((data as Al[]) ?? []); };
   useEffect(() => {
     (async () => {
-      const today = istDate(0);
+      const today = istDate(0); const monthStart = today.slice(0, 8) + '01';
       const [s, ind, bal, pr, so, po, iss] = await Promise.all([
-        supabase.from('daily_sales').select('business_date, location_id, amount').gte('business_date', istDate(-13)).lte('business_date', today),
+        supabase.from('daily_sales').select('business_date, location_id, amount').gte('business_date', monthStart < istDate(-13) ? monthStart : istDate(-13)).lte('business_date', today),
         supabase.from('indents').select('location_id, for_date, outcome, late').gte('for_date', days[0]).lte('for_date', today),
         supabase.from('vendor_bill_balances').select('balance, due_date').gt('balance', 0),
         supabase.from('items').select('id, last_cost').not('last_cost', 'is', null),
@@ -111,9 +111,15 @@ export function OwnerDashboard() {
     // counter sales
     const byLoc = new Map(sales.filter((x2) => x2.business_date === latest).map((r) => [r.location_id, Number(r.amount)]));
     const MAIN: [string, string][] = [['South Indian', 'South Indian'], ['Indian', 'Indian'], ['Snacks', 'Snacks Frozen'], ['Tandoor', 'Tandoor'], ['Continental', 'Continental'], ['Hot Brew', 'Hot Brew'], ['Cold Beverages', 'Cold Beverages']];
-    const rows = MAIN.map(([label, loc]) => [label, byLoc.get(counters.find((c) => c.name === loc)?.id ?? -1) ?? 0] as [string, number]);
-    const tot = rows.reduce((a, r) => a + r[1], 0);
-    const cs = `<tr><th>Counter</th><th class="r">Sales</th><th>Share</th><th class="r">Food cost</th></tr>` + rows.map((c) => `<tr><td>${esc(c[0])}</td><td class="r num">${inr(c[1])}</td><td><div class="sb"><i style="width:${tot ? Math.min(100, c[1] / tot * 100 * 3.2) : 0}%"></i></div></td><td class="r num">—</td></tr>`).join('') + `<tr class="tot"><td><b>All counters</b></td><td class="r num"><b>${inr(tot)}</b></td><td></td><td class="r num">—</td></tr>`;
+    const mStart = today.slice(0, 8) + '01';
+    const mSales = sales.filter((x2) => x2.business_date >= mStart);
+    const openDays = new Set(mSales.filter((x2) => Number(x2.amount) > 0).map((x2) => x2.business_date)).size;
+    const dLab = new Date(latest + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const rows = MAIN.map(([label, loc]) => { const id = counters.find((c) => c.name === loc)?.id ?? -1; const d = byLoc.get(id) ?? 0; const mtd = mSales.filter((x2) => x2.location_id === id).reduce((a, x2) => a + Number(x2.amount), 0); const avg = openDays ? mtd / openDays : 0; return { label, d, mtd, vs: avg > 0 && d > 0 ? (d - avg) / avg * 100 : null }; });
+    const tot = rows.reduce((a, r) => a + r.d, 0);
+    const vsCell = (x: number | null) => (x == null ? '<span class="mut">—</span>' : `<span style="color:${x >= 0 ? 'var(--good)' : 'var(--bad)'}">${x >= 0 ? '▲' : '▼'} ${Math.abs(x).toFixed(0)}%</span>`);
+    const cs = `<tr><th>Counter</th><th class="r">${dLab}</th><th class="r">MTD</th><th class="r">vs average</th><th class="r">Food cost MTD</th></tr>` + rows.map((r) => `<tr><td>${esc(r.label)}</td><td class="r num">${inr(r.d)}</td><td class="r num">${inr(r.mtd)}</td><td class="r">${vsCell(r.vs)}</td><td class="r num mut">—</td></tr>`).join('');
+    const csNote = `Net sales before tax. MTD is ${openDays} open ${openDays === 1 ? 'day' : 'days'}. vs average leaves out closed days.`;
     const IND_NAMES = ['Indian', 'South Indian', 'Tandoor', 'Continental', 'Gravy', 'Hot Brew', 'Cold Beverages', 'Pickup Station'];
     const dots = IND_NAMES.map((n) => { const c = counters.find((x) => x.name === n); if (!c) return ''; const r = dotRows.find((d) => d.name === n); const t = stat(c.id, today); const [k, l] = t === 'o' ? ['ok', 'On time'] : t === 'l' ? ['att', 'Late'] : t === 'm' ? ['crit', 'Missed'] : ['wait', 'No indent yet']; const pct = r?.pct ?? null; return `<div class="ir"><span class="n">${esc(n)}</span><span class="chip ${k}">${l}</span><span class="p" style="color:${pct == null ? 'var(--mut)' : pct < 70 ? 'var(--bad)' : pct < 90 ? 'var(--warn)' : 'var(--good)'}">${pct == null ? '—' : pct + '%'}</span></div>`; }).join('');
     const money = ([['Store stock', storeVal > 0 ? lakh(storeVal) : '—', storeVal > 0 ? 'Only items that have a price' : 'Needs prices and stock', storeVal > 0 ? 'part' : 'wait'], ['Counter stock', '—', 'Needs counters to count', 'wait'], ['Open purchase orders', lakh(openVal), `${openPos.length} orders. Not yet an expense`, 'live'], ['Due in 7 days', inr(due7amt), `${due7.length} bills`, 'live'], ['Wastage today', '—', 'Needs wastage entries', 'wait']] as [string, string, string, Tag][]).map((m) => `<div class="card"><div class="sm mut" style="display:flex;justify-content:space-between">${m[0]}${chip(m[3])}</div><div class="v">${m[1]}</div><div class="sm mut">${m[2]}</div></div>`).join('');
@@ -122,7 +128,7 @@ export function OwnerDashboard() {
       ...alerts.map((a) => ({ id: a.id, cls: ['urgent', 'critical', 'sos'].includes(a.level) ? 'c' : 'm', t: a.title, b: a.body ?? '' }))];
     const al = AL.length ? AL.map((a) => `<div class="al ${a.cls === 'm' ? 'm' : ''}"><span class="sev"></span><div><b>${esc(a.t)}</b><div class="sm mut">${esc(a.b)}</div></div><div class="go">${a.id ? `<button class="btn p" data-done="${a.id}">Mark done</button>` : ''}</div></div>`).join('') : '<div class="sm mut">Nothing is waiting for you.</div>';
     const head = need ? `${hasSales && delta != null ? (delta >= 0 ? 'Sales are up' : 'Sales are down') + ', and ' : ''}${need} ${need === 1 ? 'thing needs' : 'things need'} you now.` : 'Nothing needs you right now.';
-    return { latestLabel, kpis, bigA, depts, trend, tleg, cs, dots, money, al, head, dim: tot === 0, hasTot: tot > 0 };
+    return { csNote, latestLabel, kpis, bigA, depts, trend, tleg, cs, dots, money, al, head, dim: tot === 0, hasTot: tot > 0 };
   }, [sales, inds, bills, alerts, stock, cost, pos, issues, counters, days, health]);
 
   const when = (() => { const n = new Date(); const o = { timeZone: 'Asia/Kolkata' } as const; return `${n.toLocaleDateString('en-IN', { weekday: 'long', ...o })} ${n.toLocaleDateString('en-IN', { day: 'numeric', ...o })} ${n.toLocaleDateString('en-IN', { month: 'short', ...o })}, ${n.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, ...o }).replace('am', 'am').replace('pm', 'pm')}`; })();
@@ -145,7 +151,7 @@ export function OwnerDashboard() {
       </div>
       <div className="sec grid two">
         <div className="card"><div style={{ display: 'flex', justifyContent: 'space-between' }}><h2>Sales and food cost, last 7 days</h2><span className="chip part">Partial</span></div><svg className="chart" viewBox="0 0 520 190" width="100%" dangerouslySetInnerHTML={{ __html: html.trend }} /><div className="sm mut" dangerouslySetInnerHTML={{ __html: html.tleg }} /></div>
-        <div className="card"><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h2>Sales by counter, {html.latestLabel}</h2><span className={'chip ' + (html.hasTot ? 'part' : 'wait')}>{html.hasTot ? 'Partial' : 'Waiting'}</span></div><table className={'cs' + (html.dim ? ' dim' : '')} dangerouslySetInnerHTML={{ __html: html.cs }} /><div className="sm mut" style={{ marginTop: 8 }}>Food cost % per counter needs recipes and prices, so it shows a dash for now.</div></div>
+        <div className="card"><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h2>Sales by counter</h2><span className={'chip ' + (html.hasTot ? 'part' : 'wait')}>{html.hasTot ? 'Partial' : 'Waiting'}</span></div><table className={'cs' + (html.dim ? ' dim' : '')} dangerouslySetInnerHTML={{ __html: html.cs }} /><div className="sm mut" style={{ marginTop: 8 }}>{html.csNote}</div></div>
       </div>
       <div className="sec"><h2>Money</h2><div className="grid money" dangerouslySetInnerHTML={{ __html: html.money }} /></div>
       <div className="sec"><div className="card"><h2>Needs you now</h2><div dangerouslySetInnerHTML={{ __html: html.al }} /></div></div>
