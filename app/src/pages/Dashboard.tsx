@@ -5,10 +5,18 @@ import { useSession } from '../lib/session';
 import { money } from '../lib/format';
 import { dayLabel } from '../lib/ist';
 import { AlertsPanel } from '../components/AlertsPanel';
+import { StoreCheck } from '../components/StoreCheck';
+import { OwnerDashboard } from './OwnerDashboard';
 
 interface VendorDue { name: string; balance: number; bills: number }
 
 export function Dashboard() {
+  const { profile } = useSession();
+  if (profile?.role === 'owner') return <OwnerDashboard />;
+  return <OfficeDashboard />;
+}
+
+function OfficeDashboard() {
   const { profile, locations } = useSession();
   const [indents, setIndents] = useState<Record<number, string>>({});
   const [indentDate, setIndentDate] = useState('');
@@ -83,11 +91,13 @@ export function Dashboard() {
           <h1 style={{ fontSize: 26, lineHeight: '34px' }}>{greet}{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}</h1></div>
       </div>
       <AlertsPanel />
-      <div className="grid-tiles">
+      <div className={profile?.role === 'store' ? 'dash2' : undefined}>
+      <div className="stack" style={{ minWidth: 0 }}>
+      {profile?.role !== 'store' && <div className="grid-tiles">
         <Link to="/vendors" className="card tile" style={tile}><span className="label">Vendors</span><span className="big">{counts.vendors}</span><span className="small" style={{ color: counts.noPhone ? 'var(--warn)' : undefined, fontWeight: counts.noPhone ? 550 : 400 }}>{counts.noPhone ? `${counts.noPhone} without WhatsApp` : 'All reachable'}</span></Link>
         {profile?.role === 'owner' && <Link to="/people" className="card tile" style={tile}><span className="label">People with access</span><span className="big">{counts.people}</span><span className="small muted">Owner, store and counters</span></Link>}
         {seesMoney && <Link to="/bills" className="card tile attn" style={tile}><span className="label" style={{ color: 'var(--warn)' }}>Unpaid to vendors</span><span className="big">{money(unpaid)}</span><span className="small" style={{ color: 'var(--warn)', fontWeight: 550 }}>{flagged > 0 ? `${flagged} bills need a check` : 'Nothing flagged'}</span></Link>}
-      </div>
+      </div>}
 
       <div className="row" style={{ alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         {seesMoney && dues.length > 0 && (
@@ -129,6 +139,9 @@ export function Dashboard() {
             </section>
           )}
         </div>
+      </div>
+      </div>
+      {profile?.role === 'store' && <StoreCheck />}
       </div>
     </>
   );
