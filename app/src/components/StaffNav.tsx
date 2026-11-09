@@ -12,13 +12,14 @@ export const setCounter = (id: number) => { try { sessionStorage.setItem(KEY, St
 
 // Staff shell: the bottom bar from the approved mock (Home, Indent, Closing, SOS) on every staff screen.
 export function StaffShell() {
-  const { myLocations } = useSession();
+  const { myLocations, party } = useSession();
   const nav = useNavigate();
   const here = useLocation().pathname;
   const [due, setDue] = useState(0);
   const ids = myLocations.map((l) => l.id);
   const loc = getCounter(ids);
-  const rg = useReceiveGate(ids);
+  const rg = useReceiveGate(party ? [...ids, party.loc.id] : ids);
+  const rtarget = [...ids, ...(party ? [party.loc.id] : [])].find((id) => (rg.gates[id]?.pending ?? 0) > 0) ?? loc;
   useEffect(() => {
     (async () => {
       if (!ids.length) return;
@@ -33,7 +34,7 @@ export function StaffShell() {
   const items: [string, string, string, number, () => void][] = [
     ['home', 'home', 'Home', 0, () => nav('/')],
     ['indent', 'note', 'Indent', 0, () => nav(`/indent?loc=${loc}`)],
-    ['receive', 'inbox', 'Receive', rg.pending, () => nav(`/received?loc=${loc}`)],
+    ['receive', 'inbox', 'Receive', rg.pending, () => nav(`/received?loc=${rtarget}`)],
     ['closing', 'calbars', 'Closing', due, () => nav('/closing')],
     ['sos', 'siren2', 'SOS', 0, () => window.dispatchEvent(new Event('compass:sos'))]
   ];

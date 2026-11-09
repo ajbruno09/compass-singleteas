@@ -27,12 +27,14 @@ const addLabel = (n: number, unit: string) => {
 const CAT_PHOTO: Record<number, string> = { 1: 'veg', 2: 'dairy', 3: 'chicken', 4: 'atta', 5: 'spices', 6: 'sauces', 7: 'frozen', 17: 'kitchen', 18: 'oilsalt', 9: 'bread', 10: 'drinks', 11: 'icecream', 12: 'packaging', 13: 'cleaning', 14: 'gas', 15: 'stationery', 16: 'dryfruits' };
 
 export function IndentPage() {
-  const { myLocations } = useSession();
+  const { myLocations, party } = useSession();
+  const pickLocs = party ? [...myLocations, party.loc] : myLocations;
   const toast = useToast();
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
   const locId = Number(sp.get('loc')) || myLocations[0]?.id || null;
-  const where = myLocations.find((l) => l.id === locId)?.name ?? '';
+  const where = pickLocs.find((l) => l.id === locId)?.name ?? '';
+  const isParty = !!party && locId === party.loc.id;
   const gate = useReceiveGate(locId ? [locId] : []);
   const blocked = !!(locId && gate.gates[locId]?.blocked);
 
@@ -108,7 +110,7 @@ export function IndentPage() {
   }, [locId, toast]);
   useEffect(() => { setView({ kind: 'groups' }); setQ(''); void load(); }, [load]);
 
-  const sealed = indent ? isSealed(indent, rem, now) : false;
+  const sealed = indent && !isParty ? isSealed(indent, rem, now) : false;
   const editable = indent?.status === 'draft' && !sealed;
   const moreReasons = reasons.filter((r) => r.kind === 'more').map((r) => r.label);
   const missedReasons = reasons.filter((r) => r.kind === 'missed').map((r) => r.label);
@@ -210,10 +212,10 @@ export function IndentPage() {
         <AvatarButton />
       </div>
 
-      <div className={`notice ${win === 'open' ? 'ok' : win === 'early' ? 'info' : 'warn'}`}>{winChip}</div>
-      {myLocations.length > 1 && (
+      <div className={`notice ${isParty || win === 'open' ? 'ok' : win === 'early' ? 'info' : 'warn'}`}>{isParty ? <span className="chip done">{t('Party order')}: {party!.label}</span> : winChip}</div>
+      {pickLocs.length > 1 && (
         <div className="cpills" role="group" aria-label="Counter">
-          {myLocations.map((l) => <button key={l.id} aria-pressed={l.id === locId} onClick={() => setSp({ loc: String(l.id) })}>{l.name}</button>)}
+          {pickLocs.map((l) => <button key={l.id} aria-pressed={l.id === locId} onClick={() => setSp({ loc: String(l.id) })}>{party && l.id === party.loc.id ? `${t('Party')}: ${party.label}` : l.name}</button>)}
         </div>
       )}
 
@@ -229,7 +231,7 @@ export function IndentPage() {
           {voiceSupported() && editable && <button className="micbtn" aria-label={t('Speak your order')} onClick={() => setVoice(true)}><Icon name="mic" size={22} /></button>}
           </div>
 
-          {editable && lastNight && (
+          {editable && lastNight && !isParty && (
             <p className={'banner ' + (closedAt ? 'warn' : 'bad')} style={{ fontSize: 13, fontWeight: 400, margin: 0, padding: '8px 12px' }}>
               {closedAt ? t('Check your stock before ordering. Last count: {time}.', { time: timeOf(closedAt) }) : t('Check your stock before ordering. No count was sent last night.')}
             </p>
@@ -237,11 +239,11 @@ export function IndentPage() {
 
           {view.kind === 'groups' && (
             <>
-              <button className="usualbar" onClick={() => openView({ kind: 'usual' })} disabled={Object.keys(usual).length === 0}>
+              {!isParty && <button className="usualbar" onClick={() => openView({ kind: 'usual' })} disabled={Object.keys(usual).length === 0}>
                 <span className="ustar">★</span>
                 <span className="utext"><b>{t('My usual')}</b><span className="small muted">{Object.keys(usual).length ? t('{n} items you ask for often', { n: Object.keys(usual).length }) : t('Fills in after your first few indents')}</span></span>
                 <span className="uarrow" aria-hidden="true">›</span>
-              </button>
+              </button>}
               <div className="groupgrid">
                 {groupInfo.map(({ g, count, picked }) => (
                   <button key={g.id} className="grouptile" onClick={() => openView({ kind: 'group', id: g.id })}>

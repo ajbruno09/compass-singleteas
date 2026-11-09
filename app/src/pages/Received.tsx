@@ -15,7 +15,7 @@ interface Line { item_id: number; name: string; local_names: Record<string, stri
 export function ReceivedPage() {
   const [sp] = useSearchParams();
   const loc = Number(sp.get('loc'));
-  const { locations, profile } = useSession();
+  const { allLocations: locations, profile } = useSession();
   const nav = useNavigate();
   const toast = useToast();
   const { t, hi } = useLang();

@@ -24,6 +24,12 @@ export function Issue() {
   const [today, setToday] = useState<IssueRow[]>([]);
   const [forDate, setForDate] = useState('');
   const [lpgDone, setLpgDone] = useState(false);
+  const [pStat, setPStat] = useState<{ active: boolean; label?: string } | null>(null);
+  const [pLabel, setPLabel] = useState('');
+  const loadParty = useCallback(async () => { const { data } = await supabase.rpc('party_status'); setPStat((data as typeof pStat) ?? null); }, []);
+  useEffect(() => { void loadParty(); }, [loadParty]);
+  async function partyOn() { const { error } = await supabase.rpc('party_switch_on', { p_label: pLabel }); if (error) return toast(errText(error)); setPLabel(''); toast('Party order is on'); void loadParty(); window.dispatchEvent(new Event('compass:party')); setTimeout(() => window.location.reload(), 600); }
+  async function partyOff() { const { error } = await supabase.rpc('party_close'); if (error) return toast(errText(error)); toast('Party order closed'); void loadParty(); window.dispatchEvent(new Event('compass:party')); setTimeout(() => window.location.reload(), 600); }
   const [blockedList, setBlockedList] = useState<{ location_id: number; name: string; old: number }[]>([]);
   const loadBlocked = useCallback(async () => { const { data } = await supabase.rpc('receive_blocked_list'); setBlockedList((data as typeof blockedList) ?? []); }, []);
   useEffect(() => { void loadBlocked(); }, [loadBlocked]);
@@ -88,6 +94,17 @@ export function Issue() {
   return (
     <>
       <div className="pagehead"><div><p className="label">Store</p><h1>Issue to counters</h1><p className="muted small" style={{ marginTop: 2 }}>Filled from what each counter asked for. Change any amount, then send. The counter confirms what it received.</p></div></div>
+      <div className="card" style={{ display: 'grid', gap: 8 }}>
+        <b>Party order</b>
+        {pStat?.active ? (<>
+          <span className="small muted">On now: <b>{pStat.label}</b>. Kitchen counters can place the party indent. When the party is done, close it.</span>
+          <button className="btn secondary" onClick={() => void partyOff()}>Close party order</button>
+        </>) : (<>
+          <span className="small muted">Off. Switch it on for a party and the kitchen counters can order any items for it.</span>
+          <input value={pLabel} onChange={(e) => setPLabel(e.target.value)} placeholder="Party name, for example Sharma wedding" style={{ minHeight: 44 }} />
+          <button className="btn primary" disabled={!pLabel.trim()} onClick={() => void partyOn()}>Switch on party order</button>
+        </>)}
+      </div>
       {blockedList.length > 0 && (
         <div className="card" style={{ borderColor: '#F3B48E', display: 'grid', gap: 8 }}>
           <b>Counters that have not received yesterday's items</b>

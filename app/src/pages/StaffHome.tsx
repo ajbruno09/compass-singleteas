@@ -18,7 +18,7 @@ interface Week { weekly_off: number | null; shift_start: string | null; shift_en
 // First screen for every staff member. Order follows the approved mock:
 // message board, my week, to do, coming soon, get to work.
 export function StaffHome() {
-  const { profile, myLocations, signOut } = useSession();
+  const { profile, myLocations, party, signOut } = useSession();
   const nav = useNavigate();
   const { t, local, toggle, canSwitch } = useLang();
   const ids = myLocations.map((l) => l.id);
@@ -101,6 +101,11 @@ export function StaffHome() {
         </div>
       </div>
 
+      {party && (
+        <button className="countercard" onClick={() => nav(`/indent?loc=${party.loc.id}`)} style={{ borderColor: '#F3B48E', background: '#FFF1E8' }}>
+          <Icon name="box" size={30} stroke={1.6} /><span style={{ flex: 1, textAlign: 'left' }}><span className="name" style={{ display: 'block' }}>Party order: {party.label}</span><span className="small muted">Order what the party needs. Any number of items.</span></span><span className="chip due">Open</span>
+        </button>
+      )}
       {myLocations.length > 1 && (
         <div className="countersw" role="group" aria-label="Counter">{myLocations.map((l) => <button key={l.id} className={l.id === loc ? 'on' : ''} onClick={() => pick(l.id)}>{l.name}</button>)}</div>
       )}
