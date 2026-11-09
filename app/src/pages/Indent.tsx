@@ -283,6 +283,10 @@ export function IndentPage() {
         <Sheet title={t('Check your indent')} onClose={() => setReview(false)}
           footer={<button className="btn primary floor" disabled={busy || missingReason.length > 0} onClick={() => void send(false)}>{busy ? t('Sending…') : t('Send to store')}</button>}>
           {missingReason.length > 0 && <p className="banner warn">{missingReason.length === 1 ? t('One item is well above your usual. Tick that you are sure, and tell the store why.') : t('{n} items are well above your usual. Tick that you are sure, and tell the store why.', { n: missingReason.length })}</p>}
+          <div className="card" style={{ padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="muted">{t('Cart value')}</span>
+            <span className="chip off">{t('Coming soon')}</span>
+          </div>
           {items.filter((i) => lines[i.id]).map((i) => (
             <div key={i.id} className="card" style={{ padding: 12 }}>
               <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>

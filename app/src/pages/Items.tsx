@@ -110,7 +110,6 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
   const [quickText, setQuickText] = useState((item?.quick_amounts ?? DEFAULT_QUICK[item?.unit ?? 'kg'] ?? [1]).join(', '));
   const [freq, setFreq] = useState<'daily' | 'weekly'>(item?.count_frequency ?? 'weekly');
   const [tol, setTol] = useState(String(item?.tolerance_pct ?? 5));
-  const [cost, setCost] = useState(item?.last_cost?.toString() ?? '');
   const [active, setActive] = useState(item?.active ?? true);
   const [baseUnit, setBaseUnit] = useState(item?.base_unit ?? '');
   const [packOrder, setPackOrder] = useState(Boolean(item?.show_as));
@@ -152,7 +151,7 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
       const body = {
         name: name.trim(), category_id: categoryId, group_id: groupId || null, unit, purchase_unit: purchaseUnit || null,
         purchase_factor: purchaseUnit ? Number(factor) : null, quick_amounts: quickVals, count_frequency: freq,
-        tolerance_pct: Number(tol) || 0, last_cost: cost === '' ? null : Number(cost), active,
+        tolerance_pct: Number(tol) || 0, active,
         show_as: purchaseUnit && packOrder ? purchaseUnit : null, base_unit: baseUnit || null, counts_as: countsAs || null, pack_name: packName || null,
         pack_size: packSize === '' ? null : Number(packSize), pieces_per_pack: pieces === '' ? null : Number(pieces),
         slices_per_pack: slices === '' ? null : Number(slices), weight_per_pack_g: packG === '' ? null : Number(packG),
@@ -230,7 +229,7 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
         <label className="field"><span>Closing count</span>
           <select id="item-freq" value={freq} onChange={(e) => setFreq(e.target.value as 'daily' | 'weekly')}><option value="daily">Daily (key item)</option><option value="weekly">Weekly</option></select></label>
         <label className="field"><span>Allowed gap (%)</span><input id="item-tol" inputMode="decimal" value={tol} onChange={(e) => setTol(e.target.value)} className="num" /></label>
-        <label className="field"><span>Last cost per {unit} (₹)</span><input id="item-cost" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} className="num" /></label>
+        <div className="field"><span>Price</span><span className="small muted">Set in Buying setup and prices, where it also follows the bills.</span></div>
       </div>
       <fieldset className="card" style={{ display: 'grid', gap: 10 }}>
         <legend className="label">Used at, with usual level</legend>
