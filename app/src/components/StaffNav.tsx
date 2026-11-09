@@ -30,12 +30,13 @@ export function StaffShell() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids.join(','), here]);
-  const tab = here === '/' ? 'home' : here.startsWith('/indent') ? 'indent' : here.startsWith('/received') ? 'receive' : here.startsWith('/count') || here.startsWith('/closing') ? 'closing' : '';
+  const tab = here === '/' ? 'home' : here.startsWith('/indent') ? 'indent' : here.startsWith('/received') ? 'receive' : here.startsWith('/count') || here.startsWith('/closing') ? 'closing' : here.startsWith('/maintenance') ? 'maint' : '';
   const items: [string, string, string, number, () => void][] = [
     ['home', 'home', 'Home', 0, () => nav('/')],
     ['indent', 'note', 'Indent', 0, () => nav(`/indent?loc=${loc}`)],
     ['receive', 'inbox', 'Receive', rg.pending, () => nav(`/received?loc=${rtarget}`)],
     ['closing', 'calbars', 'Closing', due, () => nav('/closing')],
+    ['maint', 'wrench', 'Maintenance', 0, () => nav('/maintenance')],
     ['sos', 'siren2', 'SOS', 0, () => window.dispatchEvent(new Event('compass:sos'))]
   ];
   return (

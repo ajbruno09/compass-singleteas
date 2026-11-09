@@ -8,7 +8,7 @@ import { useToast } from '../components/Toast';
 
 interface T { id: number; title: string; area: string; kind: 'repair' | 'recurring'; vendor_name: string; repeat_days: number | null; next_due: string | null; last_done: string | null; status: 'open' | 'done'; notes: string; cost: number | null }
 interface Log { id: number; task_id: number; done_on: string; cost: number | null; vendor_name: string; note: string }
-const AREAS = ['Burner and gas', 'Kitchen exhaust', 'Pest control', 'Electrical', 'Plumbing', 'Refrigeration', 'Equipment', 'Cleaning', 'Other'];
+const AREAS = ['Burner and gas', 'Kitchen exhaust', 'Pest control', 'Electrical', 'Plumbing', 'Refrigeration', 'Equipment', 'Civil work', 'Cleaning', 'Other'];
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 const nice = (s: string | null) => (s ? new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(s + 'T00:00:00')) : 'no date');
 const diffDays = (s: string) => Math.round((new Date(s + 'T00:00:00').getTime() - new Date(today() + 'T00:00:00').getTime()) / 86400000);

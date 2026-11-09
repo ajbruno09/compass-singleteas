@@ -445,3 +445,9 @@ tr.click { cursor: pointer; }
 .usualbar .utext b { font: 650 14px/1.25 var(--font); }
 .usualbar .utext .small { font-size: 12px; }
 .usualbar .uarrow { color: var(--muted, #5C6B63); font-size: 22px; line-height: 1; }
+
+.navgroup { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+.navhead { display: flex; justify-content: space-between; align-items: center; border: 0; background: none; padding: 8px 10px 4px; font: 700 11px/1 var(--font); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); cursor: pointer; }
+.navhead i { font-style: normal; font-size: 12px; transition: transform .15s; }
+.navhead i.shut { transform: rotate(-90deg); }
+.navbadge { background: var(--bad); color: #fff; border-radius: 99px; font-size: 11px; min-width: 18px; height: 18px; padding: 0 5px; display: inline-grid; place-items: center; font-weight: 700; }
