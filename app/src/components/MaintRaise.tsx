@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { useSession } from '../lib/session';
 import { errText } from '../lib/format';
 import { useToast } from './Toast';
 import { Icon } from './Icon';
 
 export const MAINT_CATS = ['Burner and gas', 'Kitchen exhaust', 'Plumbing and water', 'Electrical', 'Refrigeration', 'Equipment', 'Pest control', 'Civil work', 'Other'];
-const OTHER_PLACES = ['Washroom', 'Main kitchen', 'Dining area', 'Outside'];
+const PLACES: [string, string][] = [['Main kitchen', 'Kitchen, store and all counters inside'], ['FOH', 'Front of house: dining, counters out front, washroom']];
 const URG: [string, string, string][] = [['wait', 'Can wait', 'Fix when convenient'], ['today', 'Today', 'Please fix today'], ['urgent', 'Urgent', 'Stops work, or unsafe']];
 
 // Phone photos are big. Shrink to about 1280px so uploads are quick on mobile data.
@@ -22,16 +21,13 @@ async function shrink(f: File): Promise<Blob> {
 }
 
 export function MaintRaise({ onDone }: { onDone: () => void }) {
-  const { myLocations } = useSession();
   const toast = useToast();
   const [cat, setCat] = useState('');
-  const [where, setWhere] = useState(myLocations[0]?.name ?? '');
+  const [where, setWhere] = useState('');
   const [note, setNote] = useState('');
   const [urg, setUrg] = useState('');
   const [files, setFiles] = useState<{ blob: File; url: string }[]>([]);
   const [busy, setBusy] = useState(false);
-  const places = [...myLocations.map((l) => l.name), ...OTHER_PLACES];
-  const locId = myLocations.find((l) => l.name === where)?.id ?? null;
   const need = [!cat && 'what is wrong', !where && 'where', !note.trim() && !files.length && 'a line or a photo', !urg && 'how urgent'].filter(Boolean) as string[];
   const addPics = (list: FileList | null) => {
     if (!list) return;
@@ -49,7 +45,7 @@ export function MaintRaise({ onDone }: { onDone: () => void }) {
         if (up.error) throw up.error;
         paths.push(path);
       }
-      const { error } = await supabase.rpc('raise_maint_request', { p_category: cat, p_where: where, p_location: locId, p_note: note.trim(), p_urgency: urg, p_photos: paths });
+      const { error } = await supabase.rpc('raise_maint_request', { p_category: cat, p_where: where, p_location: null, p_note: note.trim(), p_urgency: urg, p_photos: paths });
       if (error) throw error;
       toast('Request sent');
       window.dispatchEvent(new Event('compass:maint'));
@@ -61,7 +57,8 @@ export function MaintRaise({ onDone }: { onDone: () => void }) {
       <div><div className="label">1. What is wrong?</div>
         <div className="sosgrid" style={{ marginTop: 6 }}>{MAINT_CATS.map((c) => <button key={c} className="sosopt" aria-pressed={cat === c} onClick={() => setCat(c)}>{c}</button>)}</div></div>
       <div><div className="label">2. Where?</div>
-        <div className="row" style={{ gap: 6, marginTop: 6 }}>{places.map((p) => <button key={p} className="sosopt" style={{ minHeight: 40, fontSize: 14 }} aria-pressed={where === p} onClick={() => setWhere(p)}>{p}</button>)}</div></div>
+        <div className="sosgrid" style={{ marginTop: 6 }}>{PLACES.map(([p]) => <button key={p} className="sosopt" aria-pressed={where === p} onClick={() => setWhere(p)}>{p}</button>)}</div>
+        {where && <div className="small muted" style={{ marginTop: 4 }}>{PLACES.find((x) => x[0] === where)?.[1]}</div>}</div>
       <div><div className="label">3. Tell us a little</div>
         <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="For example: back burner will not light" style={{ width: '100%', marginTop: 6 }} /></div>
       <div><div className="label">4. Photos (up to 3)</div>
