@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { DatePicker } from '../components/DatePicker';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText } from '../lib/format';
@@ -82,7 +83,7 @@ function JobSheet({ r, onClose, onDone }: { r: R; onClose: () => void; onDone: (
   return <Sheet title="Make a job" onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving...' : 'Make job'}</button></>}>
     <p><b>{r.category}</b> · {r.where_text}</p>{r.note && <p className="small muted">{r.note}</p>}
     <label className="field"><span>Vendor or technician</span><input value={vendor} onChange={(e) => setVendor(e.target.value)} /></label>
-    <label className="field"><span>Needed by</span><input type="date" value={by} onChange={(e) => setBy(e.target.value)} /></label>
+    <div className="field"><span>Needed by</span><DatePicker value={by} onChange={setBy} label="Needed by" /></div>
     {err && <p className="banner bad" role="alert">{err}</p>}</Sheet>;
 }
 

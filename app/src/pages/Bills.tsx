@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { DatePicker } from '../components/DatePicker';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { money, money2, date, errText } from '../lib/format';
@@ -118,7 +119,7 @@ function PaymentForm({ bill, onClose, onSaved }: { bill: Bill; onClose: () => vo
       <div className="card"><strong>{bill.vendor_name}</strong><p className="small muted">Bill {bill.bill_number || 'without number'} · {date(bill.received_date)} · unpaid {money2(bill.balance)}</p></div>
       <div className="form-grid">
         <label className="field"><span>Amount (₹)</span><input id="pay-amount" inputMode="decimal" className="num" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-        <label className="field"><span>Paid on</span><input id="pay-date" type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} /></label>
+        <div className="field"><span>Paid on</span><DatePicker value={paidOn} onChange={setPaidOn} label="Paid on" /></div>
         <label className="field"><span>Mode</span><select id="pay-mode" value={mode} onChange={(e) => setMode(e.target.value)}>{MODES.map((m) => <option key={m}>{m}</option>)}</select></label>
         <label className="field"><span>Reference</span><input id="pay-ref" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="UTR or UPI ref" /></label>
       </div>
@@ -152,7 +153,7 @@ function BillForm({ vendors, onClose, onSaved }: { vendors: Vendor[]; onClose: (
       <label className="field"><span>Vendor</span><select id="bill-new-vendor" value={vendorId} onChange={(e) => setVendorId(e.target.value)}><option value="">Choose</option>{vendors.filter((v) => v.active).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label>
       <div className="form-grid">
         <label className="field"><span>Bill number</span><input id="bill-new-no" value={no} onChange={(e) => setNo(e.target.value)} /></label>
-        <label className="field"><span>Received on</span><input id="bill-new-date" type="date" value={received} onChange={(e) => setReceived(e.target.value)} /></label>
+        <div className="field"><span>Received on</span><DatePicker value={received} onChange={setReceived} label="Received on" /></div>
         <label className="field"><span>Amount (₹)</span><input id="bill-new-amount" inputMode="decimal" className="num" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
       </div>
       {error && <p className="banner bad" role="alert">{error}</p>}

@@ -13,6 +13,7 @@ import { appsFor } from '../lib/apps';
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
 import { SosWatcher } from './SosWatcher';
 import { StatusStrip } from './StatusStrip';
+import { NoticeBanner } from './NoticeBanner';
 
 interface NavItem { to: string; label: string; icon: string; roles: Role[]; group?: string }
 export const NAV: NavItem[] = [
@@ -107,7 +108,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <button className="btn quiet" onClick={signOut} aria-label="Sign out"><Icon name="out" /></button>
       </header>
       {me && <ProfileSheet onClose={() => setMe(false)} />}
-      <main className="main"><StatusStrip /><SosWatcher />{children}</main>
+      <main className="main"><StatusStrip /><SosWatcher />{loc.pathname === '/' && <NoticeBanner />}{children}</main>
     </div>
   );
 }

@@ -1,0 +1,81 @@
+/* Notices redesign: taken from approved mock16, class names prefixed nt- so nothing else in the app is touched. */
+.nt{--line2:#D3DAD6;--mut:#6E7A75;--tint:#E8F2EC;--okb:#E8F4ED;--warnb:#FBF1DD;--badb:#FBEAE7;--infob:#E7EFFA;--ok:#1B7A52;--bad:#B4382B;--info:#1E5AA8;font:400 14px/1.4 var(--font);color:var(--ink)}
+.nt *{box-sizing:border-box;margin:0}
+.nt button{font-family:var(--font)}
+.nt input,.nt textarea{min-height:0}
+.nt input[type=checkbox]{width:auto;height:auto;accent-color:var(--brand)}
+.nt-wrap{padding:0}
+.nt .nt-mut{color:var(--mut)}
+.nt .nt-sm{font-size:12.5px}
+.nt h1{font-size:24px;font-weight:600;letter-spacing:-.02em}
+.nt h2{font-size:14.5px;font-weight:550}
+.nt .nt-card{background:#fff;border:1px solid var(--line);border-radius:16px}
+.nt .nt-lbl{font-size:12px;color:var(--mut);margin:12px 0 5px;display:block}
+.nt input,.nt textarea{width:100%;font:400 14px var(--font);color:var(--ink);border:1px solid var(--line2);border-radius:10px;padding:8px 11px;background:#fff}
+.nt textarea{min-height:76px;resize:vertical}
+.nt input:focus,.nt textarea:focus{outline:2px solid #A9CDB9;border-color:#A9CDB9}
+.nt .nt-layout{display:grid;grid-template-columns:420px 1fr;gap:16px;margin-top:16px;align-items:start}
+.nt .nt-seg{display:inline-flex;padding:2px;gap:2px;background:#EEF1EF;border-radius:10px;flex-wrap:wrap}
+.nt .nt-seg button{border:0;background:none;border-radius:8px;padding:6px 12px;font:500 12.5px var(--font);color:#46524D;cursor:pointer}
+.nt .nt-seg button.nt-on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.nt .nt-pp{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;max-height:210px;overflow:auto;margin-top:8px;border:1px solid var(--line);border-radius:10px;padding:4px 8px}
+.nt .nt-pp label{display:flex;gap:8px;align-items:center;padding:5px 0;font-size:13px;cursor:pointer}
+.nt .nt-pp label span{color:var(--mut);font-size:11.5px;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px}
+.nt .nt-btn{border:1px solid var(--line2);background:#fff;border-radius:10px;padding:7px 13px;font:500 13.5px var(--font);color:#46524D;cursor:pointer}
+.nt .nt-btn.nt-p{background:var(--brand);border-color:var(--brand);color:#fff}
+.nt .nt-to{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px}
+.nt .nt-n{display:flex;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--line);cursor:pointer}
+.nt .nt-n:first-of-type{border-top:0}
+.nt .nt-n:hover{background:#F7F9F8}
+.nt .nt-n .nt-t{flex:1;min-width:0}
+.nt .nt-n .nt-t b{font-weight:500;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nt .nt-n .nt-t span{font-size:12px;color:var(--mut)}
+.nt .nt-bar{height:6px;border-radius:99px;background:#EEF1EF;overflow:hidden;width:90px}
+.nt .nt-bar i{display:block;height:100%;background:var(--brand)}
+.nt .nt-seen{font-size:12.5px;color:#46524D;white-space:nowrap;text-align:right}
+.nt .nt-det{padding:0 16px 14px 16px;background:#FAFBFA;border-top:1px dashed var(--line)}
+.nt .nt-det .nt-who{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.nt .nt-tag{font-size:11.5px;font-weight:500;border-radius:99px;padding:2px 9px;background:#EEF1EF;color:var(--mut)}
+.nt .nt-tag.nt-r{background:var(--badb);color:var(--bad)}
+.nt .nt-tag.nt-g{background:var(--okb);color:var(--ok)}
+.nt .nt-pin{color:#C99A2E;display:inline-flex;vertical-align:-2px}
+.nt .nt-ico{display:inline-flex;color:#6E7A75}
+.nt .nt-banner .nt-ico{color:var(--info)}
+.nt .nt-sect{margin-top:26px}
+.nt .nt-sect>.nt-mut{margin-bottom:8px}
+.nt .nt-banner{display:flex;align-items:center;gap:12px;background:var(--infob);color:var(--info);border-radius:12px;padding:9px 14px}
+.nt .nt-banner b{font-weight:500}
+.nt .nt-banner .nt-sp{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nt .nt-banner button{border:1px solid #B9CDEA;background:#fff;color:var(--info);border-radius:8px;height:28px;padding:0 12px;font:500 12.5px var(--font);cursor:pointer}
+.nt .nt-sw{display:flex;gap:8px;align-items:center;margin-top:12px}
+.nt .nt-sw .nt-seg{margin:0}
+.nt .nt-sched{margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:12px;background:#FAFBFA}
+.nt .nt-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.nt .nt-chp{border:1px solid var(--line2);background:#fff;border-radius:99px;padding:5px 12px;font:450 12.5px var(--font);color:#46524D;cursor:pointer}
+.nt .nt-chp.nt-on{background:var(--tint);border-color:#A9CDB9;color:var(--brand);font-weight:500}
+.nt .nt-row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.nt .nt-pick{position:relative}
+.nt .nt-pickbtn{display:flex;align-items:center;gap:8px;border:1px solid var(--line2);background:#fff;border-radius:10px;padding:7px 12px;font:450 13.5px var(--font);color:var(--ink);cursor:pointer;min-width:150px;justify-content:space-between}
+.nt .nt-pop{position:absolute;z-index:20;top:calc(100% + 6px);left:0;background:#fff;border:1px solid var(--line2);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.14);padding:12px}
+.nt .nt-cal{width:276px}
+.nt .nt-calh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-weight:500}
+.nt .nt-calh button{border:0;background:none;width:28px;height:28px;border-radius:8px;cursor:pointer;color:#46524D;font-size:16px}
+.nt .nt-calh button:hover{background:#EEF1EF}
+.nt .nt-cg{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.nt .nt-cg .nt-h{font-size:11px;color:var(--mut);height:22px;line-height:22px}
+.nt .nt-cg button{height:34px;border:0;background:none;border-radius:9px;font:400 13px var(--font);cursor:pointer;color:var(--ink)}
+.nt .nt-cg button:hover{background:#EEF1EF}
+.nt .nt-cg button.nt-o{color:#B3BDB8}
+.nt .nt-cg button.nt-t{box-shadow:inset 0 0 0 1.5px var(--brand);color:var(--brand)}
+.nt .nt-cg button.nt-s{background:var(--brand);color:#fff}
+.nt .nt-cg button:disabled{color:#CBD3CF;cursor:default;background:none}
+.nt .nt-tp{display:grid;grid-template-columns:64px 64px 64px;gap:6px}
+.nt .nt-tp .nt-col{max-height:190px;overflow:auto;display:grid;gap:2px;align-content:start}
+.nt .nt-tp button{border:0;background:none;border-radius:8px;padding:7px 0;font:450 13.5px var(--font);cursor:pointer;color:var(--ink)}
+.nt .nt-tp button:hover{background:#EEF1EF}
+.nt .nt-tp button.nt-s{background:var(--brand);color:#fff}
+.nt .nt-tph{font-size:11px;color:var(--mut);text-align:center;margin-bottom:4px}
+.nt .nt-sum{margin-top:8px;font-size:13px;color:var(--brand)}
+@media(max-width:900px){.nt .nt-layout{grid-template-columns:1fr}}
+@media(max-width:560px){.nt .nt-pop{position:fixed;left:16px;right:16px;top:auto;bottom:16px;width:auto}.nt .nt-cal{width:auto}}
+.nt .nt-chp:disabled{opacity:.4;cursor:default}

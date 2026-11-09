@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { TimePicker } from '../components/DatePicker';
 import { supabase } from '../lib/supabase';
 import { errText } from '../lib/format';
 import { useToast } from '../components/Toast';
@@ -37,8 +38,8 @@ export function Schedules() {
         <tbody>{people.map((p) => { const s = sched[p.id]; return (
           <tr key={p.id}><td><b>{p.full_name}</b><div className="small muted">{p.role}</div></td>
             <td><select aria-label={`Weekly off for ${p.full_name}`} value={s?.weekly_off ?? ''} onChange={(e) => void save(p.id, { weekly_off: e.target.value === '' ? null : Number(e.target.value) })}><option value="">Not set</option>{DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}</select></td>
-            <td><input type="time" aria-label="Shift start" value={s?.shift_start ?? ''} onChange={(e) => void save(p.id, { shift_start: e.target.value })} /></td>
-            <td><input type="time" aria-label="Shift end" value={s?.shift_end ?? ''} onChange={(e) => void save(p.id, { shift_end: e.target.value })} /></td></tr>); })}
+            <td><TimePicker label="Shift start" placeholder="Start" value={s?.shift_start ?? ''} onChange={(v) => void save(p.id, { shift_start: v })} /></td>
+            <td><TimePicker label="Shift end" placeholder="End" value={s?.shift_end ?? ''} onChange={(v) => void save(p.id, { shift_end: v })} /></td></tr>); })}
           {!people.length && <tr><td colSpan={4} className="muted">No staff yet.</td></tr>}</tbody>
       </table></div>
     </>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DatePicker } from '../components/DatePicker';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText } from '../lib/format';
@@ -33,7 +34,7 @@ export function SalesEntry() {
     <div className="page">
       <h1>Daily sales</h1>
       <p className="muted">Enter each counter's sales for the day. Your team sees their own counters, and their share of the cafe, on My Compass.</p>
-      <label className="field" style={{ maxWidth: 220 }}><span>Day</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+      <div className="field" style={{ maxWidth: 220 }}><span>Day</span><DatePicker value={date} onChange={setDate} label="Day" /></div>
       <div className="card" style={{ display: 'grid', gap: 10, maxWidth: 460 }}>
         {counters.map((c) => (
           <label key={c.id} className="row" style={{ justifyContent: 'space-between', gap: 12 }}>

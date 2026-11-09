@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DatePicker, TimePicker } from '../components/DatePicker';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
@@ -103,7 +104,7 @@ export function Issue() {
         </>) : (<>
           <span className="small muted">Off. Switch it on for a party. The kitchen counters can order any items until the date and time you choose, then it disappears from their screens.</span>
           <input value={pLabel} onChange={(e) => setPLabel(e.target.value)} placeholder="Party name, for example Sharma wedding" style={{ minHeight: 44 }} />
-          <label className="field"><span>Open for ordering until</span><input type="datetime-local" value={pUntil} onChange={(e) => setPUntil(e.target.value)} style={{ minHeight: 44 }} /></label>
+          <div className="field"><span>Open for ordering until</span><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><DatePicker value={pUntil.slice(0, 10)} onChange={(v) => setPUntil(v + 'T' + (pUntil.slice(11, 16) || '17:00'))} label="Ordering closes on" /><TimePicker value={pUntil.slice(11, 16)} onChange={(v) => setPUntil((pUntil.slice(0, 10) || new Date().toISOString().slice(0, 10)) + 'T' + v)} label="Ordering closes at" /></div></div>
           <button className="btn primary" disabled={!pLabel.trim() || !pUntil} onClick={() => void partyOn()}>Switch on party order</button>
         </>)}
       </div>

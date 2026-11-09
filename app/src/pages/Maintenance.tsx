@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { DatePicker } from '../components/DatePicker';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText, money } from '../lib/format';
@@ -63,7 +64,7 @@ function JobForm({ t, onClose, onSaved }: { t: T | null; onClose: () => void; on
     <div className="form-grid"><label className="field"><span>Area</span><select value={area} onChange={(e) => setArea(e.target.value)}>{AREAS.map((a) => <option key={a}>{a}</option>)}</select></label>
       <label className="field"><span>Type</span><select value={kind} onChange={(e) => setKind(e.target.value as 'repair' | 'recurring')}><option value="recurring">Repeats on a schedule</option><option value="repair">One time repair</option></select></label>
       {kind === 'recurring' && <label className="field"><span>Repeat every (days)</span><input inputMode="numeric" className="num" value={rep} onChange={(e) => setRep(e.target.value)} /></label>}
-      <label className="field"><span>{kind === 'recurring' ? 'Next due' : 'Needed by'}</span><input type="date" value={next} onChange={(e) => setNext(e.target.value)} /></label>
+      <div className="field"><span>{kind === 'recurring' ? 'Next due' : 'Needed by'}</span><DatePicker value={next} onChange={setNext} label="Date" /></div>
       <label className="field"><span>Vendor or technician</span><input value={vendor} onChange={(e) => setVendor(e.target.value)} /></label></div>
     <label className="field"><span>Notes</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
     {err && <p className="banner bad" role="alert">{err}</p>}</Sheet>;
@@ -75,7 +76,7 @@ function DoneForm({ t, onClose, onSaved }: { t: T; onClose: () => void; onSaved:
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
   async function save() { setBusy(true); const { error } = await supabase.rpc('maint_done', { p_id: t.id, p_done_on: on, p_cost: cost === '' ? null : Number(cost), p_vendor: vendor, p_note: note }); setBusy(false); if (error) return setErr(errText(error)); toast(t.kind === 'recurring' ? `Done. Next one is due in ${t.repeat_days} days.` : 'Marked done'); onSaved(); }
   return <Sheet title={`Mark done: ${t.title}`} onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Mark done'}</button></>}>
-    <div className="form-grid"><label className="field"><span>Done on</span><input type="date" value={on} onChange={(e) => setOn(e.target.value)} /></label><label className="field"><span>Cost (₹)</span><input inputMode="decimal" className="num" value={cost} onChange={(e) => setCost(e.target.value)} /></label>
+    <div className="form-grid"><div className="field"><span>Done on</span><DatePicker value={on} onChange={setOn} label="Done on" /></div><label className="field"><span>Cost (₹)</span><input inputMode="decimal" className="num" value={cost} onChange={(e) => setCost(e.target.value)} /></label>
       <label className="field"><span>Who did it</span><input value={vendor} onChange={(e) => setVendor(e.target.value)} /></label></div>
     <label className="field"><span>Note</span><input value={note} onChange={(e) => setNote(e.target.value)} /></label>
     {t.kind === 'recurring' && <p className="small muted">The next visit will be set {t.repeat_days} days after this date.</p>}{err && <p className="banner bad" role="alert">{err}</p>}</Sheet>;

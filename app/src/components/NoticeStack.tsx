@@ -30,8 +30,8 @@ export function NoticeStack() {
       {shown.map((n) => (
         <section key={n.id} className="card" style={{ display: 'grid', gap: 6, borderLeft: '4px solid var(--brand)' }}>
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <b style={{ fontSize: 16 }}>{n.pinned ? '📌 ' : ''}{n.title}</b>
-            <span className="small muted">{timeOf(n.created_at)}</span>
+            <b style={{ fontSize: 16 }}>{n.pinned && <span style={{ color: '#C99A2E', display: 'inline-flex', verticalAlign: -2, marginRight: 6 }}><Icon name="pin" size={14} stroke={1.8} /></span>}{n.title}</b>
+            <span className="small muted">{timeOf(n.send_at ?? n.created_at)}</span>
           </div>
           {n.body && <p style={{ whiteSpace: 'pre-wrap' }}>{n.body}</p>}
           {read.has(n.id)

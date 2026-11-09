@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { DatePicker, TimePicker } from '../components/DatePicker';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText } from '../lib/format';
@@ -83,12 +84,12 @@ function RuleForm({ rule, onClose, onSaved }: { rule: Rule; onClose: () => void;
       {rule.why && <p className="small"><b>Why this value:</b> {rule.why}</p>}
       <div className="form-grid">
         <label className="field"><span>Value{rule.unit ? ` (${rule.unit})` : ''}</span>
-          {rule.kind === 'time' ? <input id="rule-val" type="time" value={val} onChange={(e) => setVal(e.target.value)} />
+          {rule.kind === 'time' ? <TimePicker value={val} onChange={setVal} label="Time" />
             : rule.key === 'overstock_mode' ? <select id="rule-val" value={val} onChange={(e) => setVal(e.target.value)}><option value="advice_only">Advice only (warn and record)</option><option value="approval">Needs approval</option></select>
             : rule.key === 'unknown_item_alert' ? <select id="rule-val" value={val} onChange={(e) => setVal(e.target.value)}><option value="on">On</option><option value="off">Off</option></select>
             : <input id="rule-val" className="num" inputMode="decimal" value={val} onChange={(e) => setVal(e.target.value)} />}
         </label>
-        <label className="field"><span>Starts from</span><input id="rule-from" type="date" value={from} min={today} disabled={rule.wired} onChange={(e) => setFrom(e.target.value)} />
+        <label className="field"><span>Starts from</span><DatePicker value={from} min={today} disabled={rule.wired} onChange={setFrom} label="Starts from" />
           {rule.wired && <span className="small muted">Live rules change from today.</span>}</label>
       </div>
       <label className="field"><span>Note (why you changed it)</span><input id="rule-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" /></label>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DatePicker } from '../components/DatePicker';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { errText, date as fdate } from '../lib/format';
@@ -114,7 +115,7 @@ export function BuyingSetup() {
         <div className="card" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           <div><b>Fresh chicken (Srinidhi)</b><p className="muted small">One rate per bill, applied to all {chicken.length} {chicken.length === 1 ? "cut" : "cuts"} automatically.</p></div>
           {manual
-            ? <div className="row" style={{ gap: 8 }}><input type="date" value={gDate} onChange={(e) => setGDate(e.target.value)} style={{ width: 150 }} /><input className="num" inputMode="decimal" placeholder="₹ per kg" value={gRate} onChange={(e) => setGRate(e.target.value)} style={{ width: 100 }} /><button className="btn primary" disabled={busy} onClick={() => void applyGroup()}>Apply to {chicken.length} items</button></div>
+            ? <div className="row" style={{ gap: 8 }}><DatePicker value={gDate} onChange={setGDate} label="Rate date" /><input className="num" inputMode="decimal" placeholder="₹ per kg" value={gRate} onChange={(e) => setGRate(e.target.value)} style={{ width: 100 }} /><button className="btn primary" disabled={busy} onClick={() => void applyGroup()}>Apply to {chicken.length} items</button></div>
             : <div>{chickenNow ? <><span className="chip done">Latest bill</span> <b className="num">{inr(chickenNow.unit_cost ?? 0)} / kg</b> <span className="muted small">{sourceText(chickenNow)}{chickenNow.prev_unit_cost ? `, was ${inr(chickenNow.prev_unit_cost)}` : ''}</span></> : <span className="muted">No rate yet</span>}</div>}
         </div>
       )}
