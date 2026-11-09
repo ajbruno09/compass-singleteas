@@ -14,7 +14,7 @@ export interface Item {
 export interface Vendor {
   id: string; name: string; code: string | null; category: string | null; contact_person: string | null; phone: string | null;
   whatsapp: string | null; email: string | null; address: string | null; gst: string | null; credit_days: number | null;
-  bank_name: string | null; bank_account: string | null; ifsc: string | null; upi: string | null; active: boolean; remarks: string | null; qr_path?: string | null;
+  bank_name: string | null; bank_account: string | null; ifsc: string | null; upi: string | null; active: boolean; remarks: string | null; qr_path?: string | null; sends_po_whatsapp?: boolean;
 }
 export interface BillRow {
   id: string; vendor_id: string; vendor_name: string; bill_number: string | null; order_date: string | null; received_date: string | null;

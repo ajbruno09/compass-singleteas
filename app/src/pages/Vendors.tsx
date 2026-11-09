@@ -48,7 +48,7 @@ export function Vendors() {
   const shown = useMemo(() => rows.filter((r) => (showOff || r.active) && r.name.toLowerCase().includes(q.trim().toLowerCase())), [rows, q, showOff]);
   const offCount = rows.filter((r) => !r.active).length;
   async function bringBack(v: Vendor) { const { error } = await supabase.from('vendors').update({ active: true }).eq('id', v.id); if (error) alert(errText(error)); else void load(); }
-  const missingPhone = rows.filter((r) => r.active && !(r.whatsapp || r.phone)).length;
+  const missingPhone = rows.filter((r) => r.active && r.sends_po_whatsapp !== false && !(r.whatsapp || r.phone)).length;
 
   return (
     <>
@@ -70,7 +70,7 @@ export function Vendors() {
               return (
                 <tr key={v.id} className={canEdit ? 'click' : ''} onClick={() => canEdit && setEditing(v)}>
                   <td><strong>{v.name}</strong>{!v.active && <span className="chip off" style={{ marginLeft: 8 }}>Removed</span>}{v.code && <span className="small muted" style={{ marginLeft: 8 }}>{v.code}</span>}{v.category && <div className="small muted">{v.category}</div>}</td>
-                  <td className="num small">{v.whatsapp || v.phone || <span className="chip late">Missing</span>}</td>
+                  <td className="num small">{v.whatsapp || v.phone || (v.sends_po_whatsapp === false ? <span className="muted small">Not by WhatsApp</span> : <span className="chip late">Missing</span>)}</td>
                   <td className="num">{v.credit_days ?? '—'}</td>
                   {canEdit && <td onClick={(e) => e.stopPropagation()}><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="btn quiet" onClick={() => setEditing(v)}>Edit</button>{v.active ? <><button className="btn quiet" onClick={() => setPaying(v)}>Pay</button><button className="btn quiet" onClick={() => setRemoving(v)}>Remove</button></> : <button className="btn quiet" onClick={() => void bringBack(v)}>Bring back</button>}</div></td>}
                   {seesMoney && <><td className="r num">{t?.bills ?? 0}</td><td className="r num">{money(t?.billed ?? 0)}</td>
@@ -100,6 +100,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
   const [v, setV] = useState<Record<string, string>>(() => Object.fromEntries(FIELDS.map(([k]) => [k, vendor?.[k] == null ? '' : String(vendor[k])])));
   const [active, setActive] = useState(vendor?.active ?? true);
   const [remarks, setRemarks] = useState(vendor?.remarks ?? '');
+  const [wa, setWa] = useState(vendor?.sends_po_whatsapp ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [qrFile, setQrFile] = useState<File | null>(null);
@@ -109,12 +110,13 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
   async function save() {
     setError('');
     if (!v.name.trim()) return setError('Give the vendor a name.');
+    if (wa && !v.whatsapp.trim()) return setError('Add the WhatsApp number, or switch off "Send POs on WhatsApp" for this vendor.');
     if (v.whatsapp && !/^\+?[0-9 ]{10,15}$/.test(v.whatsapp)) return setError('WhatsApp number should be 10 digits, or with +91.');
     setBusy(true);
     try {
       const body: Record<string, unknown> = Object.fromEntries(Object.entries(v).map(([k, val]) => [k, val.trim() === '' ? null : val.trim()]));
       body.credit_days = v.credit_days ? Number(v.credit_days) : null;
-      body.active = active; body.remarks = remarks;
+      body.active = active; body.remarks = remarks; body.sends_po_whatsapp = wa;
       const res = vendor ? await supabase.from('vendors').update(body).eq('id', vendor.id).select('id').single() : await supabase.from('vendors').insert(body).select('id').single();
       if (res.error) throw res.error;
       if (qrFile) {
@@ -133,20 +135,22 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
   return (
     <Sheet title={vendor ? vendor.name : 'Add vendor'} onClose={onClose}
       footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save vendor'}</button></>}>
+      <label className="row" style={{ gap: 10, fontWeight: 700 }}><input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} />Send POs to this vendor on WhatsApp</label>
+      {!wa && <p className="small muted" style={{ margin: 0 }}>This vendor is ordered another way (app, shop, in house). No WhatsApp number or payment details are needed.</p>}
       <div className="form-grid">
-        {FIELDS.map(([k, label, type]) => (
+        {FIELDS.filter(([k]) => wa || !['whatsapp', 'bank_name', 'bank_account', 'ifsc', 'upi'].includes(k)).map(([k, label, type]) => (
           <label key={k} className="field"><span>{label}</span>
             <input id={`vendor-${k}`} type={type === 'number' ? 'text' : type ?? 'text'} inputMode={type === 'number' || type === 'tel' ? 'numeric' : undefined}
               value={v[k]} onChange={(e) => setV((p) => ({ ...p, [k]: e.target.value }))} /></label>
         ))}
       </div>
-      <fieldset className="card" style={{ display: 'grid', gap: 10 }}>
+      {wa && <fieldset className="card" style={{ display: 'grid', gap: 10 }}>
         <legend className="label">Payment QR code</legend>
         <div className="row" style={{ gap: 16, alignItems: 'flex-start' }}>
           <div style={{ width: 120, height: 120, borderRadius: 10, background: 'var(--surface-200)', overflow: 'hidden', display: 'grid', placeItems: 'center' }}>{qrPrev ? <img src={qrPrev} alt="Payment QR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Icon name="camera" size={30} />}</div>
           <label className="field" style={{ flex: 1 }}><span>Upload the vendor's QR image</span><input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] ?? null; setQrFile(f); if (f) setQrPrev(URL.createObjectURL(f)); }} /><span className="small muted">A screenshot of their UPI QR works. It shows large when you tap Pay, so you can scan it.</span></label>
         </div>
-      </fieldset>
+      </fieldset>}
       <label className="field"><span>Remarks</span><textarea id="vendor-remarks" value={remarks} onChange={(e) => setRemarks(e.target.value)} /></label>
       <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Active</label>
       {error && <p className="banner bad" role="alert">{error}</p>}

@@ -43,10 +43,10 @@ export function Dashboard() {
       }
       const [items, vendors, people] = await Promise.all([
         supabase.from('items').select('id, photo_path', { count: 'exact' }).eq('active', true),
-        supabase.from('vendors').select('id, phone, whatsapp', { count: 'exact' }).eq('active', true),
+        supabase.from('vendors').select('id, phone, whatsapp, sends_po_whatsapp', { count: 'exact' }).eq('active', true),
         supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('active', true)
       ]);
-      const v = (vendors.data as { phone: string | null; whatsapp: string | null }[]) ?? [];
+      const v = ((vendors.data as { phone: string | null; whatsapp: string | null; sends_po_whatsapp: boolean }[]) ?? []).filter((x) => x.sends_po_whatsapp);
       const it = (items.data as { photo_path: string | null }[]) ?? [];
       setCounts({ items: items.count ?? 0, vendors: vendors.count ?? 0, people: people.count ?? 0,
         noPhone: v.filter((x) => !x.phone && !x.whatsapp).length, noPhoto: it.filter((x) => !x.photo_path).length });
