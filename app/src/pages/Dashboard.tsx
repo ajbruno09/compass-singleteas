@@ -7,12 +7,14 @@ import { dayLabel } from '../lib/ist';
 import { AlertsPanel } from '../components/AlertsPanel';
 import { StoreCheck } from '../components/StoreCheck';
 import { OwnerDashboard } from './OwnerDashboard';
+import { StoreDashboard } from './StoreDashboard';
 
 interface VendorDue { name: string; balance: number; bills: number }
 
 export function Dashboard() {
   const { profile } = useSession();
   if (profile?.role === 'owner') return <OwnerDashboard />;
+  if (profile?.role === 'store') return <StoreDashboard />;
   return <OfficeDashboard />;
 }
 
