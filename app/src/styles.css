@@ -625,3 +625,7 @@ tr.click { cursor: pointer; }
 .mctile b { font: 500 17px/22px var(--font); }
 .mcsoon { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .mcsoon .soonbox { padding: 10px 8px; }
+
+/* Invisible scrollbars everywhere. Scrolling still works by touch, wheel and keys. */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
