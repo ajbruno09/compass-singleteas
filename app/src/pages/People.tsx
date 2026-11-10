@@ -8,6 +8,8 @@ import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 import type { Signup } from '../lib/types';
 
+// Gravy is a stock shelf, not a counter people work at. Hidden here; existing assignments stay so the gravy closing count keeps working.
+const GRAVY_SHELF = 13;
 interface Person extends Profile { profile_locations: { location_id: number }[]; first_login_at?: string | null; last_seen_at?: string | null; invited_at?: string | null }
 interface InviteTarget { name: string; phone: string; lang: string; pin: string }
 
@@ -90,7 +92,7 @@ export function People() {
                 <td className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{p.photo ? <img src={p.photo} alt="" width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <span className="avatar">{(p.full_name || '?')[0]}</span>}<strong>{p.full_name || p.email}</strong></td>
                 <td className="num small">{p.phone ?? '—'}</td>
                 <td>{ROLE_LABEL[p.role]}</td>
-                <td className="small">{p.profile_locations.map((l) => locName(l.location_id)).join(', ') || '—'}</td>
+                <td className="small">{p.profile_locations.filter((l) => l.location_id !== GRAVY_SHELF).map((l) => locName(l.location_id)).join(', ') || '—'}</td>
                 <td className="small">{p.extra_language ? LANGUAGES[p.extra_language] ?? p.extra_language : '—'}</td>
                 <td>{!p.active ? <span className="chip off">No access</span> : (() => { const st = presence(p); return <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }} title={st.label}><span aria-hidden style={{ width: 11, height: 11, borderRadius: '50%', background: LIGHT[st.tone], boxShadow: st.tone === 'on' ? '0 0 0 4px rgba(31,157,85,.2)' : 'none', flex: 'none' }} /><span className="small">{st.label}</span></span>; })()}</td>
                 <td className="row" style={{ gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>{isOwner && (p.role === 'owner' ? <button className="btn secondary" onClick={(e) => { e.stopPropagation(); setMyPin(true); }}>Change my PIN</button> : <>
@@ -178,7 +180,7 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
       </div>
       <fieldset className="card" style={{ display: 'grid', gap: 10 }}>
         <legend className="label">Works at</legend>
-        {locations.map((l) => (
+        {locations.filter((l) => l.code !== 'gravy').map((l) => (
           <label key={l.id} className="row" style={{ gap: 10 }}>
             <input type="checkbox" checked={locs.includes(l.id)} onChange={(e) => setLocs((p) => (e.target.checked ? [...p, l.id] : p.filter((x) => x !== l.id)))} />{l.name}
           </label>
@@ -275,7 +277,7 @@ function ApproveForm({ r, locations, onClose, onDone }: { r: Signup; locations: 
       </div>
       <fieldset className="card" style={{ display: 'grid', gap: 10 }}>
         <legend className="label">Works at</legend>
-        {locations.map((l) => <label key={l.id} className="row" style={{ gap: 10 }}><input type="checkbox" checked={locs.includes(l.id)} onChange={(e) => setLocs((p) => (e.target.checked ? [...p, l.id] : p.filter((x) => x !== l.id)))} />{l.name}</label>)}
+        {locations.filter((l) => (l as { code?: string }).code !== 'gravy').map((l) => <label key={l.id} className="row" style={{ gap: 10 }}><input type="checkbox" checked={locs.includes(l.id)} onChange={(e) => setLocs((p) => (e.target.checked ? [...p, l.id] : p.filter((x) => x !== l.id)))} />{l.name}</label>)}
       </fieldset>
       <div className="row" style={{ gap: 10 }}><span>First code: <b className="num" style={{ fontSize: 20, letterSpacing: 3 }}>{code}</b></span><button className="btn quiet" onClick={() => setCode(newCode())}>New code</button></div>
       {error && <p className="banner bad" role="alert">{error}</p>}
