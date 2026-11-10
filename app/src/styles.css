@@ -626,9 +626,37 @@ tr.click { cursor: pointer; }
 .mcsoon { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .mcsoon .soonbox { padding: 10px 8px; }
 
-/* Invisible scrollbars everywhere. Scrolling still works by touch, wheel and keys. */
-* { scrollbar-width: none; -ms-overflow-style: none; }
-*::-webkit-scrollbar { display: none; width: 0; height: 0; }
+/* Scrollbars stay out of sight until the pointer is over the area, then a thin handle appears.
+   That handle can be dragged, so a mouse without a wheel still works. Edges fade where more content is hidden. */
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*:hover { scrollbar-color: var(--line-strong) transparent; }
+@supports not (scrollbar-width: thin) {
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: transparent; border-radius: 99px; }
+  *:hover::-webkit-scrollbar-thumb { background: var(--line-strong); }
+}
+:root { --fs: rgba(0,0,0,.16); }
+@media (prefers-color-scheme: dark) { :root { --fs: rgba(255,255,255,.12); } }
+.sheet, .voicebox, .sidebar { --fb: var(--surface); }
+.te .sheet, .te .msheet { --fb: var(--card); }
+.sheet, .voicebox, .sidebar, .te .sheet, .te .msheet {
+  background-color: var(--fb);
+  background-image: linear-gradient(var(--fb) 30%, transparent), linear-gradient(transparent, var(--fb) 70%), radial-gradient(farthest-side at 50% 0, var(--fs), transparent), radial-gradient(farthest-side at 50% 100%, var(--fs), transparent);
+  background-position: center top, center bottom, center top, center bottom;
+  background-repeat: no-repeat;
+  background-size: 100% 36px, 100% 36px, 100% 12px, 100% 12px;
+  background-attachment: local, local, scroll, scroll;
+}
+.tablewrap, .te .msheet .mscroll {
+  --fb: var(--surface);
+  background-image: linear-gradient(to right, var(--fb) 30%, transparent), linear-gradient(to left, var(--fb) 30%, transparent), radial-gradient(farthest-side at 0 50%, var(--fs), transparent), radial-gradient(farthest-side at 100% 50%, var(--fs), transparent);
+  background-position: left center, right center, left center, right center;
+  background-repeat: no-repeat;
+  background-size: 36px 100%, 36px 100%, 12px 100%, 12px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+.te .msheet .mscroll { --fb: var(--card); }
 
 /* Dark mode for the SOS sheet and a few other spots that had fixed light colours */
 @media (prefers-color-scheme: dark) {
