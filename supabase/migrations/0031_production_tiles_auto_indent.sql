@@ -8,3 +8,4 @@
 --       (tracked in prod_indent_alloc), submits a draft indent, and tells the Store when an already sent indent changes.
 -- Seeded access: Munna and Vikas for gravy and snack, Deboda for continental.
 -- 0035: prod_catalog() returns recipes and ingredient lines with item names and units, so staff logins (who cannot read items) see names and kg/pcs.
+-- 0036: prod_recipes.multiple_of (Cheese Balls = 4, chips 40/80/120, max 200), trigger prod_orders_multiple rejects other quantities, prod_catalog returns multiple_of.

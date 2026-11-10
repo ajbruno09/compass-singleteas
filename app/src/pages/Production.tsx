@@ -5,7 +5,7 @@ import { useToast } from '../components/Toast';
 import '../production.css';
 
 type Kind = 'gravy' | 'snack' | 'continental';
-interface Recipe { item_id: number; base_qty: number; min_qty: number; max_qty: number; kind: Kind; chips: number[] | null; items: { name: string; unit: string } | null }
+interface Recipe { item_id: number; base_qty: number; min_qty: number; max_qty: number; multiple_of?: number; kind: Kind; chips: number[] | null; items: { name: string; unit: string } | null }
 interface RLine { recipe_item_id: number; ingredient_id: number; qty_per_base: number; unit_ok: boolean; name: string; unit: string }
 interface Cat { recipes: (Omit<Recipe, 'items'> & { name: string; unit: string })[]; lines: RLine[] }
 interface IItem { id: number; name: string; unit: string }
@@ -80,7 +80,7 @@ export function Production() {
     const FIRST = [661, 608, 662, 584, 560, 657, 660, 641, 574, 458, 443];
     const pos = (x: Recipe) => { const i = FIRST.indexOf(x.item_id); return i < 0 ? 1000 : i; };
     const cd = (cat.data as Cat | null) ?? { recipes: [], lines: [] };
-    const rs: Recipe[] = cd.recipes.map((x) => ({ item_id: x.item_id, base_qty: x.base_qty, min_qty: x.min_qty, max_qty: x.max_qty, kind: x.kind, chips: x.chips, items: { name: x.name, unit: x.unit } }))
+    const rs: Recipe[] = cd.recipes.map((x) => ({ item_id: x.item_id, base_qty: x.base_qty, min_qty: x.min_qty, max_qty: x.max_qty, multiple_of: x.multiple_of ?? 1, kind: x.kind, chips: x.chips, items: { name: x.name, unit: x.unit } }))
       .sort((a2, c) => pos(a2) - pos(c) || (a2.items?.name ?? '').localeCompare(c.items?.name ?? ''));
     setRecipes(rs);
     setLines(cd.lines);
@@ -146,7 +146,7 @@ export function Production() {
   const setQty = (o: Order, q: number) => { void run(() => supabase.rpc('prod_update_qty', { p_id: o.id, p_qty: q }), ''); };
   const stepBy = (o: Order, dir: 1 | -1) => {
     const r = rec.get(o.item_id); if (!r) return;
-    const stp = r.chips && r.chips.length > 1 ? r.chips[1] - r.chips[0] : 1;
+    const stp = Math.max(r.multiple_of ?? 1, r.chips && r.chips.length > 1 ? r.chips[1] - r.chips[0] : 1);
     setQty(o, Math.min(r.max_qty, Math.max(r.min_qty, o.qty + dir * stp)));
   };
   const step = (id: number, status: string) => run(() => supabase.rpc('prod_set_status', { p_id: id, p_status: status }), STEPS[status] ?? 'Done');
@@ -180,7 +180,7 @@ export function Production() {
         <div className="pd-hd"><span className="pd-nm">{r.items?.name}</span><span className="pd-sub">{r.items?.unit === 'kg' ? 'kg' : 'pcs'}</span></div>
         <div className="pd-chips">
           {chips.map((s) => <button key={s} className={'pd-q' + (q === s ? ' pd-on' : '')} onClick={() => { const n = { ...pick }; if (n[r.item_id] === s) delete n[r.item_id]; else n[r.item_id] = s; setPick(n); }}>{s}{r.items?.unit === 'kg' ? ' kg' : ''}</button>)}
-          <input className="pd-cq" type="number" min={r.min_qty} max={r.max_qty} placeholder="Other" value={q && !chips.includes(q) ? q : ''} onChange={(e) => { const v = Number(e.target.value); const n = { ...pick }; if (v > 0) n[r.item_id] = Math.min(v, r.max_qty); else delete n[r.item_id]; setPick(n); }} />
+          <input className="pd-cq" type="number" min={r.min_qty} max={r.max_qty} step={r.multiple_of ?? 1} placeholder="Other" value={q && !chips.includes(q) ? q : ''} onChange={(e) => { const v = Number(e.target.value); const n = { ...pick }; if (v > 0) n[r.item_id] = Math.min(v, r.max_qty); else delete n[r.item_id]; setPick(n); }} onBlur={(e) => { const m = r.multiple_of ?? 1; const v = Number(e.target.value); if (m > 1 && v > 0 && v % m !== 0) { const n = { ...pick, [r.item_id]: Math.min(r.max_qty, Math.max(m, Math.round(v / m) * m)) }; setPick(n); toast(`${r.items?.name} is made in portions of ${m}, so I set it to ${n[r.item_id]}`); } }} />
         </div>
         <button className="pd-more" onClick={() => setOpen({ ...open, [r.item_id]: !open[r.item_id] })}>{open[r.item_id] ? 'Hide' : 'What this uses'}</button>
         <div className={'pd-use' + (open[r.item_id] ? ' pd-open' : '')}>
