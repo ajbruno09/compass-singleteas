@@ -6,7 +6,8 @@ import '../production.css';
 
 type Kind = 'gravy' | 'snack' | 'continental';
 interface Recipe { item_id: number; base_qty: number; min_qty: number; max_qty: number; kind: Kind; chips: number[] | null; items: { name: string; unit: string } | null }
-interface RLine { recipe_item_id: number; ingredient_id: number; qty_per_base: number; unit_ok: boolean }
+interface RLine { recipe_item_id: number; ingredient_id: number; qty_per_base: number; unit_ok: boolean; name: string; unit: string }
+interface Cat { recipes: (Omit<Recipe, 'items'> & { name: string; unit: string })[]; lines: RLine[] }
 interface IItem { id: number; name: string; unit: string }
 interface Plan { id: number; item_id: number; weekday: number; qty: number; active: boolean }
 interface Level { item_id: number; trigger_level: number | null; urgent_level: number | null; urgent_batch: number }
@@ -69,28 +70,25 @@ export function Production() {
     ]);
     const b = String(bdr.data); const f = String(fdr.data);
     setBd(b); setForDate(f); setKinds((kr.data as Kind[]) ?? []);
-    const [r, rl, p, l, o, t] = await Promise.all([
-      supabase.from('prod_recipes').select('item_id, base_qty, min_qty, max_qty, kind, chips, items(name, unit)').eq('active', true),
-      supabase.from('prod_recipe_lines').select('recipe_item_id, ingredient_id, qty_per_base, unit_ok'),
+    const [cat, p, l, o, t] = await Promise.all([
+      supabase.rpc('prod_catalog'),
       supabase.from('prod_plan').select('*').eq('active', true),
       supabase.from('prod_levels').select('*'),
-      supabase.from('prod_orders').select('id, item_id, qty, for_date, status, urgent, source, reason, requested_at, qty_made, items(name, unit)').order('requested_at', { ascending: false }).limit(80),
+      supabase.from('prod_orders').select('id, item_id, qty, for_date, status, urgent, source, reason, requested_at, qty_made').order('requested_at', { ascending: false }).limit(80),
       supabase.rpc('indent_times', { p_for_date: f })
     ]);
     const FIRST = [661, 608, 662, 584, 560, 657, 660, 641, 574, 458, 443];
     const pos = (x: Recipe) => { const i = FIRST.indexOf(x.item_id); return i < 0 ? 1000 : i; };
-    const rs = ((r.data as unknown as Recipe[]) ?? []).sort((a, c) => pos(a) - pos(c) || (a.items?.name ?? '').localeCompare(c.items?.name ?? ''));
+    const cd = (cat.data as Cat | null) ?? { recipes: [], lines: [] };
+    const rs: Recipe[] = cd.recipes.map((x) => ({ item_id: x.item_id, base_qty: x.base_qty, min_qty: x.min_qty, max_qty: x.max_qty, kind: x.kind, chips: x.chips, items: { name: x.name, unit: x.unit } }))
+      .sort((a2, c) => pos(a2) - pos(c) || (a2.items?.name ?? '').localeCompare(c.items?.name ?? ''));
     setRecipes(rs);
-    const ls = (rl.data as RLine[]) ?? [];
-    setLines(ls);
-    const ids = [...new Set(ls.map((x) => x.ingredient_id))];
-    if (ids.length) {
-      const it = await supabase.from('items').select('id, name, unit').in('id', ids);
-      setInames(new Map(((it.data as IItem[]) ?? []).map((x) => [x.id, x])));
-    }
+    setLines(cd.lines);
+    setInames(new Map(cd.lines.map((x) => [x.ingredient_id, { id: x.ingredient_id, name: x.name, unit: x.unit }])));
     setPlan((p.data as Plan[]) ?? []);
     setLevels((l.data as Level[]) ?? []);
-    setOrders((o.data as unknown as Order[]) ?? []);
+    const rmap = new Map(rs.map((x) => [x.item_id, x.items]));
+    setOrders((((o.data as unknown as Order[]) ?? [])).map((x) => ({ ...x, items: rmap.get(x.item_id) ?? null })));
     const tt = ((t.data as { due_at: string; seal_at: string }[]) ?? [])[0];
     setCut(tt ? { due: tt.due_at, seal: tt.seal_at } : null);
   }, []);

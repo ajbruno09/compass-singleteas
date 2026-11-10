@@ -7,3 +7,4 @@
 -- 0033/0034: prod_sync fixes. prod_sync writes the ingredient need of all batches into the counter's indent for the date, moving only its own part
 --       (tracked in prod_indent_alloc), submits a draft indent, and tells the Store when an already sent indent changes.
 -- Seeded access: Munna and Vikas for gravy and snack, Deboda for continental.
+-- 0035: prod_catalog() returns recipes and ingredient lines with item names and units, so staff logins (who cannot read items) see names and kg/pcs.
