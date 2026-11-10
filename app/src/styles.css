@@ -629,3 +629,22 @@ tr.click { cursor: pointer; }
 /* Invisible scrollbars everywhere. Scrolling still works by touch, wheel and keys. */
 * { scrollbar-width: none; -ms-overflow-style: none; }
 *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* Dark mode for the SOS sheet and a few other spots that had fixed light colours */
+@media (prefers-color-scheme: dark) {
+  .sosleft { background: #2A1B19; border-color: #5A2E29; }
+  .sosleft.low { background: #3F1B17; }
+  .sosleft small { color: var(--ink-3); }
+  .sosleft .dot { background: #FF8E80; }
+  .sosleft .dot.used { background: transparent; border-color: #6B4944; }
+  .sosstep .n.todo { background: transparent; color: #FF8E80; border-color: #FF8E80; }
+  .sosstep .req { color: #FF8E80; }
+  .sosstep .ok { color: var(--ok); }
+  .sosopt { background: var(--sunken); border-color: var(--line-strong); color: var(--ink); }
+  .sosopt[aria-pressed=true] { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-deep); }
+  .sosopt.reason[aria-pressed=true] { border-color: #FF8E80; background: #3F1B17; color: #FF8E80; }
+  .sosgo:disabled { background: var(--sunken); color: var(--ink-3); }
+  .stat.sos.off { background: #3A2412; border-color: #5A3A1B; color: #F0A35A; }
+  .usualbar .ustar { background: #3A2E12; color: #E3B04B; }
+  .chk-row:hover { background: var(--sunken); }
+}

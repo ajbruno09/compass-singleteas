@@ -79,3 +79,9 @@
 @media(max-width:900px){.nt .nt-layout{grid-template-columns:1fr}}
 @media(max-width:560px){.nt .nt-pop{position:fixed;left:16px;right:16px;top:auto;bottom:16px;width:auto}.nt .nt-cal{width:auto}}
 .nt .nt-chp:disabled{opacity:.4;cursor:default}
+
+@media (prefers-color-scheme: dark) {
+  .nt .nt-card, .nt input, .nt textarea, .nt .nt-btn, .nt .nt-chp, .nt .nt-pickbtn, .nt .nt-pop, .nt .nt-banner button { background: var(--surface, #161C19); }
+  .nt .nt-seg button.nt-on { background: var(--sunken, #1E2622); }
+  .nt .nt-btn, .nt .nt-chp { color: var(--ink-2, #B4BFBA); }
+}
