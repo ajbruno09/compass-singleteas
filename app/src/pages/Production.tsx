@@ -2,238 +2,330 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { useToast } from '../components/Toast';
+import '../production.css';
 
-interface Recipe { item_id: number; base_qty: number; min_qty: number; step_qty: number; max_qty: number; items: { name: string } | null }
+type Kind = 'gravy' | 'snack' | 'continental';
+interface Recipe { item_id: number; base_qty: number; min_qty: number; max_qty: number; kind: Kind; chips: number[] | null; items: { name: string; unit: string } | null }
+interface RLine { recipe_item_id: number; ingredient_id: number; qty_per_base: number; unit_ok: boolean }
+interface IItem { id: number; name: string; unit: string }
 interface Plan { id: number; item_id: number; weekday: number; qty: number; active: boolean }
 interface Level { item_id: number; trigger_level: number | null; urgent_level: number | null; urgent_batch: number }
-interface Order { id: number; item_id: number; qty: number; for_date: string; status: string; urgent: boolean; source: string; reason: string | null; requested_at: string; qty_made: number | null; items: { name: string } | null }
-interface Ing { ingredient_id: number; name: string; unit: string; qty: number; unit_ok: boolean }
+interface Order { id: number; item_id: number; qty: number; for_date: string; status: string; urgent: boolean; source: string; reason: string | null; requested_at: string; qty_made: number | null; items: { name: string; unit: string } | null }
+interface Person { id: string; full_name: string }
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const STEPS: Record<string, string> = { requested: 'Requested', cooking: 'Cooking', on_the_way: 'On its way', received: 'Received', cancelled: 'Cancelled' };
-const fmt = (n: number) => String(Math.round(n * 1000) / 1000);
+const TILES: { kind: Kind; title: string; hint: (r: Recipe[]) => string }[] = [
+  { kind: 'gravy', title: 'Gravies', hint: (r) => `${r.length} items · ${fmtChips(r[0])}` },
+  { kind: 'snack', title: 'Frozen snacks', hint: (r) => `${r.length} items · ${fmtChips(r[0])}` },
+  { kind: 'continental', title: 'Continental frozen', hint: (r) => `${r.length} items · 1, 2 or 3 batches` }
+];
+function fmtChips(r?: Recipe) { if (!r?.chips?.length) return ''; const u = r.items?.unit === 'kg' ? ' kg' : ' pcs'; return r.kind === 'snack' ? '100 to 300 pcs' : r.chips.join(', ') + u; }
 
-function Stepper({ r, v, set }: { r: Recipe; v: number; set: (n: number) => void }) {
-  return (
-    <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
-      <button className="btn secondary" onClick={() => set(Math.max(r.min_qty, v - r.step_qty))} aria-label="Less">−</button>
-      <b style={{ minWidth: 56, textAlign: 'center' }}>{v}</b>
-      <button className="btn secondary" onClick={() => set(Math.min(r.max_qty, v + r.step_qty))} aria-label="More">+</button>
-    </span>
-  );
-}
+const fq = (v: number, u: string) => {
+  let x = v; let uu = u;
+  if (u === 'g' && v >= 1000) { x = v / 1000; uu = 'kg'; }
+  else if (u === 'kg' && v < 1 && v > 0) { x = Math.round(v * 1000); uu = 'g'; }
+  else if (u === 'L' && v < 1 && v > 0) { x = Math.round(v * 1000); uu = 'ml'; }
+  return `${Math.round(x * 100) / 100} ${uu}`;
+};
+const unitTxt = (u?: string) => (u === 'kg' ? ' kg' : ' pcs');
+const dayLabel = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 
 export function Production() {
-  const { profile, myLocations } = useSession();
+  const { profile } = useSession();
   const toast = useToast();
   const admin = profile?.role === 'owner';
   const staffView = profile?.role === 'department' || profile?.role === 'closing';
-  const canCook = admin || profile?.role === 'manager' || profile?.role === 'department';
   const canReceive = admin || profile?.role === 'manager' || profile?.role === 'store';
+  const [kinds, setKinds] = useState<Kind[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [lines, setLines] = useState<RLine[]>([]);
+  const [inames, setInames] = useState<Map<number, IItem>>(new Map());
   const [plan, setPlan] = useState<Plan[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [today, setToday] = useState({ date: '', dow: 1 });
-  const [qty, setQty] = useState<Record<number, number>>({});
-  const [open, setOpen] = useState<number | null>(null);
-  const [ings, setIngs] = useState<Ing[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
+  const [access, setAccess] = useState<Set<string>>(new Set());
+  const [bd, setBd] = useState('');
+  const [forDate, setForDate] = useState('');
+  const [cut, setCut] = useState<{ due: string; seal: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<'today' | 'recipes' | 'plan' | 'levels'>('today');
-  const [extra, setExtra] = useState({ item: 0, qty: 100, reason: '', urgent: false });
-  const [rc, setRc] = useState({ item: 0, qty: 100 });
-  const [rIngs, setRIngs] = useState<Ing[]>([]);
+  const [tab, setTab] = useState<'today' | 'recipes' | 'plan' | 'levels' | 'who'>('today');
+  const [scr, setScr] = useState<'home' | Kind>('home');
+  const [pick, setPick] = useState<Record<number, number>>({});
+  const [open, setOpen] = useState<Record<number, boolean>>({});
   const [made, setMade] = useState<Record<number, string>>({});
-  const [add, setAdd] = useState<Record<number, { item: number; qty: number }>>({});
+  const [rg, setRg] = useState<Kind>('gravy');
+  const [ri, setRi] = useState(0);
+  const [rq, setRq] = useState(0);
+  const [add, setAdd] = useState<Record<number, { item: number; qty: string }>>({});
 
   const load = useCallback(async () => {
-    const bd = String((await supabase.rpc('business_date', { p_at: new Date().toISOString() })).data);
-    const dow = ((new Date(bd + 'T12:00:00').getDay() + 6) % 7) + 1;
-    setToday({ date: bd, dow });
-    const [r, p, l, o] = await Promise.all([
-      supabase.from('prod_recipes').select('item_id, base_qty, min_qty, step_qty, max_qty, items(name)').eq('active', true),
+    const [bdr, fdr, kr] = await Promise.all([
+      supabase.rpc('business_date', { p_at: new Date().toISOString() }),
+      supabase.rpc('indent_for_date'),
+      supabase.rpc('my_prod_kinds')
+    ]);
+    const b = String(bdr.data); const f = String(fdr.data);
+    setBd(b); setForDate(f); setKinds((kr.data as Kind[]) ?? []);
+    const [r, rl, p, l, o, t] = await Promise.all([
+      supabase.from('prod_recipes').select('item_id, base_qty, min_qty, max_qty, kind, chips, items(name, unit)').eq('active', true),
+      supabase.from('prod_recipe_lines').select('recipe_item_id, ingredient_id, qty_per_base, unit_ok'),
       supabase.from('prod_plan').select('*').eq('active', true),
       supabase.from('prod_levels').select('*'),
-      supabase.from('prod_orders').select('id, item_id, qty, for_date, status, urgent, source, reason, requested_at, qty_made, items(name)').order('requested_at', { ascending: false }).limit(40)
+      supabase.from('prod_orders').select('id, item_id, qty, for_date, status, urgent, source, reason, requested_at, qty_made, items(name, unit)').order('requested_at', { ascending: false }).limit(80),
+      supabase.rpc('indent_times', { p_for_date: f })
     ]);
-    const rs = ((r.data as unknown as Recipe[]) ?? []).sort((a, b) => (a.items?.name ?? '').localeCompare(b.items?.name ?? ''));
+    const FIRST = [661, 608, 662, 584, 560, 657, 660, 641, 574, 458, 443];
+    const pos = (x: Recipe) => { const i = FIRST.indexOf(x.item_id); return i < 0 ? 1000 : i; };
+    const rs = ((r.data as unknown as Recipe[]) ?? []).sort((a, c) => pos(a) - pos(c) || (a.items?.name ?? '').localeCompare(c.items?.name ?? ''));
     setRecipes(rs);
+    const ls = (rl.data as RLine[]) ?? [];
+    setLines(ls);
+    const ids = [...new Set(ls.map((x) => x.ingredient_id))];
+    if (ids.length) {
+      const it = await supabase.from('items').select('id, name, unit').in('id', ids);
+      setInames(new Map(((it.data as IItem[]) ?? []).map((x) => [x.id, x])));
+    }
     setPlan((p.data as Plan[]) ?? []);
     setLevels((l.data as Level[]) ?? []);
     setOrders((o.data as unknown as Order[]) ?? []);
-    setExtra((e) => (e.item ? e : { ...e, item: rs[0]?.item_id ?? 0 }));
+    const tt = ((t.data as { due_at: string; seal_at: string }[]) ?? [])[0];
+    setCut(tt ? { due: tt.due_at, seal: tt.seal_at } : null);
   }, []);
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (!admin) return;
+    void (async () => {
+      const [pp, aa] = await Promise.all([
+        supabase.from('profiles').select('id, full_name').eq('active', true).eq('role', 'department').order('full_name'),
+        supabase.from('prod_access').select('profile_id, kind')
+      ]);
+      setPeople((pp.data as Person[]) ?? []);
+      setAccess(new Set(((aa.data as { profile_id: string; kind: string }[]) ?? []).map((x) => x.profile_id + '|' + x.kind)));
+    })();
+  }, [admin, tab]);
+
   const rec = useMemo(() => new Map(recipes.map((r) => [r.item_id, r])), [recipes]);
-  const nameOf = (id: number) => rec.get(id)?.items?.name ?? '';
-  const todays = plan.filter((p) => p.weekday === today.dow);
-  const ordered = (item: number) => orders.find((o) => o.item_id === item && o.for_date === today.date && o.status !== 'cancelled');
-  const live = orders.filter((o) => ['requested', 'cooking', 'on_the_way'].includes(o.status));
-  const recent = orders.filter((o) => ['received', 'cancelled'].includes(o.status)).slice(0, 8);
+  const byKind = (k: Kind) => recipes.filter((r) => r.kind === k);
+  const visible = (o: Order) => { const r = rec.get(o.item_id); return !!r && kinds.includes(r.kind); };
+  const live = orders.filter((o) => ['requested', 'cooking', 'on_the_way'].includes(o.status) && visible(o));
+  const recent = orders.filter((o) => ['received', 'cancelled'].includes(o.status) && visible(o)).slice(0, 6);
+  const sealed = !!cut && Date.now() >= new Date(cut.seal).getTime();
+  const dueTxt = cut ? new Date(cut.due).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(' ', ' ') : '';
+  const forTomorrow = forDate && bd && new Date(forDate).getTime() - new Date(bd).getTime() === 86400000;
+
+  const need = (itemId: number, q: number) => {
+    const r = rec.get(itemId); if (!r) return [];
+    return lines.filter((x) => x.recipe_item_id === itemId).map((x) => {
+      const it = inames.get(x.ingredient_id);
+      return { id: x.ingredient_id, name: it?.name ?? '', unit: it?.unit ?? '', qty: (x.qty_per_base * q) / r.base_qty, ok: x.unit_ok };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  };
 
   const run = async (fn: () => PromiseLike<{ error: { message: string } | null }>, ok: string) => {
     setBusy(true);
     const { error } = await fn();
     setBusy(false);
-    if (error) { toast(error.message); return; }
-    toast(ok);
+    if (error) { toast(error.message); return false; }
+    if (ok) toast(ok);
+    void load();
+    return true;
+  };
+  const send = async () => {
+    const entries = Object.entries(pick);
+    setBusy(true);
+    for (const [id, q] of entries) {
+      const { error } = await supabase.rpc('prod_order', { p_item: Number(id), p_qty: q });
+      if (error) { setBusy(false); toast(error.message); return; }
+    }
+    setBusy(false); setPick({}); setScr('home');
+    toast('Sent. Store indent and buying list are ready');
     void load();
   };
-  const order = (item: number, q: number, urgent = false, reason: string | null = null) =>
-    run(() => supabase.rpc('prod_order', { p_item: item, p_qty: q, p_urgent: urgent, p_reason: reason }), 'Batch ordered');
-  const step = (id: number, status: string) => run(() => supabase.rpc('prod_set_status', { p_id: id, p_status: status }), STEPS[status] ?? 'Done');
-  const showIngs = async (o: Order) => {
-    if (open === o.id) { setOpen(null); return; }
-    const { data } = await supabase.rpc('prod_ingredients', { p_item: o.item_id, p_qty: o.qty });
-    setIngs((data as Ing[]) ?? []);
-    setOpen(o.id);
+  const setQty = (o: Order, q: number) => { void run(() => supabase.rpc('prod_update_qty', { p_id: o.id, p_qty: q }), ''); };
+  const stepBy = (o: Order, dir: 1 | -1) => {
+    const r = rec.get(o.item_id); if (!r) return;
+    const stp = r.chips && r.chips.length > 1 ? r.chips[1] - r.chips[0] : 1;
+    setQty(o, Math.min(r.max_qty, Math.max(r.min_qty, o.qty + dir * stp)));
   };
-
-  useEffect(() => {
-    const id = rc.item || recipes[0]?.item_id;
-    if (tab !== 'recipes' || !id) return;
-    void (async () => { const { data } = await supabase.rpc('prod_ingredients', { p_item: id, p_qty: rc.qty }); setRIngs((data as Ing[]) ?? []); })();
-  }, [tab, rc.item, rc.qty, recipes]);
-  const planFor = (day: number) => plan.filter((p) => p.weekday === day);
+  const step = (id: number, status: string) => run(() => supabase.rpc('prod_set_status', { p_id: id, p_status: status }), STEPS[status] ?? 'Done');
   const addPlan = (day: number) => {
-    const a = add[day] ?? { item: recipes[0]?.item_id ?? 0, qty: 100 };
-    if (!a.item) return;
-    void run(() => supabase.from('prod_plan').upsert({ item_id: a.item, weekday: day, qty: a.qty, active: true }, { onConflict: 'item_id,weekday' }), 'Plan saved');
+    const a = add[day]; const item = a?.item || recipes.filter((r) => r.kind !== 'gravy')[0]?.item_id || recipes[0]?.item_id;
+    const q = Number(a?.qty || rec.get(item)?.chips?.[0] || 0);
+    if (!item || !q) return;
+    void run(() => supabase.from('prod_plan').upsert({ item_id: item, weekday: day, qty: q, active: true }, { onConflict: 'item_id,weekday' }), 'Plan saved');
   };
   const dropPlan = (id: number) => run(() => supabase.from('prod_plan').delete().eq('id', id), 'Removed from plan');
   const saveLevel = (item: number, patch: Partial<Level>) => {
-    const cur = levels.find((l) => l.item_id === item);
+    const cur = levels.find((x) => x.item_id === item);
     void run(() => supabase.from('prod_levels').upsert({ item_id: item, trigger_level: cur?.trigger_level ?? null, urgent_level: cur?.urgent_level ?? null, urgent_batch: cur?.urgent_batch ?? 100, ...patch }, { onConflict: 'item_id' }), 'Saved');
   };
+  const toggleAccess = (pid: string, k: Kind) => {
+    const key = pid + '|' + k; const on = !access.has(key);
+    const next = new Set(access); if (on) next.add(key); else next.delete(key); setAccess(next);
+    void run(() => supabase.rpc('prod_set_access', { p_profile: pid, p_kind: k, p_on: on }), '');
+  };
 
-  void myLocations;
+  const np = Object.keys(pick).length;
+  const cnt = (k: Kind) => byKind(k).filter((r) => pick[r.item_id]).length;
+  const adm = admin || profile?.role === 'manager' || profile?.role === 'store';
+  const showAdminTabs = admin;
 
-  return (
-    <div className={staffView ? 'phone' : ''} style={staffView ? undefined : { display: 'grid', gap: 14, maxWidth: 760 }}>
-      <div className="phone-head"><b style={{ font: '800 20px/24px var(--font-display)' }}>Snacks production</b></div>
-      {!staffView && (
-        <div className="countersw" role="tablist">
-          <button className={tab === 'today' ? 'on' : ''} onClick={() => setTab('today')}>Today</button>
-          <button className={tab === 'recipes' ? 'on' : ''} onClick={() => setTab('recipes')}>Recipes</button>
-          {admin && <><button className={tab === 'plan' ? 'on' : ''} onClick={() => setTab('plan')}>Weekly plan</button>
-          <button className={tab === 'levels' ? 'on' : ''} onClick={() => setTab('levels')}>Stock levels</button></>}
+  const itemCard = (r: Recipe) => {
+    const q = pick[r.item_id]; const chips = r.chips ?? [r.base_qty]; const u = unitTxt(r.items?.unit);
+    const ing = need(r.item_id, q || chips[0]);
+    return (
+      <div key={r.item_id} className={'pd-card pd-it' + (q ? ' pd-sel' : '')}>
+        <div className="pd-hd"><span className="pd-nm">{r.items?.name}</span><span className="pd-sub">{r.items?.unit === 'kg' ? 'kg' : 'pcs'}</span></div>
+        <div className="pd-chips">
+          {chips.map((s) => <button key={s} className={'pd-q' + (q === s ? ' pd-on' : '')} onClick={() => { const n = { ...pick }; if (n[r.item_id] === s) delete n[r.item_id]; else n[r.item_id] = s; setPick(n); }}>{s}{r.items?.unit === 'kg' ? ' kg' : ''}</button>)}
+          <input className="pd-cq" type="number" min={r.min_qty} max={r.max_qty} placeholder="Other" value={q && !chips.includes(q) ? q : ''} onChange={(e) => { const v = Number(e.target.value); const n = { ...pick }; if (v > 0) n[r.item_id] = Math.min(v, r.max_qty); else delete n[r.item_id]; setPick(n); }} />
+        </div>
+        <button className="pd-more" onClick={() => setOpen({ ...open, [r.item_id]: !open[r.item_id] })}>{open[r.item_id] ? 'Hide' : 'What this uses'}</button>
+        <div className={'pd-use' + (open[r.item_id] ? ' pd-open' : '')}>
+          {ing.map((x) => <div key={x.id}><span>{x.name}{!x.ok && <> <span className="pd-chip pd-att">unit?</span></>}</span><span className="pd-num">{fq(x.qty, x.unit)}</span></div>)}
+          {!q && <div className="pd-mut"><span>Shown for the smallest quantity</span></div>}
+        </div>
+        <span hidden>{u}</span>
+      </div>
+    );
+  };
+
+  const home = (
+    <>
+      {cut && (
+        <div className="pd-banner">
+          {sealed
+            ? <span>The indent is closed. New orders go as <b style={{ fontWeight: 600 }}>urgent</b> and Admin is told.</span>
+            : <span>Order before <b style={{ fontWeight: 600 }}>{dueTxt}</b> for {forTomorrow ? "tomorrow's" : dayLabel(forDate) + "'s"} indent. After that it goes as urgent and Admin is told.</span>}
         </div>
       )}
+      <div className="pd-tiles">
+        {TILES.filter((t) => kinds.includes(t.kind) && byKind(t.kind).length > 0).map((t) => {
+          const n = cnt(t.kind);
+          return (
+            <button key={t.kind} className="pd-tile" onClick={() => setScr(t.kind)}>
+              <span><b>{t.title}</b><span className="pd-sm pd-mut">{t.hint(byKind(t.kind))}</span></span>
+              {n ? <span className="pd-chip pd-ok">{n} chosen</span> : <span className="pd-go">›</span>}
+            </button>
+          );
+        })}
+      </div>
+      {kinds.length === 0 && <div className="pd-card pd-empty">Nothing is assigned to you yet. Please ask Admin.</div>}
 
-      {tab === 'today' && (
-        <>
-          <div className="hsec">Planned for today · {DAYS[today.dow - 1]}</div>
-          {todays.length === 0 && <div className="card small muted">Nothing is planned for today. You can still order a batch below.</div>}
-          {todays.map((p) => {
-            const r = rec.get(p.item_id); if (!r) return null;
-            const o = ordered(p.item_id);
-            const v = qty[p.item_id] ?? p.qty;
+      {live.length > 0 && (
+        <div className="pd-card">
+          <div className="pd-hd2"><h2>Batches</h2><span className="pd-sm pd-mut">Change the quantity before it starts cooking</span></div>
+          {live.map((o) => {
+            const r = rec.get(o.item_id); const u = unitTxt(o.items?.unit); const can = !!r && kinds.includes(r.kind);
             return (
-              <div className="card" key={p.id} style={{ display: 'grid', gap: 10 }}>
-                <div className="row" style={{ justifyContent: 'space-between' }}><b>{nameOf(p.item_id)}</b>{o ? <span className="chip done">{STEPS[o.status]} · {o.qty}</span> : <span className="chip due">Plan {p.qty}</span>}</div>
-                {!o && canCook && (
-                  <div className="row" style={{ justifyContent: 'space-between' }}>
-                    <Stepper r={r} v={v} set={(n) => setQty({ ...qty, [p.item_id]: n })} />
-                    <button className="btn" disabled={busy} onClick={() => order(p.item_id, v)}>Order batch</button>
+              <div key={o.id} className="pd-ordl" style={{ flexWrap: 'wrap' }}>
+                <span className="pd-t">{o.items?.name}<span className="pd-mut pd-sm"> · {dayLabel(o.for_date)}{o.urgent ? ' · urgent' : ''}</span></span>
+                {o.status === 'requested' && can
+                  ? <span className="pd-stp"><button disabled={busy} onClick={() => stepBy(o, -1)} aria-label="Less">−</button><span className="pd-num">{o.qty}{u}</span><button disabled={busy} onClick={() => stepBy(o, 1)} aria-label="More">+</button></span>
+                  : <span className="pd-num">{o.qty}{u}</span>}
+                <span className={'pd-chip ' + (o.status === 'requested' ? 'pd-wait' : 'pd-ok')}>{STEPS[o.status]}</span>
+                <span className="pd-row">
+                  <button className="pd-btn" onClick={() => setOpen({ ...open, [-o.id]: !open[-o.id] })}>{open[-o.id] ? 'Hide' : 'Ingredients'}</button>
+                  {can && o.status === 'requested' && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'cooking')}>Start cooking</button>}
+                  {can && ['requested', 'cooking'].includes(o.status) && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'on_the_way')}>Sent to store</button>}
+                  {canReceive && o.status === 'on_the_way' && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'received')}>Received</button>}
+                  {can && o.status === 'requested' && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'cancelled')}>Cancel</button>}
+                </span>
+                {admin && o.status !== 'received' && (
+                  <span className="pd-row" style={{ width: '100%' }}>
+                    <input className="pd-input" style={{ flex: 1, minWidth: 0 }} inputMode="numeric" placeholder={'Actually made' + u} value={made[o.id] ?? (o.qty_made ?? '')} onChange={(e) => setMade({ ...made, [o.id]: e.target.value })} />
+                    <button className="pd-btn" disabled={busy || !made[o.id]} onClick={() => run(() => supabase.rpc('prod_set_yield', { p_id: o.id, p_made: Number(made[o.id]) }), 'Yield saved')}>Save yield</button>
+                  </span>
+                )}
+                {open[-o.id] && (
+                  <div className="pd-use pd-open" style={{ width: '100%' }}>
+                    {need(o.item_id, o.qty).map((x) => <div key={x.id}><span>{x.name}{!x.ok && <> <span className="pd-chip pd-att">unit?</span></>}</span><span className="pd-num">{fq(x.qty, x.unit)}</span></div>)}
                   </div>
                 )}
               </div>
             );
           })}
-
-          <div className="hsec">On the line</div>
-          {live.length === 0 && <div className="card small muted">No batches in progress.</div>}
-          {live.map((o) => (
-            <div className="card" key={o.id} style={{ display: 'grid', gap: 10 }}>
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <b>{o.items?.name} · {o.qty}</b>
-                <span className={'chip ' + (o.urgent ? 'flag' : 'due')}>{o.urgent ? 'URGENT · ' : ''}{STEPS[o.status]}</span>
-              </div>
-              <div className="small muted">For {o.for_date}{o.reason ? ` · ${o.reason}` : ''}</div>
-              <div className="row" style={{ gap: 8 }}>
-                <button className="btn secondary" onClick={() => showIngs(o)}>{open === o.id ? 'Hide' : 'Ingredients'}</button>
-                {canCook && o.status === 'requested' && <button className="btn" disabled={busy} onClick={() => step(o.id, 'cooking')}>Start cooking</button>}
-                {canCook && ['requested', 'cooking'].includes(o.status) && <button className="btn" disabled={busy} onClick={() => step(o.id, 'on_the_way')}>Sent to store</button>}
-                {canReceive && o.status === 'on_the_way' && <button className="btn" disabled={busy} onClick={() => step(o.id, 'received')}>Received</button>}
-                {admin && o.status === 'requested' && <button className="btn quiet" disabled={busy} onClick={() => step(o.id, 'cancelled')}>Cancel</button>}
-              </div>
-              {admin && o.status !== 'received' && (
-                <div className="row" style={{ gap: 8 }}>
-                  <input inputMode="numeric" placeholder="Pieces actually made" value={made[o.id] ?? (o.qty_made ?? '')} onChange={(e) => setMade({ ...made, [o.id]: e.target.value })} style={{ flex: 1, minWidth: 0 }} />
-                  <button className="btn secondary" disabled={busy || !made[o.id]} onClick={() => run(() => supabase.rpc('prod_set_yield', { p_id: o.id, p_made: Number(made[o.id]) }), 'Yield saved')}>Save yield</button>
-                </div>
-              )}
-              {open === o.id && (
-                <div style={{ display: 'grid', gap: 4 }}>
-                  {ings.map((i) => (
-                    <div key={i.ingredient_id} className="row" style={{ justifyContent: 'space-between' }}>
-                      <span>{i.name}</span><span><b>{fmt(i.qty)}</b> <span className="muted small">{i.unit}</span>{!i.unit_ok && <span className="chip late" style={{ marginLeft: 6 }}>unit?</span>}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-
-          {canCook && recipes.length > 0 && (
-            <>
-              <div className="hsec">Something else, or running out</div>
-              <div className="card" style={{ display: 'grid', gap: 10 }}>
-                <select value={extra.item} onChange={(e) => setExtra({ ...extra, item: Number(e.target.value) })}>{recipes.map((r) => <option key={r.item_id} value={r.item_id}>{r.items?.name}</option>)}</select>
-                {rec.get(extra.item) && <Stepper r={rec.get(extra.item)!} v={extra.qty} set={(n) => setExtra({ ...extra, qty: n })} />}
-                <input placeholder="Reason (needed if not planned today)" value={extra.reason} onChange={(e) => setExtra({ ...extra, reason: e.target.value })} />
-                <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={extra.urgent} onChange={(e) => setExtra({ ...extra, urgent: e.target.checked })} /> Urgent, we are running out</label>
-                <button className="btn" disabled={busy || !extra.item} onClick={() => order(extra.item, extra.qty, extra.urgent, extra.reason || null)}>Order batch</button>
-              </div>
-            </>
-          )}
-
-          {recent.length > 0 && (
-            <>
-              <div className="hsec">Recent</div>
-              {recent.map((o) => (
-                <div key={o.id} className="row small" style={{ justifyContent: 'space-between' }}>
-                  <span>{o.items?.name} · {o.qty_made ?? o.qty}</span><span className="muted">{o.for_date} · {STEPS[o.status]}</span>
-                </div>
-              ))}
-            </>
-          )}
-        </>
+        </div>
       )}
+      {recent.length > 0 && (
+        <div className="pd-card">
+          <h2>Recent</h2>
+          {recent.map((o) => <div key={o.id} className="pd-ordl"><span className="pd-t">{o.items?.name}<span className="pd-mut pd-sm"> · {o.qty_made ?? o.qty}{unitTxt(o.items?.unit)}</span></span><span className="pd-mut pd-sm">{dayLabel(o.for_date)} · {STEPS[o.status]}</span></div>)}
+        </div>
+      )}
+      <div className="pd-note">For now batches are ordered by hand here. Soon Compass will order them by itself from the day's plan, and this counter and the Store will only get a notice.</div>
+    </>
+  );
+
+  const list = scr !== 'home' && (
+    <>
+      <div><button className="pd-back" onClick={() => setScr('home')}>‹ Production</button></div>
+      <h1>{TILES.find((t) => t.kind === scr)?.title}</h1>
+      <div className="pd-grid">{byKind(scr).map(itemCard)}</div>
+    </>
+  );
+
+  const rItems = byKind(rg);
+  const rItem = rItems.find((x) => x.item_id === ri) ?? rItems[0];
+  const rQty = rItem && (rItem.chips ?? []).includes(rq) ? rq : (rItem?.chips?.[0] ?? 0);
+
+  const body = (
+    <div className="pd">
+      <div className="pd-head">
+        <span className="pd-lab">Counter</span>
+        <h1>Production</h1>
+        <div className="pd-sm pd-mut">{profile ? `Signed in as ${profile.full_name}` : ''}</div>
+      </div>
+      {showAdminTabs && (
+        <div className="pd-tabs">
+          {([['today', 'Today'], ['recipes', 'Recipes'], ['plan', 'Weekly plan'], ['levels', 'Stock levels'], ['who', 'Who orders what']] as const).map(([k, l]) => <button key={k} className={tab === k ? 'pd-on' : ''} onClick={() => { setTab(k); setScr('home'); }}>{l}</button>)}
+        </div>
+      )}
+      {!showAdminTabs && adm && (
+        <div className="pd-tabs">
+          {([['today', 'Today'], ['recipes', 'Recipes']] as const).map(([k, l]) => <button key={k} className={tab === k ? 'pd-on' : ''} onClick={() => { setTab(k); setScr('home'); }}>{l}</button>)}
+        </div>
+      )}
+
+      {tab === 'today' && (scr === 'home' ? home : list)}
 
       {tab === 'recipes' && (
         <>
-          <p className="muted small">Ingredients for the snacks we make. Quantities are for the pieces you choose. 100 is the standard batch.</p>
-          <div className="card" style={{ display: 'grid', gap: 10 }}>
-            <select value={rc.item || recipes[0]?.item_id || 0} onChange={(e) => setRc({ ...rc, item: Number(e.target.value) })}>{recipes.map((r) => <option key={r.item_id} value={r.item_id}>{r.items?.name}</option>)}</select>
-            {recipes[0] && <div className="row" style={{ justifyContent: 'space-between' }}><span className="muted small">Pieces</span><Stepper r={rec.get(rc.item || recipes[0].item_id)!} v={rc.qty} set={(n) => setRc({ ...rc, qty: n })} /></div>}
-            {rIngs.map((i) => (
-              <div key={i.ingredient_id} className="row" style={{ justifyContent: 'space-between' }}>
-                <span>{i.name}</span><span><b>{fmt(i.qty)}</b> <span className="muted small">{i.unit}</span>{!i.unit_ok && <span className="chip late" style={{ marginLeft: 6 }}>unit?</span>}</span>
+          <p className="pd-sm pd-mut">Ingredients for what we make. Quantities are for the amount you choose.{rItem ? ` ${rItem.base_qty}${unitTxt(rItem.items?.unit)} is the standard batch.` : ''}</p>
+          <div className="pd-seg">{TILES.map((t) => <button key={t.kind} className={rg === t.kind ? 'pd-on' : ''} onClick={() => { setRg(t.kind); setRi(0); setRq(0); }}>{t.title}</button>)}</div>
+          {rItem && (
+            <div className="pd-card" style={{ display: 'grid', gap: 10 }}>
+              <div className="pd-chips">{rItems.map((x) => <button key={x.item_id} className={'pd-q' + (x.item_id === rItem.item_id ? ' pd-on' : '')} onClick={() => { setRi(x.item_id); setRq(0); }}>{x.items?.name}</button>)}</div>
+              <div className="pd-sm pd-mut">{rItem.items?.unit === 'kg' ? 'Kilos' : 'Pieces'}</div>
+              <div className="pd-chips">{(rItem.chips ?? []).map((x) => <button key={x} className={'pd-q' + (x === rQty ? ' pd-on' : '')} onClick={() => setRq(x)}>{x}{rItem.items?.unit === 'kg' ? ' kg' : ''}</button>)}</div>
+              <div className="pd-use pd-open" style={{ borderTop: '1px solid var(--pd-line)', paddingTop: 8, fontSize: 13.5 }}>
+                {need(rItem.item_id, rQty).map((x) => <div key={x.id}><span>{x.name}{!x.ok && <> <span className="pd-chip pd-att">unit?</span></>}</span><span className="pd-num">{fq(x.qty, x.unit)}</span></div>)}
               </div>
-            ))}
-            {rIngs.some((i) => !i.unit_ok) && <div className="small muted">"unit?" means the recipe is in kg or L but the item is counted in packets, bunches or bottles. To be confirmed.</div>}
-          </div>
+              {need(rItem.item_id, rQty).some((x) => !x.ok) && <div className="pd-sm pd-mut">"unit?" means the recipe unit does not match how the item is counted. It is left off the indent until confirmed.</div>}
+            </div>
+          )}
         </>
       )}
 
       {tab === 'plan' && admin && (
         <>
-          <p className="muted small">Choose which snacks are made on which day. The chef gets a reminder in the morning and orders that day's batch.</p>
+          <p className="pd-sm pd-mut">Choose what is made on which day. For now the counter orders by hand. Later Compass orders these by itself and only sends a notice.</p>
           {DAYS.map((d, i) => {
-            const day = i + 1; const a = add[day] ?? { item: recipes[0]?.item_id ?? 0, qty: 100 }; const r = rec.get(a.item);
+            const day = i + 1; const a = add[day];
+            const opts = recipes;
             return (
-              <div className="card" key={d} style={{ display: 'grid', gap: 8 }}>
-                <b>{d}</b>
-                {planFor(day).map((p) => (
-                  <div key={p.id} className="row" style={{ justifyContent: 'space-between' }}><span>{nameOf(p.item_id)} · <b>{p.qty}</b></span><button className="btn quiet" disabled={busy} onClick={() => dropPlan(p.id)}>Remove</button></div>
-                ))}
-                {planFor(day).length === 0 && <span className="small muted">Nothing planned</span>}
-                <div className="row" style={{ gap: 8 }}>
-                  <select value={a.item} onChange={(e) => setAdd({ ...add, [day]: { ...a, item: Number(e.target.value) } })} style={{ flex: 1, minWidth: 0 }}>{recipes.map((x) => <option key={x.item_id} value={x.item_id}>{x.items?.name}</option>)}</select>
-                  {r && <Stepper r={r} v={a.qty} set={(n) => setAdd({ ...add, [day]: { ...a, qty: n } })} />}
-                  <button className="btn" disabled={busy} onClick={() => addPlan(day)}>Add</button>
+              <div key={d} className="pd-card" style={{ display: 'grid', gap: 6 }}>
+                <h2>{d}</h2>
+                {plan.filter((p) => p.weekday === day).map((p) => <div key={p.id} className="pd-ordl"><span className="pd-t">{rec.get(p.item_id)?.items?.name} {p.qty}</span><button className="pd-btn" disabled={busy} onClick={() => dropPlan(p.id)}>Remove</button></div>)}
+                {plan.filter((p) => p.weekday === day).length === 0 && <span className="pd-sm pd-mut">Nothing planned</span>}
+                <div className="pd-row">
+                  <select className="pd-input" style={{ flex: 1, minWidth: 0 }} value={a?.item ?? opts[0]?.item_id ?? 0} onChange={(e) => setAdd({ ...add, [day]: { item: Number(e.target.value), qty: a?.qty ?? '' } })}>{opts.map((r) => <option key={r.item_id} value={r.item_id}>{r.items?.name}</option>)}</select>
+                  <input className="pd-input" style={{ width: 90 }} inputMode="numeric" placeholder="Qty" value={a?.qty ?? ''} onChange={(e) => setAdd({ ...add, [day]: { item: a?.item ?? opts[0]?.item_id ?? 0, qty: e.target.value } })} />
+                  <button className="pd-btn" disabled={busy} onClick={() => addPlan(day)}>Add a batch</button>
                 </div>
               </div>
             );
@@ -243,21 +335,43 @@ export function Production() {
 
       {tab === 'levels' && admin && (
         <>
-          <p className="muted small">When the ready stock of a snack on the Snacks Frozen shelf falls to the urgent level, an urgent batch is ordered automatically. Leave blank to switch it off for that snack.</p>
-          {recipes.map((r) => {
+          <p className="pd-sm pd-mut">When ready stock on the shelf falls to the urgent level, an urgent batch is ordered automatically. Leave blank to switch it off.</p>
+          {recipes.filter((r) => r.kind !== 'gravy').map((r) => {
             const l = levels.find((x) => x.item_id === r.item_id);
             return (
-              <div className="card" key={r.item_id} style={{ display: 'grid', gap: 8 }}>
-                <b>{r.items?.name}</b>
-                <div className="row" style={{ gap: 8 }}>
-                  <label className="small muted" style={{ flex: 1 }}>Urgent at (pcs)<input inputMode="numeric" defaultValue={l?.urgent_level ?? ''} onBlur={(e) => saveLevel(r.item_id, { urgent_level: e.target.value === '' ? null : Number(e.target.value) })} /></label>
-                  <label className="small muted" style={{ flex: 1 }}>Urgent batch<input inputMode="numeric" defaultValue={l?.urgent_batch ?? 100} onBlur={(e) => saveLevel(r.item_id, { urgent_batch: Number(e.target.value) || 100 })} /></label>
+              <div key={r.item_id} className="pd-card" style={{ display: 'grid', gap: 8 }}>
+                <h2>{r.items?.name}</h2>
+                <div className="pd-row">
+                  <label className="pd-sm pd-mut" style={{ flex: 1 }}>Urgent at (pcs)<input className="pd-input" inputMode="numeric" defaultValue={l?.urgent_level ?? ''} onBlur={(e) => saveLevel(r.item_id, { urgent_level: e.target.value === '' ? null : Number(e.target.value) })} /></label>
+                  <label className="pd-sm pd-mut" style={{ flex: 1 }}>Urgent batch<input className="pd-input" inputMode="numeric" defaultValue={l?.urgent_batch ?? r.base_qty} onBlur={(e) => saveLevel(r.item_id, { urgent_batch: Number(e.target.value) || r.base_qty })} /></label>
                 </div>
               </div>
             );
           })}
         </>
       )}
+
+      {tab === 'who' && admin && (
+        <>
+          {TILES.map((t) => (
+            <div key={t.kind} className="pd-card">
+              <h2>{t.title}</h2>
+              <div className="pd-sm pd-mut">Pick one or two people. They see only the tiles assigned to them.</div>
+              <div className="pd-add">{people.map((p) => <button key={p.id} className={'pd-q' + (access.has(p.id + '|' + t.kind) ? ' pd-on' : '')} onClick={() => toggleAccess(p.id, t.kind)}>{p.full_name}</button>)}</div>
+            </div>
+          ))}
+          <div className="pd-hint">Admin and Store can always order everything. Anyone with no tile assigned does not see Production at all. Later, when ordering becomes automatic, this only decides who may order by hand.</div>
+        </>
+      )}
+
+      {tab === 'today' && np > 0 && (
+        <div className="pd-bar">
+          <span className="pd-sm"><b style={{ fontWeight: 600 }}>{np}</b> chosen</span>
+          <span className="pd-row"><button className="pd-btn" onClick={() => setPick({})}>Clear</button><button className="pd-btn pd-p" disabled={busy} onClick={() => void send()}>Send to Store</button></span>
+        </div>
+      )}
     </div>
   );
+
+  return staffView ? <div className="phone">{body}</div> : <div>{body}</div>;
 }

@@ -1,0 +1,9 @@
+-- Applied live via Supabase MCP on 10 Nov 2026 (migrations 0031 to 0034).
+-- 0031: 14 new items (Sambar Powder, Hing, Melon Seeds, Dark Soy Sauce, Coconut Milk, Worcester Sauce, Cajun Seasoning, Cayenne Pepper, Brown Onion, Brown Garlic,
+--       Kashmiri Chilli Powder, Dry Parsley, Dry Thyme, Amul Cheese); prod_recipes gets kind/loc/dest/chips; tables prod_access and prod_indent_alloc;
+--       functions prod_can_kind, my_prod_kinds, prod_set_access, prod_sync, prod_order (any quantity, replaces an open order for the same item and date),
+--       prod_update_qty, prod_set_status (cancel re-syncs; receive goes to the recipe's dest location).
+-- 0032: 7 gravy recipes (location 13) and 4 Continental recipes (location 11), 140 ingredient lines.
+-- 0033/0034: prod_sync fixes. prod_sync writes the ingredient need of all batches into the counter's indent for the date, moving only its own part
+--       (tracked in prod_indent_alloc), submits a draft indent, and tells the Store when an already sent indent changes.
+-- Seeded access: Munna and Vikas for gravy and snack, Deboda for continental.

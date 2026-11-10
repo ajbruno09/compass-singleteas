@@ -31,6 +31,8 @@ export function IndentPage() {
   const pickLocs = party?.open ? [...myLocations, party.loc] : myLocations;
   const toast = useToast();
   const nav = useNavigate();
+  const [prodOk, setProdOk] = useState(false);
+  useEffect(() => { void supabase.rpc('my_prod_kinds').then(({ data }) => setProdOk(((data as string[]) ?? []).length > 0)); }, []);
   const [sp, setSp] = useSearchParams();
   const locId = Number(sp.get('loc')) || myLocations[0]?.id || null;
   const where = pickLocs.find((l) => l.id === locId)?.name ?? '';
@@ -224,10 +226,13 @@ export function IndentPage() {
       </div>
 
       <div className={`notice ${isParty || win === 'open' ? 'ok' : win === 'early' ? 'info' : 'warn'}`}>{isParty ? <span className="chip done">{t('Party order')}: {party!.label}{party!.until ? ` · ${t('until')} ${new Date(party!.until).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })}` : ''}</span> : winChip}</div>
+      {pickLocs.length <= 1 && prodOk && (
+        <div className="cpills" role="group" aria-label="Production"><button aria-pressed={false} onClick={() => nav('/production')}>Production</button></div>
+      )}
       {pickLocs.length > 1 && (
         <div className="cpills" role="group" aria-label="Counter">
           {pickLocs.map((l) => <button key={l.id} aria-pressed={l.id === locId} onClick={() => setSp({ loc: String(l.id) })}>{party && l.id === party.loc.id ? `${t('Party')}: ${party.label}` : l.name}</button>)}
-          {myLocations.some((l) => l.code === 'snacks_production') && <button aria-pressed={false} onClick={() => nav('/production')}>Production</button>}
+          {prodOk && <button aria-pressed={false} onClick={() => nav('/production')}>Production</button>}
         </div>
       )}
 
