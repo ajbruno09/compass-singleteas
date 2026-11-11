@@ -88,6 +88,12 @@ export function CountPage() {
     const { error } = await supabase.rpc('save_count_line', { p_count_id: countId, p_item_id: i.id, p_qty: Number(v) / mult(i) });
     if (error) setErr(errText(error)); else { setErr(''); setSaved((p) => ({ ...p, [i.id]: true })); }
   }
+  async function later() {
+    setBusy(true); setErr('');
+    for (const i of items) { if (!saved[i.id] && (vals[i.id] ?? '').trim() !== '') await save(i, vals[i.id]); }
+    setBusy(false);
+    toast(`Saved ${done} of ${items.length}. Come back any time to finish.`); nav(office ? '/counts' : '/closing');
+  }
   async function send() {
     setBusy(true); setErr('');
     const { data, error } = await supabase.rpc('submit_count', { p_count_id: countId });
@@ -134,6 +140,7 @@ export function CountPage() {
         {err && <p className="banner bad" role="alert">{err}</p>}
         <div style={{ position: 'sticky', bottom: 0, background: 'var(--bg)', paddingBottom: 8 }}>
           <button className="btn primary" style={{ width: '100%', minHeight: 52 }} disabled={busy || left > 0 || items.length === 0} onClick={send}>{busy ? t('Sending…') : left > 0 ? `${left} ${t('still to count')}` : `${t('Send count')} (${done}/${items.length})`}</button>
+          {left > 0 && <button className="btn secondary" style={{ width: '100%', minHeight: 44, marginTop: 6 }} disabled={busy} onClick={() => void later()}>Save and finish later ({done}/{items.length})</button>}
         </div></>}
     </div>
   );
