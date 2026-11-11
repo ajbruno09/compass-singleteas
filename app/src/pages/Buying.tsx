@@ -78,6 +78,7 @@ export function Buying() {
   const [moved, setMoved] = useState<Record<number, string>>({});
   const [moveFor, setMoveFor] = useState<number | null>(null);
   const [moveTo, setMoveTo] = useState('');
+  const [movePos, setMovePos] = useState({ x: 0, y: 0 });
   const [otherFor, setOtherFor] = useState<number | null>(null);
   const [otherText, setOtherText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -386,25 +387,27 @@ export function Buying() {
                                   <button aria-label="More" onClick={() => setEdit((p) => ({ ...p, [r.item.id]: r.qty + r.step }))}>+</button>
                                 </div></td>
                                 <td className="r num">{r.rate != null ? money(r.qty * r.rate) : '—'}</td>
-                                <td><button className="btn quiet" onClick={() => { setMoveFor(moveFor === r.item.id ? null : r.item.id); setMoveTo(''); }}>Move</button></td>
+                                <td><button className="btn quiet" onClick={(e) => { const bb = (e.currentTarget as HTMLElement).getBoundingClientRect(); setMovePos({ x: bb.right, y: bb.bottom }); setMoveFor(moveFor === r.item.id ? null : r.item.id); setMoveTo(''); }}>Move</button></td>
                               </tr>))}</tbody>
                           </table>
                         </div>
                       )}
-                      {list.filter((r) => r.item.id === moveFor).map((r) => (
-                        <div key={'mv' + r.item.id} className="banner" style={{ margin: '10px 16px 0' }}>
-                          <div><b>Move {r.item.name}</b> to another vendor</div>
-                          <div className="row" style={{ gap: 8, marginTop: 6 }}>
-                            <select aria-label="Vendor" value={moveTo} onChange={(e) => setMoveTo(e.target.value)} style={{ minWidth: 220 }}>
+                      {moveFor != null && list.some((r) => r.item.id === moveFor) && (
+                        <>
+                          <div onClick={() => setMoveFor(null)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                          <div role="dialog" aria-label="Move item" style={{ position: 'fixed', zIndex: 41, top: Math.min(movePos.y + 6, window.innerHeight - 250), left: Math.max(8, Math.min(movePos.x - 280, window.innerWidth - 296)), width: 280, background: 'var(--surface, #fff)', border: '1px solid var(--line, #ddd)', borderRadius: 12, boxShadow: 'var(--shadow-2)', padding: 12 }}>
+                            <div className="small" style={{ marginBottom: 6 }}>Move {itemMap.get(moveFor)?.name} to</div>
+                            <select aria-label="Vendor" value={moveTo} onChange={(e) => setMoveTo(e.target.value)} style={{ width: '100%' }}>
                               <option value="">Choose vendor</option>
                               {vendors.filter((x) => x.id !== vid).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                             </select>
-                            <button className="btn primary" disabled={!moveTo} onClick={() => moveToday(r.item.id)}>Just for today</button>
-                            <button className="btn" disabled={!moveTo} onClick={() => void moveUsual(r.item.id)}>Make usual vendor</button>
-                            <button className="btn quiet" onClick={() => setMoveFor(null)}>Cancel</button>
+                            <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                              <button className="btn primary" disabled={!moveTo} onClick={() => moveToday(moveFor)}>Just for today</button>
+                              <button className="btn" disabled={!moveTo} onClick={() => void moveUsual(moveFor)}>Make usual</button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        </>
+                      )}
                       {vpos.length > 0 && (
                         <div className="row" style={{ padding: '10px 16px 0', gap: 8 }}>
                           <span className="muted small">Placed:</span>
