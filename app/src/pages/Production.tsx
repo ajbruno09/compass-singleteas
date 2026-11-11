@@ -39,6 +39,9 @@ export function Production() {
   const admin = profile?.role === 'owner';
   const staffView = profile?.role === 'department' || profile?.role === 'closing';
   const canReceive = admin || profile?.role === 'manager' || profile?.role === 'store';
+  const [cancels, setCancels] = useState<{ id: string; order_id: number; reason: string; status: string; by: string | null; note: string | null }[]>([]);
+  const [cancelFor, setCancelFor] = useState<number | null>(null);
+  const [cancelWhy, setCancelWhy] = useState('');
   const [kinds, setKinds] = useState<Kind[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [lines, setLines] = useState<RLine[]>([]);
@@ -90,6 +93,8 @@ export function Production() {
     setLevels((l.data as Level[]) ?? []);
     const rmap = new Map(rs.map((x) => [x.item_id, x.items]));
     setOrders((((o.data as unknown as Order[]) ?? [])).map((x) => ({ ...x, items: rmap.get(x.item_id) ?? null })));
+    const cl = await supabase.rpc('prod_cancel_list');
+    setCancels((cl.data as typeof cancels) ?? []);
     const tt = ((t.data as { due_at: string; seal_at: string }[]) ?? [])[0];
     setCut(tt ? { due: tt.due_at, seal: tt.seal_at } : null);
   }, []);
@@ -160,6 +165,9 @@ export function Production() {
     const stp = Math.max(r.multiple_of ?? 1, r.chips && r.chips.length > 1 ? r.chips[1] - r.chips[0] : 1);
     setQty(o, Math.min(r.max_qty, Math.max(r.min_qty, o.qty + dir * stp)));
   };
+  const CANCEL_WHY = ['Raised by mistake', 'Not needed any more', 'Wrong quantity, will raise again', 'Other'];
+  const askCancel = (id: number) => { if (!cancelWhy) return; void run(() => supabase.rpc('prod_cancel_request', { p_order: id, p_reason: cancelWhy }), admin ? 'Order cancelled' : 'Sent to Admin for approval').then(() => { setCancelFor(null); setCancelWhy(''); }); };
+  const decideCancel = (rid: string, ok: boolean) => run(() => supabase.rpc('prod_cancel_decide', { p_request: rid, p_ok: ok, p_note: '' }), ok ? 'Order cancelled' : 'Kept going');
   const step = (id: number, status: string) => run(() => supabase.rpc('prod_set_status', { p_id: id, p_status: status }), STEPS[status] ?? 'Done');
   const addPlan = (day: number) => {
     const a = add[day]; const item = a?.item || recipes.filter((r) => r.kind !== 'gravy')[0]?.item_id || recipes[0]?.item_id;
@@ -244,8 +252,19 @@ export function Production() {
                   {can && o.status === 'requested' && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'cooking')}>Start cooking</button>}
                   {can && ['requested', 'cooking'].includes(o.status) && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'on_the_way')}>Sent to store</button>}
                   {canReceive && o.status === 'on_the_way' && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'received')}>Received</button>}
-                  {can && o.status === 'requested' && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'cancelled')}>Cancel</button>}
+                  {(can || canReceive) && ['requested', 'cooking'].includes(o.status) && !cancels.some((c) => c.order_id === o.id && c.status === 'pending') && <button className="pd-btn" disabled={busy} onClick={() => { setCancelFor(cancelFor === o.id ? null : o.id); setCancelWhy(''); }}>{admin ? 'Cancel' : 'Ask to cancel'}</button>}
                 </span>
+                {cancels.filter((c) => c.order_id === o.id && c.status === 'pending').map((c) => (
+                  <span key={c.id} className="pd-row" style={{ width: '100%' }}>
+                    <span className="pd-chip pd-wait">Cancel requested</span>
+                    <span className="pd-sm pd-mut" style={{ flex: 1 }}>{c.by ? `${c.by}: ` : ''}{c.reason}. Waiting for Admin.</span>
+                    {admin && <><button className="pd-btn" disabled={busy} onClick={() => void decideCancel(c.id, true)}>Approve cancel</button><button className="pd-btn" disabled={busy} onClick={() => void decideCancel(c.id, false)}>Keep it going</button></>}
+                  </span>))}
+                {cancelFor === o.id && (
+                  <span className="pd-row" style={{ width: '100%' }}>
+                    <select className="pd-input" style={{ flex: 1, minWidth: 0 }} aria-label="Why cancel" value={cancelWhy} onChange={(e) => setCancelWhy(e.target.value)}><option value="">Why cancel? (required)</option>{CANCEL_WHY.map((x) => <option key={x} value={x}>{x}</option>)}</select>
+                    <button className="pd-btn" disabled={busy || !cancelWhy} onClick={() => askCancel(o.id)}>{admin ? 'Cancel the batch' : 'Send to Admin'}</button>
+                  </span>)}
                 {admin && o.status !== 'received' && (
                   <span className="pd-row" style={{ width: '100%' }}>
                     <input className="pd-input" style={{ flex: 1, minWidth: 0 }} inputMode="numeric" placeholder={'Actually made' + u} value={made[o.id] ?? (o.qty_made ?? '')} onChange={(e) => setMade({ ...made, [o.id]: e.target.value })} />
