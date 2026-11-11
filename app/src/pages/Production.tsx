@@ -252,7 +252,7 @@ export function Production() {
                   {can && o.status === 'requested' && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'cooking')}>Start cooking</button>}
                   {can && ['requested', 'cooking'].includes(o.status) && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'on_the_way')}>Sent to store</button>}
                   {canReceive && o.status === 'on_the_way' && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'received')}>Received</button>}
-                  {(can || canReceive) && ['requested', 'cooking'].includes(o.status) && !cancels.some((c) => c.order_id === o.id && c.status === 'pending') && <button className="pd-btn" disabled={busy} onClick={() => { setCancelFor(cancelFor === o.id ? null : o.id); setCancelWhy(''); }}>{admin ? 'Cancel' : 'Ask to cancel'}</button>}
+                  {(can || canReceive) && ['requested', 'cooking', 'on_the_way'].includes(o.status) && !cancels.some((c) => c.order_id === o.id && c.status === 'pending') && <button className="pd-btn" disabled={busy} onClick={() => { setCancelFor(cancelFor === o.id ? null : o.id); setCancelWhy(''); }}>{admin ? 'Cancel' : 'Ask to cancel'}</button>}
                 </span>
                 {cancels.filter((c) => c.order_id === o.id && c.status === 'pending').map((c) => (
                   <span key={c.id} className="pd-row" style={{ width: '100%' }}>
