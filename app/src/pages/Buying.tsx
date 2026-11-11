@@ -55,6 +55,8 @@ function printText(title: string, text: string) {
 async function copyText(t: string) { try { await navigator.clipboard.writeText(t); return true; } catch { return false; } }
 
 interface Hold { id: string; item_id: number; qty: number; from_date: string; due_date: string; reason: string; counters: string | null; push_count: number }
+interface Drop { id: string; item_id: number; item_name: string; unit: string; for_date: string; qty: number; reason: string; note: string | null; status: string; owner_question: string | null; store_reply: string | null; requested_at: string; decided_at: string | null; requested_by_name: string | null }
+const DROP_WHY = ['Same item asked again, they only need the new quantity', 'Counter got it another way', 'No longer needed', 'Other'];
 interface Approval { for_date: string; over_amount: number; status: string }
 const REASONS = ['Over the daily limit', 'Cash is tight', 'Vendor closed', 'Not available today', 'Other'];
 const daysBetween = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
@@ -96,6 +98,13 @@ export function Buying() {
   const [pushQty, setPushQty] = useState('');
   const [pushWhy, setPushWhy] = useState('');
   const [pushPos, setPushPos] = useState({ x: 0, y: 0 });
+  const [drops, setDrops] = useState<Drop[]>([]);
+  const [keeps, setKeeps] = useState<number[]>([]);
+  const [dropFor, setDropFor] = useState<number | null>(null);
+  const [dropWhy, setDropWhy] = useState('');
+  const [dropNote, setDropNote] = useState('');
+  const [talk, setTalk] = useState<Record<string, string>>({});
+  const [askOpen, setAskOpen] = useState<string | null>(null);
   const [openRow, setOpenRow] = useState<number | null>(null);
   const [limEdit, setLimEdit] = useState<string | null>(null);
 
@@ -118,6 +127,9 @@ export function Buying() {
       supabase.from('stock_on_hand').select('item_id, qty').eq('location_id', STORE_ID),
       supabase.from('purchase_orders').select('id, po_number, vendor_id, status, notes, sent_at, order_date, required_date, required_time, delivery, channel, for_date, party, po_lines(item_id, qty, unit_rate)').eq('for_date', date).neq('status', 'cancelled').order('created_at')
     ]);
+    const dl = await supabase.rpc('buy_drop_list', { p_date: date });
+    const dj = (dl.data as { drops?: Drop[]; keeps?: number[] } | null) ?? {};
+    setDrops((dj.drops ?? []).map((d) => ({ ...d, qty: Number(d.qty) }))); setKeeps(dj.keeps ?? []);
     const [hd, lm, pt, ap] = await Promise.all([
       supabase.from('buy_holds').select('id, item_id, qty, from_date, due_date, reason, counters, push_count').eq('status', 'open'),
       supabase.rpc('buy_limit'), supabase.rpc('buy_placed_total', { p_date: date }),
@@ -233,11 +245,17 @@ export function Buying() {
 
   const estimate = (list: Row[]) => list.reduce((t, r) => t + (r.rate != null ? r.qty * r.rate : 0), 0);
   const shortRows = rows.filter((r) => !vendorMap.get(vOf(r) ?? '')?.is_store && r.qty < r.sug - 1e-9);
+  const isDouble = (r: Row) => r.carried > 1e-9 && r.asked - r.carried > 1e-9;
+  const dropOf = (id: number) => drops.find((d) => d.item_id === id && d.for_date === date && (d.status === 'asked' || d.status === 'question'));
+  const needsDecision = (r: Row) => isDouble(r) && !keeps.includes(r.item.id);
+  const doubleRows = rows.filter((r) => needsDecision(r) && !vendorMap.get(vOf(r) ?? '')?.is_store);
+  const pendingDrops = drops.filter((d) => d.status === 'asked' || d.status === 'question');
+  const doneDrops = drops.filter((d) => d.status === 'approved');
   const dayTotal = placed + vendorIds.reduce((t, id) => t + (vendorMap.get(id)?.is_store ? 0 : estimate(byVendor.get(id) ?? [])), 0);
   const over = limit > 0 ? Math.max(0, Math.round(dayTotal - limit)) : 0;
   const approved = appr?.status === 'approved';
   const overBlocked = over > 0 && !approved && !isOwner;
-  const blocked = shortRows.length > 0 || overBlocked;
+  const blocked = shortRows.length > 0 || overBlocked || doubleRows.length > 0;
   function openPush(r: Row, amount: number, el: HTMLElement) {
     const bb = el.getBoundingClientRect(); setPushPos({ x: bb.right, y: bb.bottom });
     setPushFor(pushFor === r.item.id ? null : r.item.id); setPushQty(String(n2(amount))); setPushWhy(over > 0 ? 'Over the daily limit' : '');
@@ -263,6 +281,20 @@ export function Buying() {
   async function saveLimit() {
     const { error } = await supabase.rpc('set_buy_limit', { p_amount: Number(limEdit || 0) });
     if (error) return toast(errText(error)); setLimEdit(null); toast('Daily limit saved'); await load();
+  }
+  async function dropRequest(r: Row) {
+    if (!dropWhy) return;
+    const { error } = await supabase.rpc('buy_drop_request', { p_item: r.item.id, p_date: date, p_reason: dropWhy, p_note: dropNote });
+    if (error) return toast(errText(error));
+    toast('Sent to the owner'); setDropFor(null); setDropWhy(''); setDropNote(''); await load();
+  }
+  async function keepAll(r: Row) {
+    const { error } = await supabase.rpc('buy_keep_all', { p_item: r.item.id, p_date: date });
+    if (error) return toast(errText(error)); await load();
+  }
+  async function dropAct(fn: string, args: Record<string, unknown>, msg: string) {
+    const { error } = await supabase.rpc(fn, args);
+    if (error) return toast(errText(error)); toast(msg); setAskOpen(null); await load();
   }
   async function cancelHold(id: string) {
     const { error } = await supabase.rpc('buy_cancel_hold', { p_id: id });
@@ -362,6 +394,7 @@ export function Buying() {
           </div>
         </div>
       )}
+      {!loading && doubleRows.length > 0 && <div className="banner warn" style={{ marginBottom: 12 }}><b>{doubleRows.length === 1 ? 'One item may be ordered twice.' : `${doubleRows.length} items may be ordered twice.`}</b> Open {doubleRows.length === 1 ? 'it' : 'them'} below and decide: ask the owner to drop the earlier ask, or confirm the full quantity. Orders can be sent after that.</div>}
       {!loading && overBlocked && shortRows.length === 0 && <div className="banner warn" style={{ marginBottom: 12 }}>Today is over the daily limit. Push some items to tomorrow, or ask the owner to approve. Orders can be sent once it fits.</div>}
 
       {loading ? <p className="muted">Loading…</p> : (
@@ -491,7 +524,7 @@ export function Buying() {
                             <tbody>{list.map((r) => (
                               <Fragment key={r.item.id}>
                               <tr style={r.carried > 0 ? { background: 'var(--warn-soft, #FBF0D5)' } : undefined}>
-                                <td>{r.carried > 0 ? <button className="btn quiet" style={{ padding: 0, fontWeight: 600 }} aria-expanded={openRow === r.item.id} onClick={() => setOpenRow(openRow === r.item.id ? null : r.item.id)}><span style={{ display: 'inline-block', transform: openRow === r.item.id ? 'none' : 'rotate(-90deg)', transition: 'transform .12s', marginRight: 4 }}><Icon name="chev" /></span>{r.item.name}</button> : <b>{r.item.name}</b>}{r.carried > 0 && <div style={{ marginTop: 3 }}><span className={r.carriedAge >= 3 ? 'chip late' : 'chip due'}>{r.carriedAge >= 3 ? '⚠ ' : ''}From {r.carriedAge === 1 ? 'yesterday' : `${r.carriedAge} days ago`}: {n2(r.carried)} {r.item.unit}</span><div className="muted small">{r.carriedWhy}</div></div>}{r.item.rate_varies && <span className="chip late ratetag">Rate varies</span>}{r.ordered > 0 && <div className="muted small">{n2(r.ordered)} {r.item.unit} already ordered</div>}</td>
+                                <td>{r.carried > 0 ? <button className="btn quiet" style={{ padding: 0, fontWeight: 600 }} aria-expanded={openRow === r.item.id} onClick={() => setOpenRow(openRow === r.item.id ? null : r.item.id)}><span style={{ display: 'inline-block', transform: openRow === r.item.id ? 'none' : 'rotate(-90deg)', transition: 'transform .12s', marginRight: 4 }}><Icon name="chev" /></span>{r.item.name}</button> : <b>{r.item.name}</b>}{r.carried > 0 && <div style={{ marginTop: 3 }}><span className={r.carriedAge >= 3 ? 'chip late' : 'chip due'}>{r.carriedAge >= 3 ? '⚠ ' : ''}From {r.carriedAge === 1 ? 'yesterday' : `${r.carriedAge} days ago`}: {n2(r.carried)} {r.item.unit}</span><div className="muted small">{r.carriedWhy}</div></div>}{needsDecision(r) && <div style={{ marginTop: 3 }}><span className="chip late">Possible double</span></div>}{r.item.rate_varies && <span className="chip late ratetag">Rate varies</span>}{r.ordered > 0 && <div className="muted small">{n2(r.ordered)} {r.item.unit} already ordered</div>}</td>
                                 <td className="small">{r.by.filter((b) => b.loc !== 'Earlier orders').map((b) => `${b.loc} ${n2(b.qty)}`).join(' · ') || '—'}</td>
                                 <td className="r num">{n2(r.asked)}</td>
                                 <td className="r num muted">{n2(r.inStore)} {r.item.unit}</td>
@@ -504,12 +537,34 @@ export function Buying() {
                                 <td className="r num">{r.rate != null ? money(r.qty * r.rate) : '—'}</td>
                                 <td style={{ whiteSpace: 'nowrap' }}><button className="btn quiet" onClick={(e) => openPush(r, r.qty, e.currentTarget)}>Push</button><button className="btn quiet" onClick={(e) => { const bb = (e.currentTarget as HTMLElement).getBoundingClientRect(); setMovePos({ x: bb.right, y: bb.bottom }); setMoveFor(moveFor === r.item.id ? null : r.item.id); setMoveTo(''); }}>Move</button></td>
                               </tr>
-                              {r.carried > 0 && openRow === r.item.id && (
+                              {r.carried > 0 && (openRow === r.item.id || needsDecision(r)) && (
                                 <tr style={{ background: 'var(--warn-soft, #FBF0D5)' }}><td colSpan={8} style={{ paddingTop: 0 }}>
                                   <div className="stack" style={{ gap: 4, padding: '4px 0 6px 26px' }}>
                                     <div className="row small" style={{ justifyContent: 'space-between' }}><span><b>Current order</b> <span className="muted">{r.by.filter((x) => x.loc !== 'Earlier orders').map((x) => `${x.loc} ${n2(x.qty)}`).join(' · ') || 'No new ask today'}</span></span><b className="num">{packText(r.item, Math.max(0, r.asked - r.carried))}</b></div>
                                     {holds.filter((h) => h.item_id === r.item.id && h.due_date <= date && h.from_date < date).map((h) => (
                                       <div key={h.id} className="row small" style={{ justifyContent: 'space-between' }}><span><b>Previous order</b> <span className="muted">asked {dayLabel(h.from_date)}{h.counters ? ` · ${h.counters}` : ''} · pushed: {h.reason}{h.push_count > 1 ? ` (${h.push_count} times)` : ''}</span></span><b className="num">{packText(r.item, h.qty)}</b></div>))}
+                                    {needsDecision(r) && (() => { const d = dropOf(r.item.id); return (
+                                      <div style={{ marginTop: 6 }}>
+                                        <div className="small" style={{ color: '#6B4A00' }}><b>Possible double order.</b> This counter asked again for the same item. The total of {packText(r.item, r.asked)} may be more than they need.</div>
+                                        {d ? (
+                                          <div className="small" style={{ marginTop: 6 }}>
+                                            {d.status === 'asked' ? <span className="chip due">Waiting for the owner to decide on dropping {packText(r.item, d.qty)}</span> : <div className="stack" style={{ gap: 6 }}><div><b>Owner asks:</b> {d.owner_question}</div>
+                                              <div className="row" style={{ gap: 6 }}><input aria-label="Your reply" placeholder="Your reply" value={talk[d.id] ?? ''} onChange={(e) => setTalk((t) => ({ ...t, [d.id]: e.target.value }))} style={{ flex: 1 }} /><button className="btn primary" disabled={!(talk[d.id] ?? '').trim()} onClick={() => void dropAct('buy_drop_reply', { p_id: d.id, p_reply: talk[d.id] }, 'Reply sent')}>Reply</button></div></div>}
+                                          </div>
+                                        ) : dropFor === r.item.id ? (
+                                          <div className="stack" style={{ gap: 6, marginTop: 6, maxWidth: 420 }}>
+                                            <div className="muted small">The counter is not told. Only the owner sees this.</div>
+                                            <select aria-label="Why drop" value={dropWhy} onChange={(e) => setDropWhy(e.target.value)}><option value="">Why do you want to drop it? (required)</option>{DROP_WHY.map((x) => <option key={x} value={x}>{x}</option>)}</select>
+                                            <textarea rows={2} aria-label="Note for the owner" placeholder="Short note for the owner (optional)" value={dropNote} onChange={(e) => setDropNote(e.target.value)} />
+                                            <div className="row" style={{ gap: 8 }}><button className="btn primary" disabled={!dropWhy} onClick={() => void dropRequest(r)}>Send to owner</button><button className="btn quiet" onClick={() => setDropFor(null)}>Cancel</button></div>
+                                          </div>
+                                        ) : (
+                                          <div className="row" style={{ gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                                            <button className="btn primary" onClick={() => { setDropFor(r.item.id); setDropWhy(''); setDropNote(''); }}>Ask owner to drop the previous {packText(r.item, r.carried)}</button>
+                                            <button className="btn" onClick={() => void keepAll(r)}>Buy all {packText(r.item, r.asked)}, it is needed</button>
+                                          </div>
+                                        )}
+                                      </div>); })()}
                                   </div></td></tr>)}
                               </Fragment>))}</tbody>
                           </table>
@@ -548,6 +603,34 @@ export function Buying() {
             })}
           </div>
         </>
+      )}
+
+      {!loading && canDecide && pendingDrops.length > 0 && (
+        <div className="card" style={{ borderColor: 'var(--warn, #B77A00)' }}>
+          <b>Drop requests ({pendingDrops.length})</b>
+          <div className="stack" style={{ gap: 10, marginTop: 8 }}>
+            {pendingDrops.map((d) => (
+              <div key={d.id} style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+                <div className="row" style={{ justifyContent: 'space-between' }}><div><b>{d.item_name}: drop {n2(d.qty)} {d.unit}</b><div className="muted small">From the earlier ask, for {dayLabel(d.for_date)}. Asked by {d.requested_by_name ?? 'the store'}.</div></div></div>
+                <div className="small" style={{ marginTop: 4 }}>Store's reason: <b>{d.reason}</b>{d.note ? ` · ${d.note}` : ''}{d.store_reply ? <><br />Store replied: <b>{d.store_reply}</b></> : null}</div>
+                {d.status === 'question' ? <div className="muted small" style={{ marginTop: 4 }}>You asked: {d.owner_question}. Waiting for the store.</div> : askOpen === d.id ? (
+                  <div className="row" style={{ gap: 6, marginTop: 6 }}><input aria-label="Your question" value={talk['q' + d.id] ?? ''} placeholder="Ask the store why" onChange={(e) => setTalk((t) => ({ ...t, ['q' + d.id]: e.target.value }))} style={{ flex: 1 }} /><button className="btn primary" disabled={!(talk['q' + d.id] ?? '').trim()} onClick={() => void dropAct('buy_drop_ask', { p_id: d.id, p_question: talk['q' + d.id] }, 'Question sent')}>Send</button><button className="btn quiet" onClick={() => setAskOpen(null)}>Cancel</button></div>
+                ) : (
+                  <div className="row" style={{ gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                    <button className="btn primary" onClick={() => void dropAct('buy_drop_decide', { p_id: d.id, p_ok: true }, 'Drop approved')}>Approve drop</button>
+                    <button className="btn" onClick={() => setAskOpen(d.id)}>Ask why first</button>
+                    <button className="btn quiet" onClick={() => void dropAct('buy_drop_decide', { p_id: d.id, p_ok: false }, 'Rejected, the store buys all')}>Reject, buy all</button>
+                  </div>)}
+              </div>))}
+          </div>
+        </div>
+      )}
+
+      {!loading && canDecide && doneDrops.length > 0 && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <b>Dropped this week</b>
+          <div className="stack" style={{ gap: 4, marginTop: 6 }}>{doneDrops.map((d) => <div key={d.id} className="small"><b>{d.item_name}</b> {n2(d.qty)} {d.unit} <span className="muted">· {d.reason} · asked by {d.requested_by_name ?? 'the store'} · {d.decided_at ? dayLabel(d.decided_at.slice(0, 10)) : ''}</span></div>)}</div>
+        </div>
       )}
 
       {!loading && pushedOut.length > 0 && (
