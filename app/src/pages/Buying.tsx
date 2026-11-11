@@ -488,9 +488,9 @@ export function Buying() {
                           <table>
                             <thead><tr><th>Item</th><th>Asked by counters</th><th className="r">Asked</th><th className="r">In store</th><th className="r">Suggested</th><th>Order</th><th className="r">Estimate</th><th /></tr></thead>
                             <tbody>{list.map((r) => (
-                              <tr key={r.item.id}>
-                                <td><b>{r.item.name}</b>{r.item.rate_varies && <span className="chip late ratetag">Rate varies</span>}{r.ordered > 0 && <div className="muted small">{n2(r.ordered)} {r.item.unit} already ordered</div>}</td>
-                                <td className="small">{r.by.map((b) => `${b.loc} ${n2(b.qty)}`).join(' · ')}{r.carried > 0 && <div><span className={r.carriedAge >= 3 ? 'chip late' : 'chip due'}>{n2(r.carried)} from {r.carriedAge === 1 ? 'yesterday' : `${r.carriedAge} days ago`}</span>{r.carriedWhy && <span className="muted small"> {r.carriedWhy}</span>}</div>}</td>
+                              <tr key={r.item.id} style={r.carried > 0 ? { background: 'var(--warn-soft, #FBF0D5)' } : undefined}>
+                                <td><b>{r.item.name}</b>{r.carried > 0 && <div style={{ marginTop: 3 }}><span className={r.carriedAge >= 3 ? 'chip late' : 'chip due'}>{r.carriedAge >= 3 ? '⚠ ' : ''}From {r.carriedAge === 1 ? 'yesterday' : `${r.carriedAge} days ago`}: {n2(r.carried)} {r.item.unit}</span><div className="muted small">{r.carriedWhy}</div></div>}{r.item.rate_varies && <span className="chip late ratetag">Rate varies</span>}{r.ordered > 0 && <div className="muted small">{n2(r.ordered)} {r.item.unit} already ordered</div>}</td>
+                                <td className="small">{r.by.filter((b) => b.loc !== 'Earlier orders').map((b) => `${b.loc} ${n2(b.qty)}`).join(' · ') || '—'}</td>
                                 <td className="r num">{n2(r.asked)}</td>
                                 <td className="r num muted">{n2(r.inStore)} {r.item.unit}</td>
                                 <td className="r num muted">{packText(r.item, r.sug)}</td>

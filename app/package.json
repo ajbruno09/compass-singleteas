@@ -1,7 +1,7 @@
 {
   "name": "compass",
   "private": true,
-  "version": "5.82",
+  "version": "5.83",
   "type": "module",
   "scripts": {
     "dev": "vite",
