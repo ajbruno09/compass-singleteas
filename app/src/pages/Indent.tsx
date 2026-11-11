@@ -90,7 +90,7 @@ export function IndentPage() {
     setLoading(true);
     const [it, gr, us, win, ind] = await Promise.all([
       supabase.rpc('department_items', { p_location_id: locId }),
-      supabase.from('item_groups').select('*').order('sort'),
+      supabase.from('item_groups').select('*').eq('active', true).order('sort'),
       supabase.rpc('my_usual', { p_location_id: locId }),
       supabase.rpc('indent_window'),
       supabase.rpc('open_indent', { p_location_id: locId })

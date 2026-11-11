@@ -35,7 +35,7 @@ export function StockView() {
       setLinks(new Set(d.map((r) => `${r.location_id}:${r.item_id}`)));
       setPars(new Map(d.filter((r) => r.location_id === 1 && r.par_level != null).map((r) => [r.item_id, Number(r.par_level)])));
     });
-    supabase.from('item_groups').select('*').order('sort').then(({ data }) => setGroups((data as Group[]) ?? []));
+    supabase.from('item_groups').select('*').eq('active', true).order('sort').then(({ data }) => setGroups((data as Group[]) ?? []));
   }, []);
   const qtyOf = useMemo(() => {
     const m = new Map<number, number>();

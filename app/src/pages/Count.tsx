@@ -34,7 +34,7 @@ export function CountPage() {
   const place = locations.find((l) => l.id === loc)?.name ?? '';
   const office = profile?.role === 'owner' || profile?.role === 'store' || profile?.role === 'manager';
 
-  useEffect(() => { supabase.from('item_groups').select('id, name, icon').order('sort').then(({ data }) => setGroups((data as typeof groups) ?? [])); }, []);
+  useEffect(() => { supabase.from('item_groups').select('id, name, icon').eq('active', true).order('sort').then(({ data }) => setGroups((data as typeof groups) ?? [])); }, []);
   useEffect(() => {
     if (!loc) return;
     (async () => {

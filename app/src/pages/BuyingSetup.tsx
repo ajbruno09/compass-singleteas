@@ -48,7 +48,7 @@ export function BuyingSetup() {
     const [b, v, g] = await Promise.all([
       supabase.from('item_price_book').select('*').order('name').limit(2000),
       supabase.from('vendors').select('id, name, is_store').eq('active', true).order('name'),
-      supabase.from('item_groups').select('id, name'),
+      supabase.from('item_groups').select('id, name').eq('active', true),
     ]);
     setRows(((b.data as Row[]) ?? []).map((r) => ({ ...r, price: r.price == null ? null : Number(r.price), pack_qty: r.pack_qty == null ? null : Number(r.pack_qty), unit_cost: r.unit_cost == null ? null : Number(r.unit_cost), prev_unit_cost: r.prev_unit_cost == null ? null : Number(r.prev_unit_cost) })));
     setVendors((v.data as Vendor[]) ?? []);

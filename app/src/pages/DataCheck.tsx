@@ -39,7 +39,7 @@ export function DataCheck() {
     const [b, v, g] = await Promise.all([
       supabase.from('item_price_book').select('item_id, name, unit, group_id, default_vendor_id, price, pack_label, pack_qty, content_qty, content_unit, unit_cost').order('name').limit(2000),
       supabase.from('vendors').select('id, name').eq('active', true).order('name'),
-      supabase.from('item_groups').select('id, name').order('sort'),
+      supabase.from('item_groups').select('id, name').eq('active', true).order('sort'),
     ]);
     const c = await supabase.rpc('cost_overview'); setCosts((c.data as Cost[]) ?? []);
     setRows((b.data as Row[]) ?? []); setVendors((v.data as Vendor[]) ?? []); setGroups((g.data as Group[]) ?? []);

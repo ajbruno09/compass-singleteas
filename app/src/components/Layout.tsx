@@ -46,6 +46,7 @@ export const NAV: NavItem[] = [
   { to: '/notices', label: 'Notices', icon: 'bell', roles: ['owner', 'manager'], group: 'Setup' },
   { to: '/rules', label: 'Rules', icon: 'scale', roles: ['owner', 'manager'], group: 'Setup' },
   { to: '/counters', label: 'Counters', icon: 'box', roles: ['owner'], group: 'Setup' },
+  { to: '/shelves', label: 'Shelves', icon: 'box', roles: ['owner'], group: 'Setup' },
   { to: '/reasons', label: 'Indent reasons', icon: 'clip', roles: ['owner'], group: 'Setup' },
   { to: '/scorecard', label: 'Counter record', icon: 'scale', roles: ['owner', 'manager', 'store'], group: 'Reports' },
   { to: '/schedules', label: 'Weekly offs', icon: 'clock', roles: ['owner', 'manager'], group: 'Team' },

@@ -41,7 +41,7 @@ export function Indents() {
   useEffect(() => {
     supabase.rpc('indent_for_date').then(({ data }) => { const d = String(data); setDate(d); setTarget(d); });
     supabase.rpc('indent_window').then(({ data }) => setRem((data as Reminders) ?? {}));
-    supabase.from('item_groups').select('*').order('sort').then(({ data }) => setGroups((data as Group[]) ?? []));
+    supabase.from('item_groups').select('*').eq('active', true).order('sort').then(({ data }) => setGroups((data as Group[]) ?? []));
     supabase.from('items').select('id, name, unit, group_id').then(({ data }) => setItems(Object.fromEntries(((data as ItemRow[]) ?? []).map((i) => [i.id, i]))));
   }, []);
 

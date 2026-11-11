@@ -69,7 +69,7 @@ function ItemsUpload() {
   const loadRefs = async () => {
     const [c, u, g, v, it] = await Promise.all([
       supabase.from('categories').select('id, name').order('sort'), supabase.from('units').select('code, name').order('code'),
-      supabase.from('item_groups').select('id, name').order('sort'), supabase.from('vendors').select('id, name').eq('active', true).order('name'),
+      supabase.from('item_groups').select('id, name').eq('active', true).order('sort'), supabase.from('vendors').select('id, name').eq('active', true).order('name'),
       supabase.from('items').select('*, item_locations(location_id)').order('name')
     ]);
     return { cats: (c.data ?? []) as { id: number; name: string }[], units: (u.data ?? []) as { code: string; name: string }[], groups: (g.data ?? []) as { id: number; name: string }[], vendors: (v.data ?? []) as { id: string; name: string }[], items: (it.data ?? []) as Record<string, unknown>[] };

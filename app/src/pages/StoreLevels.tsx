@@ -25,7 +25,7 @@ export function StoreLevels() {
   const load = useCallback(async () => {
     const [i, g, s, p] = await Promise.all([
       supabase.from('items').select('id, name, unit, group_id').eq('active', true).order('name').limit(2000),
-      supabase.from('item_groups').select('*').order('sort'),
+      supabase.from('item_groups').select('*').eq('active', true).order('sort'),
       supabase.from('stock_on_hand').select('item_id, qty').eq('location_id', 1),
       supabase.from('item_locations').select('item_id, par_level').eq('location_id', 1),
     ]);

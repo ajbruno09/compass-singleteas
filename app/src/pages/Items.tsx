@@ -30,7 +30,7 @@ export function Items() {
     setRows((data as ItemRow[]) ?? []);
     setLoading(false);
   }
-  useEffect(() => { load(); supabase.from('item_groups').select('id, name').order('sort').then(({ data }) => setGroupList((data as { id: number; name: string }[]) ?? [])); }, []);
+  useEffect(() => { load(); supabase.from('item_groups').select('id, name').eq('active', true).order('sort').then(({ data }) => setGroupList((data as { id: number; name: string }[]) ?? [])); }, []);
   const tabCats = useMemo(() => categories.filter((c) => rows.some((r) => r.category_id === c.id)), [categories, rows]);
   const groupsHere = useMemo(() => groupList.filter((g) => rows.some((r) => (cat === 'all' || r.category_id === cat) && (r as { group_id?: number | null }).group_id === g.id)), [groupList, rows, cat]);
   const ctrsHere = useMemo(() => locations.filter((l) => rows.some((r) => r.item_locations.some((x) => x.location_id === l.id))), [locations, rows]);
@@ -103,7 +103,7 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
   const [categoryId, setCategoryId] = useState<number>(item?.category_id ?? 1);
   const [groupId, setGroupId] = useState<number>((item as { group_id?: number | null } | null)?.group_id ?? 0);
   const [groupList, setGroupList] = useState<{ id: number; name: string }[]>([]);
-  useEffect(() => { supabase.from('item_groups').select('id, name').order('sort').then(({ data }) => setGroupList((data as { id: number; name: string }[]) ?? [])); }, []);
+  useEffect(() => { supabase.from('item_groups').select('id, name').eq('active', true).order('sort').then(({ data }) => setGroupList((data as { id: number; name: string }[]) ?? [])); }, []);
   const [unit, setUnit] = useState(item?.unit ?? 'kg');
   const [purchaseUnit, setPurchaseUnit] = useState(item?.purchase_unit ?? '');
   const [factor, setFactor] = useState(item?.purchase_factor?.toString() ?? '');
