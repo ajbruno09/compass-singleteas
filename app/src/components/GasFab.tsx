@@ -20,8 +20,8 @@ export function GasFab() {
   if (here !== '/' && !here.startsWith('/indent')) return null;
   if (rows.length === 0) return null;
   const todo = rows.some((r) => !r.weighed_today);
-  // Closing time only: from 4 pm until 4 am. Outside that it stays out of the way.
-  if (todo && hour < 16 && hour >= 4) return null;
+  // Closing time only: from 3 pm until 4 am. Outside that it stays out of the way.
+  if (todo && hour < 15 && hour >= 4) return null;
   if (!todo) return <div className="gasfab done" aria-live="polite">LPG weighed ✓</div>;
   return <button className="gasfab" onClick={() => nav('/gas')} aria-label="Weigh the LPG cylinders now">⚖ Weigh LPG</button>;
 }
