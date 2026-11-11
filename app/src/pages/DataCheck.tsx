@@ -17,6 +17,7 @@ const SMALL = ['g', 'ml'];
 const CONTAINERS = ['bottle', 'pkt', 'tub', 'roll'];
 const DUPS: [string, string, string][] = [['Amul Cheese', 'Cheese Block', 'Amul Cheese was added for the Cheese Balls recipe. Cheese Block already has a price and a vendor.']];
 const GROUP_FIX: Record<string, string[]> = { 'Brown Onion': ['Vegetables & Fruits', 'Spices'], 'Brown Garlic': ['Spices', 'Vegetables & Fruits'] };
+const FX: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap' };
 const fnum = (n: number) => (n >= 100 ? Math.round(n).toString() : n >= 1 ? n.toFixed(2) : n.toFixed(4)).replace(/\.?0+$/, '');
 
 export function DataCheck() {
@@ -140,8 +141,8 @@ export function DataCheck() {
               return <tr key={c.item_id}>
                 <td>{nameBlock(c.item_id, c.name, `per ${un}`)}</td>
                 <td className="r num">{c.cost != null ? '₹' + c.cost.toFixed(2) : '-'}</td>
-                <td className="r"><input className="num" style={{ width: 60 }} inputMode="decimal" value={m} onChange={(e) => set(c.item_id, 'm', e.target.value)} />
-                  {m !== String(c.markup) && <button className="btn primary" style={{ marginLeft: 6 }} disabled={busy || !(Number(m) >= 0)} onClick={() => rpc('dc_set_markup', { p_item: c.item_id, p_pct: Number(m) }, 'Markup saved')}>Save</button>}</td>
+                <td className="r"><div style={{ ...FX, justifyContent: 'flex-end' }}><input className="num" style={{ width: 64, flex: 'none' }} inputMode="decimal" value={m} onChange={(e) => set(c.item_id, 'm', e.target.value)} />
+                  {m !== String(c.markup) && <button className="btn primary" disabled={busy || !(Number(m) >= 0)} onClick={() => rpc('dc_set_markup', { p_item: c.item_id, p_pct: Number(m) }, 'Markup saved')}>Save</button>}</div></td>
                 <td className="r num">{c.rate != null && miss.length === 0 ? '₹' + c.rate.toFixed(2) : '-'}</td>
                 <td>{miss.length === 0 ? <span className="chip done">Complete</span> : <span className="muted small">Cannot price yet: {miss.slice(0, 6).join(', ')}{miss.length > 6 ? ` and ${miss.length - 6} more` : ''}. Add the price under Missing price.</span>}</td>
               </tr>;
@@ -159,8 +160,8 @@ export function DataCheck() {
               const q = Number(val(r.item_id, 'q', fnum(sugg))); const p = Number(val(r.item_id, 'p', String(r.price ?? '')));
               return <tr key={r.item_id}>
                 {nameCell(r, `Now: ${r.pack_qty} ${r.unit} for ₹${r.price}, which is ₹${fnum(r.unit_cost ?? 0)} per ${r.unit}`)}
-                <td className="r"><input className="num" style={{ width: 90 }} inputMode="decimal" value={val(r.item_id, 'q', fnum(sugg))} onChange={(e) => set(r.item_id, 'q', e.target.value)} /> {r.unit}</td>
-                <td className="r">₹<input className="num" style={{ width: 90 }} inputMode="decimal" value={val(r.item_id, 'p', String(r.price ?? ''))} onChange={(e) => set(r.item_id, 'p', e.target.value)} /></td>
+                <td className="r"><div style={{ ...FX, justifyContent: 'flex-end' }}><input className="num" style={{ width: 90, flex: 'none' }} inputMode="decimal" value={val(r.item_id, 'q', fnum(sugg))} onChange={(e) => set(r.item_id, 'q', e.target.value)} />{r.unit}</div></td>
+                <td className="r"><div style={{ ...FX, justifyContent: 'flex-end' }}>₹<input className="num" style={{ width: 90, flex: 'none' }} inputMode="decimal" value={val(r.item_id, 'p', String(r.price ?? ''))} onChange={(e) => set(r.item_id, 'p', e.target.value)} /></div></td>
                 <td className="r num">{q > 0 && p > 0 ? '₹' + fnum(p / q) : '-'}</td>
                 <td className="r"><button className="btn primary" disabled={busy || !(q > 0 && p > 0)} onClick={() => saveRows([{ item_id: r.item_id, pack_label: r.pack_label ?? 'kg', pack_qty: String(q), price: String(p), vendor_id: r.default_vendor_id ?? '' }])}>Save</button></td>
               </tr>;
@@ -179,9 +180,9 @@ export function DataCheck() {
               const ok = !!v && !!l && Number(q) > 0 && Number(p) > 0;
               return <tr key={r.item_id}>
                 {nameCell(r, `Counted in ${r.unit}${r.default_vendor_id ? '' : ', no vendor yet'}`)}
-                <td><select value={v} onChange={(e) => set(r.item_id, 'v', e.target.value)}><option value="">Choose vendor</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></td>
-                <td><input className="num" style={{ width: 70 }} inputMode="decimal" placeholder="Qty" value={q} onChange={(e) => set(r.item_id, 'q', e.target.value)} /> <select value={l} onChange={(e) => set(r.item_id, 'l', e.target.value)}>{[...new Set([l, ...PACKS])].map((x) => <option key={x}>{x}</option>)}</select></td>
-                <td className="r">₹<input className="num" style={{ width: 80 }} inputMode="decimal" value={p} onChange={(e) => set(r.item_id, 'p', e.target.value)} /></td>
+                <td><select style={{ width: '100%', maxWidth: 260 }} value={v} onChange={(e) => set(r.item_id, 'v', e.target.value)}><option value="">Choose vendor</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></td>
+                <td><div style={FX}><input className="num" style={{ width: 76, flex: 'none' }} inputMode="decimal" placeholder="Qty" value={q} onChange={(e) => set(r.item_id, 'q', e.target.value)} /><select style={{ width: 84, flex: 'none' }} value={l} onChange={(e) => set(r.item_id, 'l', e.target.value)}>{[...new Set([l, ...PACKS])].map((x) => <option key={x}>{x}</option>)}</select></div></td>
+                <td className="r"><div style={{ ...FX, justifyContent: 'flex-end' }}>₹<input className="num" style={{ width: 90, flex: 'none' }} inputMode="decimal" value={p} onChange={(e) => set(r.item_id, 'p', e.target.value)} /></div></td>
                 <td className="r"><button className="btn primary" disabled={busy || !ok} onClick={() => saveRows([{ item_id: r.item_id, pack_label: l, pack_qty: q, price: p, vendor_id: v }])}>Save</button></td>
               </tr>;
             })}</tbody></table></div>}
@@ -197,7 +198,7 @@ export function DataCheck() {
               const q = val(r.item_id, 'q', ''); const u = val(r.item_id, 'u', 'ml');
               return <tr key={r.item_id}>
                 {nameCell(r, `Counted as 1 ${r.unit}`)}
-                <td><input className="num" style={{ width: 90 }} inputMode="decimal" placeholder="Size" value={q} onChange={(e) => set(r.item_id, 'q', e.target.value)} /> <select value={u} onChange={(e) => set(r.item_id, 'u', e.target.value)}>{['ml', 'L', 'g', 'kg'].map((x) => <option key={x}>{x}</option>)}</select></td>
+                <td><div style={FX}><input className="num" style={{ width: 90, flex: 'none' }} inputMode="decimal" placeholder="Size" value={q} onChange={(e) => set(r.item_id, 'q', e.target.value)} /><select style={{ width: 76, flex: 'none' }} value={u} onChange={(e) => set(r.item_id, 'u', e.target.value)}>{['ml', 'L', 'g', 'kg'].map((x) => <option key={x}>{x}</option>)}</select></div></td>
                 <td className="r"><button className="btn primary" disabled={busy || !(Number(q) > 0)} onClick={() => saveRows([{ item_id: r.item_id, content_qty: q, content_unit: u }])}>Save</button></td>
               </tr>;
             })}</tbody></table></div>}
