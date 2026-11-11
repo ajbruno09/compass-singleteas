@@ -54,10 +54,16 @@ function printText(title: string, text: string) {
 }
 async function copyText(t: string) { try { await navigator.clipboard.writeText(t); return true; } catch { return false; } }
 
-interface Row { item: ItemRow; asked: number; by: { loc: string; qty: number }[]; inStore: number; ordered: number; sug: number; qty: number; rate: number | null; step: number }
+interface Hold { id: string; item_id: number; qty: number; from_date: string; due_date: string; reason: string; counters: string | null; push_count: number }
+interface Approval { for_date: string; over_amount: number; status: string }
+const REASONS = ['Over the daily limit', 'Cash is tight', 'Vendor closed', 'Not available today', 'Other'];
+const daysBetween = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
+interface Row { carried: number; carriedAge: number; carriedWhy: string; item: ItemRow; asked: number; by: { loc: string; qty: number }[]; inStore: number; ordered: number; sug: number; qty: number; rate: number | null; step: number }
 
 export function Buying() {
-  const { locations } = useSession();
+  const { locations, profile } = useSession();
+  const isOwner = profile?.role === 'owner';
+  const canDecide = profile?.role === 'owner' || profile?.role === 'manager';
   const toast = useToast();
   const [date, setDate] = useState('');
   const [target, setTarget] = useState('');
@@ -82,6 +88,15 @@ export function Buying() {
   const [otherFor, setOtherFor] = useState<number | null>(null);
   const [otherText, setOtherText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [holds, setHolds] = useState<Hold[]>([]);
+  const [limit, setLimit] = useState(0);
+  const [placed, setPlaced] = useState(0);
+  const [appr, setAppr] = useState<Approval | null>(null);
+  const [pushFor, setPushFor] = useState<number | null>(null);
+  const [pushQty, setPushQty] = useState('');
+  const [pushWhy, setPushWhy] = useState('');
+  const [pushPos, setPushPos] = useState({ x: 0, y: 0 });
+  const [limEdit, setLimEdit] = useState<string | null>(null);
 
   useEffect(() => { supabase.rpc('indent_for_date').then(({ data }) => { const d = String(data); setDate(d); setTarget(d); }); }, []);
 
@@ -102,6 +117,13 @@ export function Buying() {
       supabase.from('stock_on_hand').select('item_id, qty').eq('location_id', STORE_ID),
       supabase.from('purchase_orders').select('id, po_number, vendor_id, status, notes, sent_at, order_date, required_date, required_time, delivery, channel, for_date, party, po_lines(item_id, qty, unit_rate)').eq('for_date', date).neq('status', 'cancelled').order('created_at')
     ]);
+    const [hd, lm, pt, ap] = await Promise.all([
+      supabase.from('buy_holds').select('id, item_id, qty, from_date, due_date, reason, counters, push_count').eq('status', 'open'),
+      supabase.rpc('buy_limit'), supabase.rpc('buy_placed_total', { p_date: date }),
+      supabase.from('buy_approvals').select('for_date, over_amount, status').eq('for_date', date).maybeSingle()
+    ]);
+    setHolds(((hd.data as Hold[]) ?? []).map((h) => ({ ...h, qty: Number(h.qty) })));
+    setLimit(Number(lm.data ?? 0)); setPlaced(Number(pt.data ?? 0)); setAppr((ap.data as Approval | null) ?? null);
     const [pl, pst, psr] = await Promise.all([supabase.rpc('party_loc'), supabase.rpc('party_status'), supabase.from('party_sourcing').select('item_id, vendor_id, approved_asked, buy_qty, ordered_qty').eq('for_date', date)]);
     setPartyLoc(pl.data == null ? null : Number(pl.data)); setPartyLabel(String((pst.data as { label?: string } | null)?.label ?? '')); setPs((psr.data as PS[]) ?? []);
     setIndents((ind.data as IndentRow[]) ?? []);
@@ -131,12 +153,23 @@ export function Buying() {
   }, [pos]);
 
   const rows: Row[] = useMemo(() => {
-    const agg = new Map<number, { asked: number; by: Map<string, number> }>();
+    const agg = new Map<number, { asked: number; by: Map<string, number>; carried: number; age: number; why: string }>();
+    const emptyE = () => ({ asked: 0, by: new Map<string, number>(), carried: 0, age: 0, why: '' });
     for (const r of sentInd) {
       const loc = locations.find((l) => l.id === r.location_id)?.name ?? '';
       for (const l of r.indent_lines) {
-        const e = agg.get(l.item_id) ?? { asked: 0, by: new Map() };
+        const e = agg.get(l.item_id) ?? emptyE();
         e.asked += Number(l.qty); e.by.set(loc, (e.by.get(loc) ?? 0) + Number(l.qty)); agg.set(l.item_id, e);
+      }
+    }
+    // Pushed asks: out of today's list while pushed, back in from their due date.
+    for (const h of holds) {
+      if (h.due_date <= date && h.from_date < date) {
+        const e = agg.get(h.item_id) ?? emptyE();
+        e.asked += h.qty; e.carried += h.qty; e.age = Math.max(e.age, daysBetween(h.from_date, date)); e.why = h.reason;
+        e.by.set('Earlier orders', (e.by.get('Earlier orders') ?? 0) + h.qty); agg.set(h.item_id, e);
+      } else if (h.from_date === date && h.due_date > date) {
+        const e = agg.get(h.item_id); if (e) { e.asked -= h.qty; const k = [...e.by.keys()][0]; if (k) e.by.set(k, Math.max(0, (e.by.get(k) ?? 0) - h.qty)); }
       }
     }
     const out: Row[] = [];
@@ -148,10 +181,11 @@ export function Buying() {
       const sug = roundUp(Math.max(0, e.asked - inStore - ordered), step);
       const qty = edit[id] ?? sug;
       const rate = (item.default_vendor_id && rateMap.get(`${item.default_vendor_id}:${id}`)) || (item.last_cost != null ? Number(item.last_cost) : null);
-      out.push({ item, asked: e.asked, by: [...e.by.entries()].map(([loc, qty]) => ({ loc, qty })), inStore, ordered, sug, qty, rate, step });
+      if (e.asked <= 1e-9 && e.carried <= 1e-9) continue;
+      out.push({ carried: e.carried, carriedAge: e.age, carriedWhy: e.why, item, asked: e.asked, by: [...e.by.entries()].map(([loc, qty]) => ({ loc, qty })), inStore, ordered, sug, qty, rate, step });
     }
     return out.sort((a, b) => (a.item.group_id ?? 99) - (b.item.group_id ?? 99) || a.item.name.localeCompare(b.item.name));
-  }, [sentInd, itemMap, onHand, orderedBy, edit, rateMap, locations]);
+  }, [sentInd, itemMap, onHand, orderedBy, edit, rateMap, locations, holds, date]);
 
   const toBuy = rows.filter((r) => r.qty > 0);
   const vOf = (r: Row) => moved[r.item.id] ?? r.item.default_vendor_id;
@@ -179,7 +213,7 @@ export function Buying() {
       if (rem <= 1e-9 || !x.vendor_id || !item || vendorMap.get(x.vendor_id)?.is_store) continue;
       const rate = rateMap.get(`${x.vendor_id}:${x.item_id}`) ?? (item.last_cost != null ? Number(item.last_cost) : null);
       const step = item.purchase_factor ? Number(item.purchase_factor) : stepOf(item.unit);
-      m.set(x.vendor_id, [...(m.get(x.vendor_id) ?? []), { item, asked: partyAsked.get(x.item_id) ?? rem, by: [{ loc: 'Party', qty: rem }], inStore: 0, ordered: 0, sug: rem, qty: rem, rate, step }]);
+      m.set(x.vendor_id, [...(m.get(x.vendor_id) ?? []), { carried: 0, carriedAge: 0, carriedWhy: '', item, asked: partyAsked.get(x.item_id) ?? rem, by: [{ loc: 'Party', qty: rem }], inStore: 0, ordered: 0, sug: rem, qty: rem, rate, step }]);
     }
     return m;
   }, [ps, itemMap, rateMap, partyAsked, vendorMap]);
@@ -197,6 +231,43 @@ export function Buying() {
   function setAllEmpty(v: string) { if (!v) return; setPdraft((d) => { const n = { ...d }; for (const r of partyNew) if (!pVendor(r)) n[r.item.id] = { ...n[r.item.id], vendor: v }; return n; }); }
 
   const estimate = (list: Row[]) => list.reduce((t, r) => t + (r.rate != null ? r.qty * r.rate : 0), 0);
+  const shortRows = rows.filter((r) => !vendorMap.get(vOf(r) ?? '')?.is_store && r.qty < r.sug - 1e-9);
+  const dayTotal = placed + vendorIds.reduce((t, id) => t + (vendorMap.get(id)?.is_store ? 0 : estimate(byVendor.get(id) ?? [])), 0);
+  const over = limit > 0 ? Math.max(0, Math.round(dayTotal - limit)) : 0;
+  const approved = appr?.status === 'approved';
+  const overBlocked = over > 0 && !approved && !isOwner;
+  const blocked = shortRows.length > 0 || overBlocked;
+  function openPush(r: Row, amount: number, el: HTMLElement) {
+    const bb = el.getBoundingClientRect(); setPushPos({ x: bb.right, y: bb.bottom });
+    setPushFor(pushFor === r.item.id ? null : r.item.id); setPushQty(String(n2(amount))); setPushWhy(over > 0 ? 'Over the daily limit' : '');
+  }
+  async function doPush() {
+    const r = rows.find((x) => x.item.id === pushFor); const amt = Number(pushQty);
+    if (!r || !pushWhy || !(amt > 0)) return;
+    const own = Math.max(0, r.asked - r.carried); const pn = Math.min(amt, own); const po = amt - pn;
+    const names = r.by.filter((b) => b.loc !== 'Earlier orders').map((b) => b.loc).join(', ');
+    const { error } = await supabase.rpc('buy_push', { p_item: r.item.id, p_date: date, p_new: pn, p_old: po, p_reason: pushWhy, p_counters: names || null });
+    if (error) return toast(errText(error));
+    setEdit((e) => { const n = { ...e }; if (n[r.item.id] != null) n[r.item.id] = Math.max(0, r.qty - amt); return n; });
+    toast(`${r.item.name} pushed to tomorrow`); setPushFor(null); await load();
+  }
+  async function askOwner() {
+    const { error } = await supabase.rpc('buy_ask_approval', { p_date: date, p_over: over });
+    if (error) return toast(errText(error)); toast('Asked the owner'); await load();
+  }
+  async function decide(ok: boolean) {
+    const { error } = await supabase.rpc('buy_decide', { p_date: date, p_ok: ok });
+    if (error) return toast(errText(error)); toast(ok ? 'Approved' : 'Sent back to the store'); await load();
+  }
+  async function saveLimit() {
+    const { error } = await supabase.rpc('set_buy_limit', { p_amount: Number(limEdit || 0) });
+    if (error) return toast(errText(error)); setLimEdit(null); toast('Daily limit saved'); await load();
+  }
+  async function cancelHold(id: string) {
+    const { error } = await supabase.rpc('buy_cancel_hold', { p_id: id });
+    if (error) return toast(errText(error)); toast('Ask cancelled'); await load();
+  }
+  const pushedOut = holds.filter((h) => h.from_date === date && h.due_date > date);
   const grand = vendorIds.reduce((t, id) => t + (vendorMap.get(id)?.is_store ? 0 : estimate(byVendor.get(id) ?? [])), 0);
   const isStoreV = (r: Row) => !!vendorMap.get(vOf(r) ?? '')?.is_store;
   const itemCount = toBuy.filter((r) => !isStoreV(r)).length;
@@ -249,6 +320,48 @@ export function Buying() {
         <div className="card kp"><div className="label">Estimated value</div><div className="num kpn">{money(grand)}</div><div className="muted small">at last available rates, to plan cash</div></div>
         <div className="card kp"><div className="label">Orders sent</div><div className="num kpn">{ordersSent}</div></div>
       </div>
+
+      {!loading && (limit > 0 || isOwner) && (
+        <div className="card" style={{ padding: '12px 16px', borderColor: over > 0 && !approved ? 'var(--warn, #B77A00)' : undefined }}>
+          <div className="row" style={{ justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              {limit > 0 ? <><b>Today {money(dayTotal)} · daily limit {money(limit)}</b>
+                <div className="muted small">{over > 0 ? (approved ? `${money(over)} over, approved by the owner.` : appr?.status === 'asked' ? `${money(over)} over. Waiting for the owner.` : appr?.status === 'declined' ? `${money(over)} over. The owner said not today. Push some items to tomorrow.` : `${money(over)} over. Push some items to tomorrow, or ask the owner to approve the extra.`) : 'Within the limit.'}</div></>
+                : <><b>No daily buying limit set</b><div className="muted small">Set one and the store has to stay within it, or ask you.</div></>}
+            </div>
+            <div className="row" style={{ gap: 8 }}>
+              {over > 0 && !approved && !canDecide && appr?.status !== 'asked' && <button className="btn" onClick={askOwner}>Ask owner to approve</button>}
+              {isOwner && limEdit === null && <button className="btn quiet" onClick={() => setLimEdit(String(limit || ''))}>{limit > 0 ? 'Change limit' : 'Set limit'}</button>}
+              {isOwner && limEdit !== null && (<>
+                <input inputMode="numeric" aria-label="Daily limit in rupees" placeholder="₹ per day, 0 for none" value={limEdit} onChange={(e) => setLimEdit(e.target.value.replace(/[^0-9]/g, ''))} style={{ width: 150 }} />
+                <button className="btn primary" onClick={saveLimit}>Save</button><button className="btn quiet" onClick={() => setLimEdit(null)}>Cancel</button></>)}
+            </div>
+          </div>
+          {canDecide && appr?.status === 'asked' && (
+            <div className="banner warn" style={{ marginTop: 10 }}>
+              <div><b>The store asks to go {money(Number(appr.over_amount))} over today's limit.</b></div>
+              <div className="row" style={{ gap: 8, marginTop: 6 }}><button className="btn primary" onClick={() => decide(true)}>Approve</button><button className="btn" onClick={() => decide(false)}>Send back, push items</button></div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!loading && shortRows.length > 0 && (
+        <div className="banner warn" style={{ marginBottom: 12 }}>
+          <div><b>Decide every item before sending.</b> {shortRows.length === 1 ? 'This item is' : 'These items are'} short of what the counters asked. Buy the full quantity again, or push the rest to tomorrow.</div>
+          <div className="stack" style={{ gap: 6, marginTop: 8 }}>
+            {shortRows.map((r) => (
+              <div key={'sh' + r.item.id} className="row" style={{ gap: 8, justifyContent: 'space-between' }}>
+                <span><b>{r.item.name}</b> <span className="muted small">buying {packText(r.item, r.qty)} of {packText(r.item, r.sug)}</span></span>
+                <span className="row" style={{ gap: 6 }}>
+                  <button className="btn quiet" onClick={() => setEdit((e) => { const n = { ...e }; delete n[r.item.id]; return n; })}>Buy all</button>
+                  <button className="btn" onClick={(e) => openPush(r, r.sug - r.qty, e.currentTarget)}>Push the rest</button>
+                </span>
+              </div>))}
+          </div>
+        </div>
+      )}
+      {!loading && overBlocked && shortRows.length === 0 && <div className="banner warn" style={{ marginBottom: 12 }}>Today is over the daily limit. Push some items to tomorrow, or ask the owner to approve. Orders can be sent once it fits.</div>}
 
       {loading ? <p className="muted">Loading…</p> : (
         <>
@@ -377,7 +490,7 @@ export function Buying() {
                             <tbody>{list.map((r) => (
                               <tr key={r.item.id}>
                                 <td><b>{r.item.name}</b>{r.item.rate_varies && <span className="chip late ratetag">Rate varies</span>}{r.ordered > 0 && <div className="muted small">{n2(r.ordered)} {r.item.unit} already ordered</div>}</td>
-                                <td className="small">{r.by.map((b) => `${b.loc} ${n2(b.qty)}`).join(' · ')}</td>
+                                <td className="small">{r.by.map((b) => `${b.loc} ${n2(b.qty)}`).join(' · ')}{r.carried > 0 && <div><span className={r.carriedAge >= 3 ? 'chip late' : 'chip due'}>{n2(r.carried)} from {r.carriedAge === 1 ? 'yesterday' : `${r.carriedAge} days ago`}</span>{r.carriedWhy && <span className="muted small"> {r.carriedWhy}</span>}</div>}</td>
                                 <td className="r num">{n2(r.asked)}</td>
                                 <td className="r num muted">{n2(r.inStore)} {r.item.unit}</td>
                                 <td className="r num muted">{packText(r.item, r.sug)}</td>
@@ -387,7 +500,7 @@ export function Buying() {
                                   <button aria-label="More" onClick={() => setEdit((p) => ({ ...p, [r.item.id]: r.qty + r.step }))}>+</button>
                                 </div></td>
                                 <td className="r num">{r.rate != null ? money(r.qty * r.rate) : '—'}</td>
-                                <td><button className="btn quiet" onClick={(e) => { const bb = (e.currentTarget as HTMLElement).getBoundingClientRect(); setMovePos({ x: bb.right, y: bb.bottom }); setMoveFor(moveFor === r.item.id ? null : r.item.id); setMoveTo(''); }}>Move</button></td>
+                                <td style={{ whiteSpace: 'nowrap' }}><button className="btn quiet" onClick={(e) => openPush(r, r.qty, e.currentTarget)}>Push</button><button className="btn quiet" onClick={(e) => { const bb = (e.currentTarget as HTMLElement).getBoundingClientRect(); setMovePos({ x: bb.right, y: bb.bottom }); setMoveFor(moveFor === r.item.id ? null : r.item.id); setMoveTo(''); }}>Move</button></td>
                               </tr>))}</tbody>
                           </table>
                         </div>
@@ -416,13 +529,46 @@ export function Buying() {
                       )}
                       <div className="row" style={{ padding: '10px 16px 0', justifyContent: 'space-between' }}>
                         <span className="muted small">{kind === 'store' ? '' : 'Change any quantity, then review. Values are estimates to plan cash, at the last rate available until the exact rate is entered. The order message never carries a price. Nothing is sent until you tap the button.'}</span>
-                        {kind !== 'store' && list.length > 0 && <button className="btn primary" onClick={() => setDlg({ vendorId: vid })}>{kind === 'bought' ? 'Open shopping list' : 'Review order'}</button>}
+                        {kind !== 'store' && list.length > 0 && <button className="btn primary" disabled={blocked} onClick={() => setDlg({ vendorId: vid })}>{kind === 'bought' ? 'Open shopping list' : 'Review order'}</button>}
                       </div>
                     </div>
                   )}
                 </div>
               );
             })}
+          </div>
+        </>
+      )}
+
+      {!loading && pushedOut.length > 0 && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <b>Pushed to tomorrow ({pushedOut.length})</b>
+          <div className="stack" style={{ gap: 4, marginTop: 6 }}>
+            {pushedOut.map((h) => { const it = itemMap.get(h.item_id); return (
+              <div key={h.id} className="row small" style={{ justifyContent: 'space-between' }}>
+                <span><b>{it?.name}</b> {it ? packText(it, h.qty) : n2(h.qty)} <span className="muted">· {h.reason}</span></span>
+                {canDecide && <button className="btn quiet" onClick={() => cancelHold(h.id)}>Cancel ask</button>}
+              </div>); })}
+          </div>
+        </div>
+      )}
+
+      {pushFor != null && rows.some((r) => r.item.id === pushFor) && (
+        <>
+          <div onClick={() => setPushFor(null)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div role="dialog" aria-label="Push to tomorrow" style={{ position: 'fixed', zIndex: 41, top: Math.min(pushPos.y + 6, window.innerHeight - 320), left: Math.max(8, Math.min(pushPos.x - 300, window.innerWidth - 316)), width: 300, background: 'var(--surface, #fff)', border: '1px solid var(--line, #ddd)', borderRadius: 12, boxShadow: 'var(--shadow-2)', padding: 12 }}>
+            <div className="small" style={{ marginBottom: 6 }}><b>Push {itemMap.get(pushFor)?.name} to tomorrow</b></div>
+            <div className="muted small" style={{ marginBottom: 6 }}>The counter will see it is pending. It shows on tomorrow's list until it is bought.</div>
+            <label className="small">How much to push</label>
+            <input inputMode="decimal" aria-label="Quantity to push" value={pushQty} onChange={(e) => setPushQty(e.target.value.replace(/[^0-9.]/g, ''))} style={{ width: '100%', marginBottom: 8 }} />
+            <select aria-label="Reason" value={pushWhy} onChange={(e) => setPushWhy(e.target.value)} style={{ width: '100%' }}>
+              <option value="">Why? (required)</option>
+              {REASONS.map((x) => <option key={x} value={x}>{x}</option>)}
+            </select>
+            <div className="row" style={{ gap: 8, marginTop: 10 }}>
+              <button className="btn primary" disabled={!pushWhy || !(Number(pushQty) > 0)} onClick={() => void doPush()}>Push to tomorrow</button>
+              <button className="btn quiet" onClick={() => setPushFor(null)}>Cancel</button>
+            </div>
           </div>
         </>
       )}
