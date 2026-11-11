@@ -54,7 +54,7 @@
 .nt .nt-chp{border:1px solid var(--line2);background:#fff;border-radius:99px;padding:5px 12px;font:450 12.5px var(--font);color:#46524D;cursor:pointer}
 .nt .nt-chp.nt-on{background:var(--tint);border-color:#A9CDB9;color:var(--brand);font-weight:500}
 .nt .nt-row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.nt .nt-pick{position:relative}
+.nt .nt-pick,.nt.nt-pick{position:relative}
 .nt .nt-pickbtn{display:flex;align-items:center;gap:8px;border:1px solid var(--line2);background:#fff;border-radius:10px;padding:7px 12px;font:450 13.5px var(--font);color:var(--ink);cursor:pointer;min-width:150px;justify-content:space-between}
 .nt .nt-pop{position:absolute;z-index:20;top:calc(100% + 6px);left:0;background:#fff;border:1px solid var(--line2);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.14);padding:12px}
 .nt .nt-cal{width:276px}
