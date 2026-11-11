@@ -52,7 +52,7 @@ export function CountPage() {
         const it = list.find((x) => x.id === r.id);
         if (it && it.unit === 'kg' && r.pack_name === 'portion' && Number(r.details?.piece_g) > 0) { it.pieceG = Number(r.details?.piece_g); it.portionKg = Number(r.weight_per_pack_g) / 1000; }
       }
-      const daily = freq === 'weekly' ? list : list.filter((i) => i.count_frequency === freq);
+      const daily = freq === 'weekly' || loc === 1 ? list : list.filter((i) => i.count_frequency === freq);
       setItems(loc === 1 && !daily.length ? list : daily);
       const { data: id, error } = await supabase.rpc('open_count', { p_location_id: loc, p_freq: freq });
       if (error) { setErr(errText(error)); return; }
