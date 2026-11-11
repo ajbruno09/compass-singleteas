@@ -1,5 +1,5 @@
 import { PoCancelBox, PoCancelInbox } from '../components/PoCancel';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { dayLabel, timeOf } from '../lib/ist';
@@ -96,6 +96,7 @@ export function Buying() {
   const [pushQty, setPushQty] = useState('');
   const [pushWhy, setPushWhy] = useState('');
   const [pushPos, setPushPos] = useState({ x: 0, y: 0 });
+  const [openRow, setOpenRow] = useState<number | null>(null);
   const [limEdit, setLimEdit] = useState<string | null>(null);
 
   useEffect(() => { supabase.rpc('indent_for_date').then(({ data }) => { const d = String(data); setDate(d); setTarget(d); }); }, []);
@@ -488,8 +489,9 @@ export function Buying() {
                           <table>
                             <thead><tr><th>Item</th><th>Asked by counters</th><th className="r">Asked</th><th className="r">In store</th><th className="r">Suggested</th><th>Order</th><th className="r">Estimate</th><th /></tr></thead>
                             <tbody>{list.map((r) => (
-                              <tr key={r.item.id} style={r.carried > 0 ? { background: 'var(--warn-soft, #FBF0D5)' } : undefined}>
-                                <td><b>{r.item.name}</b>{r.carried > 0 && <div style={{ marginTop: 3 }}><span className={r.carriedAge >= 3 ? 'chip late' : 'chip due'}>{r.carriedAge >= 3 ? '⚠ ' : ''}From {r.carriedAge === 1 ? 'yesterday' : `${r.carriedAge} days ago`}: {n2(r.carried)} {r.item.unit}</span><div className="muted small">{r.carriedWhy}</div></div>}{r.item.rate_varies && <span className="chip late ratetag">Rate varies</span>}{r.ordered > 0 && <div className="muted small">{n2(r.ordered)} {r.item.unit} already ordered</div>}</td>
+                              <Fragment key={r.item.id}>
+                              <tr style={r.carried > 0 ? { background: 'var(--warn-soft, #FBF0D5)' } : undefined}>
+                                <td>{r.carried > 0 ? <button className="btn quiet" style={{ padding: 0, fontWeight: 600 }} aria-expanded={openRow === r.item.id} onClick={() => setOpenRow(openRow === r.item.id ? null : r.item.id)}><span style={{ display: 'inline-block', transform: openRow === r.item.id ? 'none' : 'rotate(-90deg)', transition: 'transform .12s', marginRight: 4 }}><Icon name="chev" /></span>{r.item.name}</button> : <b>{r.item.name}</b>}{r.carried > 0 && <div style={{ marginTop: 3 }}><span className={r.carriedAge >= 3 ? 'chip late' : 'chip due'}>{r.carriedAge >= 3 ? '⚠ ' : ''}From {r.carriedAge === 1 ? 'yesterday' : `${r.carriedAge} days ago`}: {n2(r.carried)} {r.item.unit}</span><div className="muted small">{r.carriedWhy}</div></div>}{r.item.rate_varies && <span className="chip late ratetag">Rate varies</span>}{r.ordered > 0 && <div className="muted small">{n2(r.ordered)} {r.item.unit} already ordered</div>}</td>
                                 <td className="small">{r.by.filter((b) => b.loc !== 'Earlier orders').map((b) => `${b.loc} ${n2(b.qty)}`).join(' · ') || '—'}</td>
                                 <td className="r num">{n2(r.asked)}</td>
                                 <td className="r num muted">{n2(r.inStore)} {r.item.unit}</td>
@@ -501,7 +503,15 @@ export function Buying() {
                                 </div></td>
                                 <td className="r num">{r.rate != null ? money(r.qty * r.rate) : '—'}</td>
                                 <td style={{ whiteSpace: 'nowrap' }}><button className="btn quiet" onClick={(e) => openPush(r, r.qty, e.currentTarget)}>Push</button><button className="btn quiet" onClick={(e) => { const bb = (e.currentTarget as HTMLElement).getBoundingClientRect(); setMovePos({ x: bb.right, y: bb.bottom }); setMoveFor(moveFor === r.item.id ? null : r.item.id); setMoveTo(''); }}>Move</button></td>
-                              </tr>))}</tbody>
+                              </tr>
+                              {r.carried > 0 && openRow === r.item.id && (
+                                <tr style={{ background: 'var(--warn-soft, #FBF0D5)' }}><td colSpan={8} style={{ paddingTop: 0 }}>
+                                  <div className="stack" style={{ gap: 4, padding: '4px 0 6px 26px' }}>
+                                    <div className="row small" style={{ justifyContent: 'space-between' }}><span><b>Current order</b> <span className="muted">{r.by.filter((x) => x.loc !== 'Earlier orders').map((x) => `${x.loc} ${n2(x.qty)}`).join(' · ') || 'No new ask today'}</span></span><b className="num">{packText(r.item, Math.max(0, r.asked - r.carried))}</b></div>
+                                    {holds.filter((h) => h.item_id === r.item.id && h.due_date <= date && h.from_date < date).map((h) => (
+                                      <div key={h.id} className="row small" style={{ justifyContent: 'space-between' }}><span><b>Previous order</b> <span className="muted">asked {dayLabel(h.from_date)}{h.counters ? ` · ${h.counters}` : ''} · pushed: {h.reason}{h.push_count > 1 ? ` (${h.push_count} times)` : ''}</span></span><b className="num">{packText(r.item, h.qty)}</b></div>))}
+                                  </div></td></tr>)}
+                              </Fragment>))}</tbody>
                           </table>
                         </div>
                       )}
