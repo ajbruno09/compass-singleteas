@@ -330,11 +330,14 @@ function WhoWeighs() {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
-    const [p, d] = await Promise.all([
-      supabase.from('profiles').select('id, full_name').eq('active', true).in('role', ['department', 'closing']).order('full_name'),
+    const [p, d, pl] = await Promise.all([
+      supabase.from('profiles').select('id, full_name, role').eq('active', true).in('role', ['department', 'closing', 'store']).order('full_name'),
       supabase.from('duty_people').select('profile_id').eq('duty', 'gas_weigh'),
+      supabase.from('profile_locations').select('profile_id, location_id'),
     ]);
-    setPeople((p.data as { id: string; full_name: string }[]) ?? []);
+    const FOH = [5, 6];
+    const kitchen = new Set(((pl.data as { profile_id: string; location_id: number }[]) ?? []).filter((x) => !FOH.includes(x.location_id)).map((x) => x.profile_id));
+    setPeople(((p.data as { id: string; full_name: string; role: string }[]) ?? []).filter((x) => x.role === 'store' || kitchen.has(x.id)));
     setSel(new Set(((d.data as { profile_id: string }[]) ?? []).map((x) => x.profile_id)));
   }, []);
   useEffect(() => { void load(); }, [load]);
