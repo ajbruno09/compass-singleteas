@@ -251,6 +251,8 @@ function Drawer({ title, onClose, footer, children }: { title: string; onClose: 
 // ---------- Store screen ----------
 function StoreView() {
   const toast = useToast();
+  const { profile: me } = useSession();
+  const isOwner = me?.role === 'owner';
   const [ov, setOv] = useState<Ov | null>(null);
   const [panel, setPanel] = useState<null | 'recv' | 'swap' | 'weigh'>(null);
   const [preset, setPreset] = useState<string | undefined>();
@@ -311,11 +313,47 @@ function StoreView() {
             {ov.history.map((h) => <div key={h.code + h.at} className="gs-tr gs-three"><b>{h.code}</b><span>{h.days ?? '·'} {h.days === 1 ? 'day' : 'days'}</span><span>{h.days ? inr(19 * ov.cost_per_kg / Math.max(1, h.days)) : '·'}</span></div>)}
           </section>
         )}
+        {isOwner && <WhoWeighs />}
       </div>
       {panel === 'recv' && <ReceivePanel onClose={() => setPanel(null)} onDone={() => void load()} />}
       {panel === 'swap' && <SwapPanel ov={ov} preset={preset} onClose={() => setPanel(null)} onDone={() => void load()} />}
       {panel === 'weigh' && <Drawer title="Weigh the cylinders" onClose={() => { setPanel(null); void load(); }} footer={<button className="gs-btn" onClick={() => { setPanel(null); void load(); }}>Close</button>}><WeighCard onDone={() => void load()} /></Drawer>}
     </>
+  );
+}
+
+
+// ---------- Owner: who weighs the gas bank at closing ----------
+function WhoWeighs() {
+  const toast = useToast();
+  const [people, setPeople] = useState<{ id: string; full_name: string }[]>([]);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    const [p, d] = await Promise.all([
+      supabase.from('profiles').select('id, full_name').eq('active', true).in('role', ['department', 'closing']).order('full_name'),
+      supabase.from('duty_people').select('profile_id').eq('duty', 'gas_weigh'),
+    ]);
+    setPeople((p.data as { id: string; full_name: string }[]) ?? []);
+    setSel(new Set(((d.data as { profile_id: string }[]) ?? []).map((x) => x.profile_id)));
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  async function flip(id: string) {
+    setBusy(true);
+    const on = sel.has(id);
+    const r = on ? await supabase.from('duty_people').delete().eq('duty', 'gas_weigh').eq('profile_id', id) : await supabase.from('duty_people').upsert({ duty: 'gas_weigh', profile_id: id });
+    setBusy(false);
+    if (r.error) { toast(errText(r.error)); return; }
+    void load();
+  }
+  return (
+    <section className="gs-tbl">
+      <h3>Who weighs the gas at closing</h3>
+      <p className="small muted" style={{ margin: '2px 0 10px' }}>Pick one or two people. Only they see the weighing task at night. The Store and Admin can always weigh. If nobody is picked, anyone on the Indian, South Indian, Tandoor, Continental or Staff Food counters can.</p>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {people.map((x) => <button key={x.id} disabled={busy} aria-pressed={sel.has(x.id)} onClick={() => void flip(x.id)} style={{ padding: '8px 14px', borderRadius: 12, border: '1px solid ' + (sel.has(x.id) ? 'var(--brand)' : 'var(--line)'), background: sel.has(x.id) ? 'var(--brand)' : 'var(--card)', color: sel.has(x.id) ? '#fff' : 'var(--ink)', font: '500 14px var(--font)', cursor: 'pointer' }}>{x.full_name}</button>)}
+      </div>
+    </section>
   );
 }
 
