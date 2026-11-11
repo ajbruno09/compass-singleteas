@@ -10,7 +10,7 @@ interface Row {
 }
 interface Vendor { id: string; name: string }
 interface Group { id: number; name: string }
-type Tab = 'cost' | 'price' | 'buy' | 'pack' | 'dup' | 'grp' | 'inh' | 'cln';
+type Tab = 'ren' | 'cost' | 'price' | 'buy' | 'pack' | 'dup' | 'grp' | 'inh' | 'cln';
 interface Cost { item_id: number; name: string; unit: string; kind: string; cost: number | null; missing: { id: number; name: string }[]; markup: number; rate: number | null }
 const PACKS = ['kg', 'g', 'L', 'ml', 'pack', 'tray', 'case', 'bag', 'box', 'bottle', 'piece', 'roll', 'dozen', 'can'];
 const SMALL = ['g', 'ml'];
@@ -27,6 +27,7 @@ export function DataCheck() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [tab, setTab] = useState<Tab>('cost');
   const [costs, setCosts] = useState<Cost[]>([]);
+  const [rq, setRq] = useState('');
   const [ed, setEd] = useState<Record<string, Record<string, string>>>({});
   const [skip, setSkip] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
@@ -58,9 +59,9 @@ export function DataCheck() {
   const stray = rows.filter((r) => r.content_unit && !(r.content_qty && r.content_qty > 0));
 
   const incomplete = costs.filter((c) => c.missing.length > 0);
-  const counts: Record<Tab, number> = { cost: incomplete.length, price: wrongPack.length, buy: buy.length, pack: pack.length, dup: dups.length, grp: grp.length, inh: 0, cln: stray.length };
+  const counts: Record<Tab, number> = { ren: 0, cost: incomplete.length, price: wrongPack.length, buy: buy.length, pack: pack.length, dup: dups.length, grp: grp.length, inh: 0, cln: stray.length };
   const left = counts.cost + counts.price + counts.buy + counts.pack + counts.dup + counts.grp + (stray.length ? 1 : 0);
-  const TABS: [Tab, string][] = [['cost', 'Costing'], ['price', 'Wrong price'], ['buy', 'Missing price'], ['pack', 'Pack sizes'], ['dup', 'Possible duplicates'], ['grp', 'Wrong group'], ['inh', 'Made in house'], ['cln', 'Cleanup']];
+  const TABS: [Tab, string][] = [['cost', 'Costing'], ['ren', 'Rename items'], ['price', 'Wrong price'], ['buy', 'Missing price'], ['pack', 'Pack sizes'], ['dup', 'Possible duplicates'], ['grp', 'Wrong group'], ['inh', 'Made in house'], ['cln', 'Cleanup']];
 
   const val = (id: number, k: string, dflt: string) => ed[id]?.[k] ?? dflt;
   const set = (id: number, k: string, v: string) => setEd((e) => ({ ...e, [id]: { ...e[id], [k]: v } }));
@@ -91,8 +92,25 @@ export function DataCheck() {
         <div style={{ textAlign: 'right' }}><div className="num" style={{ fontSize: 28, fontWeight: 600 }}>{left}</div><div className="muted small">to look at</div></div>
       </div>
       <div className="seg" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
-        {TABS.map(([k, l]) => <button key={k} aria-pressed={tab === k} onClick={() => setTab(k)}>{l}{k !== 'inh' ? ` (${counts[k]})` : ` (${inh.length})`}</button>)}
+        {TABS.map(([k, l]) => <button key={k} aria-pressed={tab === k} onClick={() => setTab(k)}>{l}{k === 'ren' ? '' : k !== 'inh' ? ` (${counts[k]})` : ` (${inh.length})`}</button>)}
       </div>
+
+      {tab === 'ren' && (
+        <div className="card">
+          <p className="muted small" style={{ marginBottom: 8 }}>Fix a spelling or a wrong name. Recipes, stock, prices and history stay attached, and the old name is kept so bills and reports still match.</p>
+          <input placeholder="Search for an item" value={rq} onChange={(e) => setRq(e.target.value)} style={{ width: 280, marginBottom: 10 }} />
+          <div className="tablewrap"><table className="table">
+            <tbody>{rows.filter((r) => !rq || r.name.toLowerCase().includes(rq.toLowerCase())).slice(0, 40).map((r) => {
+              const n = val(r.item_id, 'n', r.name); const ch = n.trim() !== r.name;
+              return <tr key={r.item_id}>
+                <td><input style={{ width: '100%', minWidth: 220 }} value={n} onChange={(e) => set(r.item_id, 'n', e.target.value)} /></td>
+                <td className="muted small">{gName.get(r.group_id ?? -1)}, counted in {r.unit}</td>
+                <td className="r">{ch && <button className="btn primary" disabled={busy || n.trim().length < 2} onClick={() => rpc('dc_rename_item', { p_item: r.item_id, p_name: n }, 'Renamed')}>Save</button>}</td>
+              </tr>;
+            })}</tbody></table></div>
+          {rows.filter((r) => !rq || r.name.toLowerCase().includes(rq.toLowerCase())).length > 40 && <p className="muted small" style={{ marginTop: 8 }}>Showing the first 40. Search to narrow it down.</p>}
+        </div>
+      )}
 
       {tab === 'cost' && (
         <div className="card">
