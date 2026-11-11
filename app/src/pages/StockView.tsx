@@ -6,7 +6,7 @@ import { qty as fmtQty, packFactor } from '../lib/format';
 import type { Group } from '../lib/types';
 import '../mock-levels.css';
 
-interface Item { id: number; name: string; unit: string; group_id: number | null; show_as?: string | null; purchase_factor?: number | null }
+interface Item { id: number; name: string; unit: string; group_id: number | null; show_as?: string | null; purchase_factor?: number | null; pcs_per_portion?: number | null; count_unit?: string | null }
 interface OnHand { location_id: number; item_id: number; qty: number }
 type V = 'stock' | 'neg' | 'all';
 const EPS = 0.0004;
@@ -22,11 +22,13 @@ export function StockView() {
   const [links, setLinks] = useState<Set<string>>(new Set());
   const [pars, setPars] = useState<Map<number, number>>(new Map());
   const [q, setQ] = useState('');
+  const [pcs, setPcs] = useState<Map<number, number>>(new Map());
+  useEffect(() => { supabase.rpc('pieces_on_hand', { p_loc: 1 }).then(({ data }) => setPcs(new Map(((data as { item_id: number; pieces: number }[]) ?? []).map((r) => [r.item_id, Number(r.pieces)])))); }, []);
   const [view, setView] = useState<V>('stock');
   const [shut, setShut] = useState<Set<string>>(new Set());
   const [openRow, setOpenRow] = useState<Set<number>>(new Set());
   useEffect(() => {
-    supabase.from('items').select('id, name, unit, group_id, show_as, purchase_factor').eq('active', true).order('name').limit(2000).then(({ data }) => setItems((data as Item[]) ?? []));
+    supabase.from('items').select('id, name, unit, group_id, show_as, purchase_factor, pcs_per_portion, count_unit').eq('active', true).order('name').limit(2000).then(({ data }) => setItems((data as Item[]) ?? []));
     supabase.from('stock_on_hand').select('*').then(({ data }) => setOh((data as OnHand[]) ?? []));
     supabase.from('item_locations').select('item_id, location_id, par_level').then(({ data }) => {
       const d = (data as { item_id: number; location_id: number; par_level: number | null }[]) ?? [];
@@ -79,7 +81,7 @@ export function StockView() {
               <button className="sx-gh" onClick={() => setShut((s) => tog(s, key))}><span className="sx-ic">{icon(g.icon ?? '📦')}</span><span><span className="sx-t">{g.name}</span> <span className="sx-c">{rows.length} {rows.length === 1 ? 'item' : 'items'}</span></span><span className="sx-sp" />{neg > 0 && <span className="sx-chip">{neg} below zero</span>}<span className="sx-chev">▾</span></button>
               <div className="sx-rows">{rows.map((i) => { const v = qtyOf.get(i.id) ?? 0; const isNeg = v < -EPS; return (
                 <div key={i.id} className={`sx-row ${isNeg ? 'sx-neg' : ''} ${openRow.has(i.id) ? 'sx-open' : ''}`} onClick={(e) => { if (isNeg && !(e.target as HTMLElement).closest('.sx-btn')) setOpenRow((s) => tog(s, i.id)); }}>
-                  <span className="sx-nm">{i.name}{lowAt(i) && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--warn)', background: 'var(--warns)', borderRadius: 99, padding: '1px 8px' }}>Low</span>}</span><span className="sx-q">{fmt(i, v)}</span>
+                  <span className="sx-nm">{i.name}{loc === 1 && i.pcs_per_portion && (pcs.get(i.id) ?? 0) > 0 && (() => { const p = pcs.get(i.id) ?? 0; const pp = Number(i.pcs_per_portion); const w = Math.floor(p / pp + 1e-9); const lo = Math.round(p - w * pp); return <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{i.count_unit === 'bird' ? `${w} ${w === 1 ? 'bird' : 'birds'}` : `${w} portions${lo ? ` + ${lo} pcs` : ''}`}</span>; })()}{lowAt(i) && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--warn)', background: 'var(--warns)', borderRadius: 99, padding: '1px 8px' }}>Low</span>}</span><span className="sx-q">{fmt(i, v)}</span>
                   {isNeg && <div className="sx-more"><span>More went out than came in. A closing count fixes it.</span><button className="sx-btn sx-p" onClick={() => nav('/counts')}>Recount</button></div>}
                 </div>); })}</div>
             </div>);

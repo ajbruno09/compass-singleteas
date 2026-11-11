@@ -5,7 +5,7 @@ import { Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { useSession } from '../lib/session';
 
-interface Item { id: number; name: string; unit: string; show_as?: string | null; purchase_factor?: number | null; pack_name?: string | null }
+interface Item { id: number; name: string; unit: string; show_as?: string | null; purchase_factor?: number | null; pack_name?: string | null; count_unit?: string | null; pcs_per_portion?: number | null }
 // Chicken portions are for counters. The store receives those in kg.
 const rf = (i: Item) => (i.pack_name === 'portion' ? 0 : packFactor(i));
 interface Vendor { id: string; name: string }
@@ -89,15 +89,20 @@ export function Receive() {
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<Pending[]>([]);
   const [addFor, setAddFor] = useState<Pending | null>(null);
+  const [pcsOn, setPcsOn] = useState<Record<number, number>>({});
+  const [costKg, setCostKg] = useState<Record<number, number>>({});
 
   const load = useCallback(async () => {
     const [p, i, v] = await Promise.all([
       supabase.from('purchase_orders').select('id, po_number, vendor_id, status, order_date, required_date, po_lines(item_id, qty)').in('status', ['sent', 'partly_received']).order('order_date', { ascending: false }),
-      supabase.from('items').select('id, name, unit, show_as, purchase_factor, pack_name').eq('active', true).order('name'),
+      supabase.from('items').select('id, name, unit, show_as, purchase_factor, pack_name, count_unit, pcs_per_portion').eq('active', true).order('name'),
       supabase.from('vendors').select('id, name').eq('active', true).order('name')
     ]);
     const list = (p.data as Po[]) ?? [];
     setPos(list);
+    const [po2, pc2] = await Promise.all([supabase.rpc('pieces_on_hand', { p_loc: 1 }), supabase.from('item_price_book').select('item_id, unit_cost').not('unit_cost', 'is', null)]);
+    setPcsOn(Object.fromEntries(((po2.data as { item_id: number; pieces: number }[]) ?? []).map((r) => [r.item_id, Math.max(0, Number(r.pieces))])));
+    setCostKg(Object.fromEntries(((pc2.data as { item_id: number; unit_cost: number }[]) ?? []).map((r) => [r.item_id, Number(r.unit_cost)])));
     const pb = await supabase.from('goods_receipts').select('id, grn_number, vendor_id, received_at').eq('bill_later', true).order('received_at', { ascending: false });
     setPending((pb.data as Pending[]) ?? []);
     setItems(Object.fromEntries(((i.data as Item[]) ?? []).map((x) => [x.id, x])));
@@ -149,14 +154,16 @@ export function Receive() {
         </div>
       )}
       {addFor && <AddBillSheet grn={addFor} vendorName={vendors[addFor.vendor_id]?.name ?? 'Vendor'} onClose={() => setAddFor(null)} onDone={() => { setAddFor(null); void load(); }} />}
-      {open && <ReceiveSheet po={open === 'free' ? null : open} items={items} vendors={vendors} got={got} onClose={() => setOpen(null)} onDone={() => { setOpen(null); void load(); }} />}
+      {open && <ReceiveSheet pcsOn={pcsOn} costKg={costKg} po={open === 'free' ? null : open} items={items} vendors={vendors} got={got} onClose={() => setOpen(null)} onDone={() => { setOpen(null); void load(); }} />}
     </>
   );
 }
 
-function ReceiveSheet({ po, items, vendors, got, onClose, onDone }: { po: Po | null; items: Record<number, Item>; vendors: Record<string, Vendor>; got: (po: Po, item: number) => number; onClose: () => void; onDone: () => void }) {
+function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg }: { pcsOn: Record<number, number>; costKg: Record<number, number>; po: Po | null; items: Record<number, Item>; vendors: Record<string, Vendor>; got: (po: Po, item: number) => number; onClose: () => void; onDone: () => void }) {
   const toast = useToast();
   const [vals, setVals] = useState<Record<number, string>>({});
+  const [cnt, setCnt] = useState<Record<number, string>>({});
+  const [neck, setNeck] = useState('');
   const [vendor, setVendor] = useState('');
   const [extra, setExtra] = useState<number[]>([]);
   const [bill, setBill] = useState('');
@@ -169,11 +176,33 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone }: { po: Po | n
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const ids = po ? po.po_lines.map((l) => l.item_id).concat(extra.filter((e) => !po.po_lines.some((l) => l.item_id === e))) : extra;
-  const matches = useMemo(() => find.trim().length < 2 ? [] : Object.values(items).filter((i) => i.name.toLowerCase().includes(find.toLowerCase()) && !ids.includes(i.id)).slice(0, 6), [find, items, ids]);
+  const neckItem = Object.values(items).find((i) => i.name === 'Chicken Neck');
+  const hasCount = ids.some((i) => items[i]?.count_unit);
+  const isCount = (id: number) => !!items[id]?.count_unit;
+  const portionText = (id: number) => {
+    const it = items[id]; const kg = Number(vals[id]) || 0; const c = Number(cnt[id]) || 0;
+    if (!it || !(kg > 0) || !(c > 0)) return null;
+    const ppp = Number(it.pcs_per_portion) || 1; const total = c + (pcsOn[id] ?? 0);
+    const per = costKg[id] ? Math.round((costKg[id] * kg / c) * ppp * 100) / 100 : null;
+    if (it.count_unit === 'bird') return `${c} ${c === 1 ? 'bird' : 'birds'} · avg ${Math.round((kg / c) * 1000)} g each${per != null ? ` · ₹${Math.round(per)} per bird` : ''}`;
+    const whole = Math.floor(total / ppp); const loose = Math.round(total - whole * ppp);
+    return `In store after: ${whole} portions${loose ? ` + ${loose} loose pcs` : ''} · ${Math.round((kg / c) * 1000)} g per piece${per != null ? ` · ₹${Math.round(per)} per portion` : ''}`;
+  };
+  const matches = useMemo(() => find.trim().length < 2 ? [] : Object.values(items).filter((i) => i.name.toLowerCase().includes(find.toLowerCase()) && !ids.includes(i.id) && i.name !== 'Chicken Neck').slice(0, 6), [find, items, ids]);
 
   async function save() {
     setErr('');
-    const lines = Object.entries(vals).filter(([, v]) => Number(v) > 0).map(([id, v]) => ({ item_id: Number(id), qty: round3(Number(v) * (rf(items[Number(id)] ?? ({} as Item)) || 1)) }));
+    for (const id of ids) {
+      if (!isCount(id)) continue;
+      const kg = Number(vals[id]) > 0, c = Number(cnt[id]) > 0;
+      if ((kg || c) && !(kg && c)) return setErr(`${items[id].name}: enter both the weight and the ${items[id].count_unit === 'bird' ? 'birds' : 'piece'} count.`);
+    }
+    const anyCount = ids.some((id) => isCount(id) && Number(vals[id]) > 0);
+    if (anyCount && neckItem && neck.trim() === '') return setErr('Enter the neck weight. Type 0 if no neck came.');
+    const lines: { item_id: number; qty: number; pieces?: number }[] = Object.entries(vals).filter(([, v]) => Number(v) > 0).map(([id, v]) => isCount(Number(id))
+      ? { item_id: Number(id), qty: round3(Number(v)), pieces: Number(cnt[Number(id)]) }
+      : { item_id: Number(id), qty: round3(Number(v) * (rf(items[Number(id)] ?? ({} as Item)) || 1)) });
+    if (anyCount && neckItem && Number(neck) > 0) lines.push({ item_id: neckItem.id, qty: round3(Number(neck)) });
     if (!lines.length) return setErr('Enter what arrived for at least one item.');
     if (!po && !vendor) return setErr('Choose the vendor.');
     if (!files.length && !later) return setErr('Add a photo of the bill, or choose Bill will come later.');
@@ -193,9 +222,19 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone }: { po: Po | n
       <div className="tablewrap"><table>
         <thead><tr><th>Item</th>{po && <th className="r">Ordered</th>}<th className="r" style={{ width: 130 }}>Arrived now</th></tr></thead>
         <tbody>{ids.map((id) => { const it = items[id]; if (!it) return null; const line = po?.po_lines.find((l) => l.item_id === id); const already = po && line ? got(po, id) : 0; const f = rf(it); const d = (n: number) => (f ? `${Math.round((n / f) * 10) / 10} ${it.show_as}` : fmtQty(n, it.unit));
+          if (isCount(id)) { const bird = it.count_unit === 'bird'; const pt = portionText(id); const ordBirds = bird && line && it.purchase_factor ? Math.round((Number(line.qty) / Number(it.purchase_factor)) * 10) / 10 : null; return (
+            <tr key={id}><td><b>{it.name}</b> <span className="muted small">weight and {bird ? 'birds' : 'count'}</span>{pt && <div className="small" style={{ color: 'var(--brand)', marginTop: 3 }}>{pt}</div>}</td>
+              {po && <td className="r num">{line ? <>{fmtQty(Number(line.qty), 'kg')}{ordBirds != null && <div className="small muted">{ordBirds} birds</div>}{already > 0 && <div className="small muted">got {fmtQty(already, 'kg')}</div>}</> : <span className="muted small">extra</span>}</td>}
+              <td className="r"><div className="stack" style={{ gap: 6, alignItems: 'flex-end' }}>
+                <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 74, borderColor: Number(cnt[id]) > 0 && !(Number(vals[id]) > 0) ? 'var(--bad)' : undefined }} aria-label={`${it.name} weight in kg`} placeholder="kg" value={vals[id] ?? ''}  onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} /><span className="muted small" style={{ width: 38, textAlign: 'left' }}>kg</span></span>
+                <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><input inputMode="numeric" className="num" style={{ textAlign: 'right', width: 74, borderColor: Number(vals[id]) > 0 && !(Number(cnt[id]) > 0) ? 'var(--bad)' : undefined }} aria-label={`${it.name} ${bird ? 'birds' : 'pieces'}`} placeholder={bird ? 'birds' : 'pcs'} value={cnt[id] ?? ''} onChange={(e) => setCnt((p) => ({ ...p, [id]: e.target.value.replace(/[^0-9]/g, '') }))} /><span className="muted small" style={{ width: 38, textAlign: 'left' }}>{bird ? 'birds' : 'pcs'}</span></span>
+              </div></td></tr>); }
           return <tr key={id}><td><b>{it.name}</b> <span className="muted small">{f ? it.show_as : it.unit}</span></td>
             {po && <td className="r num">{line ? <>{d(Number(line.qty))}{already > 0 && <div className="small muted">got {d(already)}</div>}</> : <span className="muted small">extra</span>}</td>}
-            <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110 }} aria-label={`Arrived ${it.name}`} value={vals[id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} /></td></tr>; })}</tbody>
+            <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110 }} aria-label={`Arrived ${it.name}`} value={vals[id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} /></td></tr>; })}
+          {hasCount && neckItem && (
+            <tr style={{ background: 'var(--warn-soft, #FBF0D5)' }}><td><b>Chicken neck</b> <span className="muted small">kg only. Not on the order. Type 0 if none came.</span></td>{po && <td className="r muted small">extra</td>}
+              <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110, borderColor: neck.trim() === '' ? 'var(--bad)' : undefined }} aria-label="Chicken neck weight in kg" placeholder="kg" value={neck} onChange={(e) => setNeck(e.target.value)} /></td></tr>)}</tbody>
       </table></div>
       <label className="field"><span>Add another item</span><input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Type a few letters" /></label>
       {matches.length > 0 && <div className="row">{matches.map((m) => <button key={m.id} className="qchip" onClick={() => { setExtra((p) => [...p, m.id]); setFind(''); }}>{m.name}</button>)}</div>}
