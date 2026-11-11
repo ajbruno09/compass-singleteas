@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { SosButton } from './Sos';
 import { MessagesPill } from './MessagesPill';
+import { GasFab } from './GasFab';
 import { Icon } from './Icon';
 import { useReceiveGate } from '../lib/gate';
 
@@ -44,6 +45,7 @@ export function StaffShell() {
     <div className="staffshell">
       <Outlet />
       {myLocations.length > 0 && <MessagesPill />}
+      {myLocations.length > 0 && <GasFab />}
       {myLocations.length > 0 && <SosButton locations={myLocations} defaultId={loc} />}
       <nav className="staffnav" aria-label="Main">
         {items.map(([k, e, l, n, go]) => (

@@ -676,3 +676,7 @@ tr.click { cursor: pointer; }
   .usualbar .ustar { background: #3A2E12; color: #E3B04B; }
   .chk-row:hover { background: var(--sunken); }
 }
+
+.gasfab { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: calc(206px + env(safe-area-inset-bottom)); z-index: 30; display: inline-flex; align-items: center; gap: 6px; min-height: 46px; padding: 0 18px; border-radius: 999px; border: 0; background: var(--brand); color: var(--on-brand, #fff); font: 600 15px/1 var(--font); box-shadow: var(--shadow-2); cursor: pointer; animation: pulse 1.6s ease-in-out infinite; }
+.gasfab.done { animation: none; background: var(--brand-soft); color: var(--brand); border: 1px solid var(--brand); min-height: 38px; font-weight: 500; font-size: 13.5px; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .gasfab { animation: none; } }
