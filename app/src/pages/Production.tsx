@@ -6,12 +6,12 @@ import '../production.css';
 
 type Kind = 'gravy' | 'snack' | 'continental';
 interface Recipe { item_id: number; base_qty: number; min_qty: number; max_qty: number; multiple_of?: number; kind: Kind; chips: number[] | null; items: { name: string; unit: string } | null }
-interface RLine { recipe_item_id: number; ingredient_id: number; qty_per_base: number; unit_ok: boolean; name: string; unit: string }
+interface RLine { recipe_item_id: number; ingredient_id: number; qty_per_base: number; unit_ok: boolean; name: string; unit: string; ask_default?: boolean; per_unit?: number; pack?: boolean }
 interface Cat { recipes: (Omit<Recipe, 'items'> & { name: string; unit: string })[]; lines: RLine[] }
 interface IItem { id: number; name: string; unit: string }
 interface Plan { id: number; item_id: number; weekday: number; qty: number; active: boolean }
 interface Level { item_id: number; trigger_level: number | null; urgent_level: number | null; urgent_batch: number }
-interface Order { id: number; item_id: number; qty: number; for_date: string; status: string; urgent: boolean; source: string; reason: string | null; requested_at: string; qty_made: number | null; items: { name: string; unit: string } | null }
+interface Order { id: number; item_id: number; qty: number; for_date: string; status: string; urgent: boolean; source: string; reason: string | null; requested_at: string; qty_made: number | null; ask_over?: Record<string, boolean> | null; items: { name: string; unit: string } | null }
 interface Person { id: string; full_name: string }
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -56,6 +56,7 @@ export function Production() {
   const [scr, setScr] = useState<'home' | Kind>('home');
   const [pick, setPick] = useState<Record<number, number>>({});
   const [open, setOpen] = useState<Record<number, boolean>>({});
+  const [askSel, setAskSel] = useState<Record<string, boolean>>({});
   const [made, setMade] = useState<Record<number, string>>({});
   const [rg, setRg] = useState<Kind>('gravy');
   const [ri, setRi] = useState(0);
@@ -74,7 +75,7 @@ export function Production() {
       supabase.rpc('prod_catalog'),
       supabase.from('prod_plan').select('*').eq('active', true),
       supabase.from('prod_levels').select('*'),
-      supabase.from('prod_orders').select('id, item_id, qty, for_date, status, urgent, source, reason, requested_at, qty_made').order('requested_at', { ascending: false }).limit(80),
+      supabase.from('prod_orders').select('id, item_id, qty, for_date, status, urgent, source, reason, requested_at, qty_made, ask_over').order('requested_at', { ascending: false }).limit(80),
       supabase.rpc('indent_times', { p_for_date: f })
     ]);
     const FIRST = [661, 608, 662, 584, 560, 657, 660, 641, 574, 458, 443];
@@ -119,9 +120,18 @@ export function Production() {
     const r = rec.get(itemId); if (!r) return [];
     return lines.filter((x) => x.recipe_item_id === itemId).map((x) => {
       const it = inames.get(x.ingredient_id);
-      return { id: x.ingredient_id, name: it?.name ?? '', unit: it?.unit ?? '', qty: (x.qty_per_base * q) / r.base_qty, ok: x.unit_ok };
+      return { id: x.ingredient_id, name: it?.name ?? '', unit: it?.unit ?? '', qty: (x.qty_per_base * q) / r.base_qty, ok: x.unit_ok, def: x.ask_default !== false, per: x.pack ? (x.per_unit ?? 1) : 0 };
     }).sort((a, b) => a.name.localeCompare(b.name));
   };
+
+  const ingRow = (x: { id: number; name: string; unit: string; qty: number; ok: boolean; per: number }, on: boolean, flip: (() => void) | null) => (
+    <div key={x.id} style={{ alignItems: 'center' }}>
+      <span style={{ flex: 1 }}>{x.name}{!x.ok && <> <span className="pd-chip pd-att">unit?</span></>}
+        <div className="pd-sm pd-mut">{fq(x.qty, x.unit)}{x.per > 0 && on ? ` · goes as ${Math.max(1, Math.ceil(x.qty / x.per - 1e-9))} pack${Math.ceil(x.qty / x.per - 1e-9) > 1 ? 's' : ''}` : ''}</div></span>
+      <span className={'pd-sm' + (on ? '' : ' pd-mut')} style={{ marginRight: 8 }}>{on ? 'Ask Store' : 'Have it'}</span>
+      <button className={'pd-sw' + (on ? ' pd-on' : '') + (flip ? '' : ' pd-lock')} onClick={flip ?? undefined} aria-label={on ? 'Ask Store, tap to switch off' : 'Have it, tap to ask Store'} />
+    </div>
+  );
 
   const run = async (fn: () => PromiseLike<{ error: { message: string } | null }>, ok: string) => {
     setBusy(true);
@@ -136,10 +146,11 @@ export function Production() {
     const entries = Object.entries(pick);
     setBusy(true);
     for (const [id, q] of entries) {
-      const { error } = await supabase.rpc('prod_order', { p_item: Number(id), p_qty: q });
+      const ov: Record<string, boolean> = {}; for (const [k, v] of Object.entries(askSel)) { const [it, ing] = k.split('|'); if (Number(it) === Number(id)) ov[ing] = v; }
+      const { error } = await supabase.rpc('prod_order', { p_item: Number(id), p_qty: q, p_ask: ov });
       if (error) { setBusy(false); toast(error.message); return; }
     }
-    setBusy(false); setPick({}); setScr('home');
+    setBusy(false); setPick({}); setAskSel({}); setScr('home');
     toast('Sent. Store indent and buying list are ready');
     void load();
   };
@@ -184,7 +195,8 @@ export function Production() {
         </div>
         <button className="pd-more" onClick={() => setOpen({ ...open, [r.item_id]: !open[r.item_id] })}>{open[r.item_id] ? 'Hide' : 'What this uses'}</button>
         <div className={'pd-use' + (open[r.item_id] ? ' pd-open' : '')}>
-          {ing.map((x) => <div key={x.id}><span>{x.name}{!x.ok && <> <span className="pd-chip pd-att">unit?</span></>}</span><span className="pd-num">{fq(x.qty, x.unit)}</span></div>)}
+          <div className="pd-sm pd-mut" style={{ display: 'block', marginBottom: 4 }}>Switch on what the kitchen needs from the Store. Switch off what is already in the kitchen.</div>
+          {ing.map((x) => { const k = r.item_id + '|' + x.id; const on = k in askSel ? askSel[k] : x.def; return ingRow(x, on, () => setAskSel({ ...askSel, [k]: !on })); })}
           {!q && <div className="pd-mut"><span>Shown for the smallest quantity</span></div>}
         </div>
         <span hidden>{u}</span>
@@ -241,7 +253,7 @@ export function Production() {
                 )}
                 {open[-o.id] && (
                   <div className="pd-use pd-open" style={{ width: '100%' }}>
-                    {need(o.item_id, o.qty).map((x) => <div key={x.id}><span>{x.name}{!x.ok && <> <span className="pd-chip pd-att">unit?</span></>}</span><span className="pd-num">{fq(x.qty, x.unit)}</span></div>)}
+                    {need(o.item_id, o.qty).map((x) => { const on = o.ask_over && String(x.id) in o.ask_over ? !!o.ask_over[String(x.id)] : x.def; return ingRow(x, on, can && o.status === 'requested' ? () => { void run(() => supabase.rpc('prod_set_ask', { p_id: o.id, p_ing: x.id, p_on: !on }), ''); } : null); })}
                   </div>
                 )}
               </div>
@@ -301,7 +313,8 @@ export function Production() {
               <div className="pd-sm pd-mut">{rItem.items?.unit === 'kg' ? 'Kilos' : 'Pieces'}</div>
               <div className="pd-chips">{(rItem.chips ?? []).map((x) => <button key={x} className={'pd-q' + (x === rQty ? ' pd-on' : '')} onClick={() => setRq(x)}>{x}{rItem.items?.unit === 'kg' ? ' kg' : ''}</button>)}</div>
               <div className="pd-use pd-open" style={{ borderTop: '1px solid var(--pd-line)', paddingTop: 8, fontSize: 13.5 }}>
-                {need(rItem.item_id, rQty).map((x) => <div key={x.id}><span>{x.name}{!x.ok && <> <span className="pd-chip pd-att">unit?</span></>}</span><span className="pd-num">{fq(x.qty, x.unit)}</span></div>)}
+                <div className="pd-sm pd-mut" style={{ display: 'block', marginBottom: 4 }}>The recipe is always the full list, for costing. The switch is only the default for what the counter asks the Store.</div>
+                {need(rItem.item_id, rQty).map((x) => ingRow(x, x.def, admin ? () => { void run(() => supabase.rpc('prod_set_ask_default', { p_recipe: rItem.item_id, p_ing: x.id, p_on: !x.def }), ''); } : null))}
               </div>
               {need(rItem.item_id, rQty).some((x) => !x.ok) && <div className="pd-sm pd-mut">"unit?" means the recipe unit does not match how the item is counted. It is left off the indent until confirmed.</div>}
             </div>
