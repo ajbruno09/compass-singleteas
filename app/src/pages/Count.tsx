@@ -92,7 +92,7 @@ export function CountPage() {
     setBusy(true); setErr('');
     for (const i of items) { if (!saved[i.id] && (vals[i.id] ?? '').trim() !== '') await save(i, vals[i.id]); }
     setBusy(false);
-    toast(`Saved ${done} of ${items.length}. Come back any time to finish.`); nav(office ? '/counts' : '/closing');
+    toast(`Saved ${done} of ${items.length}. Stock is already updated. Come back any time to finish.`); nav(office ? '/counts' : '/closing');
   }
   async function send() {
     setBusy(true); setErr('');
@@ -107,7 +107,7 @@ export function CountPage() {
     <div className="phone">
       <div className="phone-head"><button className="btn quiet" onClick={() => nav(office ? '/counts' : '/closing')}><Icon name="back" /> {t('Back')}</button><b>{freq === 'weekly' ? 'Weekly closing, all items' : t('Closing stock')} · {place}</b><AvatarButton /></div>
       {sentAlready ? <p className="banner">{t('Today\'s count is already sent. Thank you.')}</p> : <>
-        <p className="muted small">{t('Count what is left. Every item must be counted. If you have none, enter 0.')}</p>
+        <p className="muted small">{t('Count what is left. Every item must be counted. If you have none, enter 0.')} Each number you save updates stock straight away.</p>
         <div style={{ height: 8, borderRadius: 8, background: 'var(--line, #E3E8E5)', overflow: 'hidden' }}><div style={{ width: `${items.length ? (done / items.length) * 100 : 0}%`, height: '100%', background: 'var(--green, #1F6B4A)' }} /></div>
         <p className="small"><b>{done} of {items.length}</b> {t('counted')}{left > 0 ? ` · ${left} ${t('still to count')}` : ''}</p>
         {!cur ? (
