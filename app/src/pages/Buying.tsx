@@ -54,13 +54,13 @@ function printText(title: string, text: string) {
 }
 async function copyText(t: string) { try { await navigator.clipboard.writeText(t); return true; } catch { return false; } }
 
-interface Hold { id: string; item_id: number; qty: number; from_date: string; due_date: string; reason: string; counters: string | null; push_count: number }
-interface Drop { id: string; item_id: number; item_name: string; unit: string; for_date: string; qty: number; reason: string; note: string | null; status: string; owner_question: string | null; store_reply: string | null; requested_at: string; decided_at: string | null; requested_by_name: string | null }
+interface Hold { status: string; drop_pending: boolean; id: string; item_id: number; qty: number; from_date: string; due_date: string; reason: string; counters: string | null; push_count: number }
+interface Drop { id: string; item_id: number; item_name: string; unit: string; for_date: string; qty: number; reason: string; note: string | null; status: string; owner_question: string | null; store_reply: string | null; requested_at: string; decided_at: string | null; requested_by_name: string | null; kind?: string }
 const DROP_WHY = ['Same item asked again, they only need the new quantity', 'Counter got it another way', 'No longer needed', 'Other'];
 interface Approval { for_date: string; over_amount: number; status: string }
 const REASONS = ['Over the daily limit', 'Cash is tight', 'Vendor closed', 'Not available today', 'Other'];
 const daysBetween = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
-interface Row { carried: number; carriedAge: number; carriedWhy: string; item: ItemRow; asked: number; by: { loc: string; qty: number }[]; inStore: number; ordered: number; sug: number; qty: number; rate: number | null; step: number }
+interface Row { near?: number; carried: number; carriedAge: number; carriedWhy: string; item: ItemRow; asked: number; by: { loc: string; qty: number }[]; inStore: number; ordered: number; sug: number; qty: number; rate: number | null; step: number }
 
 export function Buying() {
   const { locations, profile } = useSession();
@@ -105,6 +105,7 @@ export function Buying() {
   const [dropNote, setDropNote] = useState('');
   const [talk, setTalk] = useState<Record<string, string>>({});
   const [askOpen, setAskOpen] = useState<string | null>(null);
+  const [shortFor, setShortFor] = useState<number | null>(null);
   const [openRow, setOpenRow] = useState<number | null>(null);
   const [limEdit, setLimEdit] = useState<string | null>(null);
 
@@ -131,7 +132,7 @@ export function Buying() {
     const dj = (dl.data as { drops?: Drop[]; keeps?: number[] } | null) ?? {};
     setDrops((dj.drops ?? []).map((d) => ({ ...d, qty: Number(d.qty) }))); setKeeps(dj.keeps ?? []);
     const [hd, lm, pt, ap] = await Promise.all([
-      supabase.from('buy_holds').select('id, item_id, qty, from_date, due_date, reason, counters, push_count').eq('status', 'open'),
+      supabase.from('buy_holds').select('id, item_id, qty, from_date, due_date, reason, counters, push_count, status, drop_pending').or(`status.eq.open,and(status.eq.dropped,from_date.eq.${date})`),
       supabase.rpc('buy_limit'), supabase.rpc('buy_placed_total', { p_date: date }),
       supabase.from('buy_approvals').select('for_date, over_amount, status').eq('for_date', date).maybeSingle()
     ]);
@@ -177,11 +178,12 @@ export function Buying() {
     }
     // Pushed asks: out of today's list while pushed, back in from their due date.
     for (const h of holds) {
-      if (h.due_date <= date && h.from_date < date) {
+      if (h.drop_pending) continue;
+      if (h.status === 'open' && h.due_date <= date && h.from_date < date) {
         const e = agg.get(h.item_id) ?? emptyE();
         e.asked += h.qty; e.carried += h.qty; e.age = Math.max(e.age, daysBetween(h.from_date, date)); e.why = h.reason;
         e.by.set('Earlier orders', (e.by.get('Earlier orders') ?? 0) + h.qty); agg.set(h.item_id, e);
-      } else if (h.from_date === date && h.due_date > date) {
+      } else if (h.from_date === date && (h.due_date > date || h.status === 'dropped')) {
         const e = agg.get(h.item_id); if (e) { e.asked -= h.qty; const k = [...e.by.keys()][0]; if (k) e.by.set(k, Math.max(0, (e.by.get(k) ?? 0) - h.qty)); }
       }
     }
@@ -191,11 +193,13 @@ export function Buying() {
       const inStore = Math.max(0, onHand[id] ?? 0);
       const ordered = orderedBy.get(id) ?? 0;
       const step = item.purchase_factor ? Number(item.purchase_factor) : stepOf(item.unit);
-      const sug = roundUp(Math.max(0, e.asked - inStore - ordered), step);
+      const gap = e.asked - inStore - ordered;
+      const near = gap > 1e-9 && e.asked > 0 && gap <= 0.2 * e.asked + 1e-9;
+      const sug = near ? 0 : roundUp(Math.max(0, gap), step);
       const qty = edit[id] ?? sug;
       const rate = (item.default_vendor_id && rateMap.get(`${item.default_vendor_id}:${id}`)) || (item.last_cost != null ? Number(item.last_cost) : null);
       if (e.asked <= 1e-9 && e.carried <= 1e-9) continue;
-      out.push({ carried: e.carried, carriedAge: e.age, carriedWhy: e.why, item, asked: e.asked, by: [...e.by.entries()].map(([loc, qty]) => ({ loc, qty })), inStore, ordered, sug, qty, rate, step });
+      out.push({ near: near ? gap : 0, carried: e.carried, carriedAge: e.age, carriedWhy: e.why, item, asked: e.asked, by: [...e.by.entries()].map(([loc, qty]) => ({ loc, qty })), inStore, ordered, sug, qty, rate, step });
     }
     return out.sort((a, b) => (a.item.group_id ?? 99) - (b.item.group_id ?? 99) || a.item.name.localeCompare(b.item.name));
   }, [sentInd, itemMap, onHand, orderedBy, edit, rateMap, locations, holds, date]);
@@ -288,6 +292,15 @@ export function Buying() {
     if (error) return toast(errText(error));
     toast('Sent to the owner'); setDropFor(null); setDropWhy(''); setDropNote(''); await load();
   }
+  async function dropShort(r: Row) {
+    if (!dropWhy) return;
+    const own = Math.max(0, r.asked - r.carried);
+    const amt = Math.min(r.sug - r.qty, own);
+    if (!(amt > 0)) return toast('Push the rest instead. Part of it is from an earlier ask.');
+    const { error } = await supabase.rpc('buy_drop_short', { p_item: r.item.id, p_date: date, p_qty: amt, p_reason: dropWhy, p_note: dropNote });
+    if (error) return toast(errText(error));
+    toast('Sent to the owner'); setShortFor(null); setDropWhy(''); setDropNote(''); await load();
+  }
   async function keepAll(r: Row) {
     const { error } = await supabase.rpc('buy_keep_all', { p_item: r.item.id, p_date: date });
     if (error) return toast(errText(error)); await load();
@@ -300,7 +313,7 @@ export function Buying() {
     const { error } = await supabase.rpc('buy_cancel_hold', { p_id: id });
     if (error) return toast(errText(error)); toast('Ask cancelled'); await load();
   }
-  const pushedOut = holds.filter((h) => h.from_date === date && h.due_date > date);
+  const pushedOut = holds.filter((h) => h.status === 'open' && !h.drop_pending && h.from_date === date && h.due_date > date);
   const grand = vendorIds.reduce((t, id) => t + (vendorMap.get(id)?.is_store ? 0 : estimate(byVendor.get(id) ?? [])), 0);
   const isStoreV = (r: Row) => !!vendorMap.get(vOf(r) ?? '')?.is_store;
   const itemCount = toBuy.filter((r) => !isStoreV(r)).length;
@@ -381,20 +394,32 @@ export function Buying() {
 
       {!loading && shortRows.length > 0 && (
         <div className="banner warn" style={{ marginBottom: 12 }}>
-          <div><b>Decide every item before sending.</b> {shortRows.length === 1 ? 'This item is' : 'These items are'} short of what the counters asked. Buy the full quantity again, or push the rest to tomorrow.</div>
+          <div><b>Decide every item before sending.</b> {shortRows.length === 1 ? 'This item is' : 'These items are'} short of what the counters asked. The store can buy extra, but not less without a reason. Buy the full quantity, push the rest to tomorrow, or ask the owner to drop it.</div>
           <div className="stack" style={{ gap: 6, marginTop: 8 }}>
-            {shortRows.map((r) => (
-              <div key={'sh' + r.item.id} className="row" style={{ gap: 8, justifyContent: 'space-between' }}>
-                <span><b>{r.item.name}</b> <span className="muted small">buying {packText(r.item, r.qty)} of {packText(r.item, r.sug)}</span></span>
-                <span className="row" style={{ gap: 6 }}>
-                  <button className="btn quiet" onClick={() => setEdit((e) => { const n = { ...e }; delete n[r.item.id]; return n; })}>Buy all</button>
-                  <button className="btn" onClick={(e) => openPush(r, r.sug - r.qty, e.currentTarget)}>Push the rest</button>
-                </span>
-              </div>))}
+            {shortRows.map((r) => { const dp = dropOf(r.item.id); return (
+              <div key={'sh' + r.item.id}>
+                <div className="row" style={{ gap: 8, justifyContent: 'space-between' }}>
+                  <span><b>{r.item.name}</b> <span className="muted small">buying {packText(r.item, r.qty)} of {packText(r.item, r.sug)}</span></span>
+                  {dp ? <span className="chip due">Waiting for the owner to approve dropping {packText(r.item, dp.qty)}</span> : (
+                    <span className="row" style={{ gap: 6 }}>
+                      <button className="btn quiet" onClick={() => setEdit((e) => { const n = { ...e }; delete n[r.item.id]; return n; })}>Buy all</button>
+                      <button className="btn" onClick={(e) => openPush(r, r.sug - r.qty, e.currentTarget)}>Push the rest</button>
+                      <button className="btn" onClick={() => { setShortFor(shortFor === r.item.id ? null : r.item.id); setDropWhy(''); setDropNote(''); }}>Ask owner to drop the rest</button>
+                    </span>)}
+                </div>
+                {!dp && shortFor === r.item.id && (
+                  <div className="stack" style={{ gap: 6, marginTop: 6, maxWidth: 420 }}>
+                    <div className="muted small">Ordering less than asked needs the owner's yes. The counter is not told.</div>
+                    <select aria-label="Why drop" value={dropWhy} onChange={(e) => setDropWhy(e.target.value)}><option value="">Why do you want to drop it? (required)</option>{DROP_WHY.map((x) => <option key={x} value={x}>{x}</option>)}</select>
+                    <textarea rows={2} aria-label="Note for the owner" placeholder="Short note for the owner (optional)" value={dropNote} onChange={(e) => setDropNote(e.target.value)} />
+                    <div className="row" style={{ gap: 8 }}><button className="btn primary" disabled={!dropWhy} onClick={() => void dropShort(r)}>Send to owner</button><button className="btn quiet" onClick={() => setShortFor(null)}>Cancel</button></div>
+                  </div>)}
+              </div>); })}
           </div>
         </div>
       )}
       {!loading && doubleRows.length > 0 && <div className="banner warn" style={{ marginBottom: 12 }}><b>{doubleRows.length === 1 ? 'One item may be ordered twice.' : `${doubleRows.length} items may be ordered twice.`}</b> Open {doubleRows.length === 1 ? 'it' : 'them'} below and decide: ask the owner to drop the earlier ask, or confirm the full quantity. Orders can be sent after that.</div>}
+      {!loading && rows.some((r) => (r.near ?? 0) > 0) && <p className="muted small" style={{ marginBottom: 10 }}>Nearly covered by stock, not listed: {rows.filter((r) => (r.near ?? 0) > 0).map((r) => `${r.item.name} (needs ${n2(r.near ?? 0)} ${r.item.unit} more)`).join(', ')}.</p>}
       {!loading && overBlocked && shortRows.length === 0 && <div className="banner warn" style={{ marginBottom: 12 }}>Today is over the daily limit. Push some items to tomorrow, or ask the owner to approve. Orders can be sent once it fits.</div>}
 
       {loading ? <p className="muted">Loading…</p> : (
@@ -611,7 +636,7 @@ export function Buying() {
           <div className="stack" style={{ gap: 10, marginTop: 8 }}>
             {pendingDrops.map((d) => (
               <div key={d.id} style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
-                <div className="row" style={{ justifyContent: 'space-between' }}><div><b>{d.item_name}: drop {n2(d.qty)} {d.unit}</b><div className="muted small">From the earlier ask, for {dayLabel(d.for_date)}. Asked by {d.requested_by_name ?? 'the store'}.</div></div></div>
+                <div className="row" style={{ justifyContent: 'space-between' }}><div><b>{d.item_name}: drop {n2(d.qty)} {d.unit}</b><div className="muted small">{d.kind === 'short' ? `The store ordered less than asked for ${dayLabel(d.for_date)}.` : `From the earlier ask, for ${dayLabel(d.for_date)}.`} Asked by {d.requested_by_name ?? 'the store'}.</div></div></div>
                 <div className="small" style={{ marginTop: 4 }}>Store's reason: <b>{d.reason}</b>{d.note ? ` · ${d.note}` : ''}{d.store_reply ? <><br />Store replied: <b>{d.store_reply}</b></> : null}</div>
                 {d.status === 'question' ? <div className="muted small" style={{ marginTop: 4 }}>You asked: {d.owner_question}. Waiting for the store.</div> : askOpen === d.id ? (
                   <div className="row" style={{ gap: 6, marginTop: 6 }}><input aria-label="Your question" value={talk['q' + d.id] ?? ''} placeholder="Ask the store why" onChange={(e) => setTalk((t) => ({ ...t, ['q' + d.id]: e.target.value }))} style={{ flex: 1 }} /><button className="btn primary" disabled={!(talk['q' + d.id] ?? '').trim()} onClick={() => void dropAct('buy_drop_ask', { p_id: d.id, p_question: talk['q' + d.id] }, 'Question sent')}>Send</button><button className="btn quiet" onClick={() => setAskOpen(null)}>Cancel</button></div>
