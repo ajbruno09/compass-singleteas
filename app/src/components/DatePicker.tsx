@@ -27,6 +27,7 @@ function useAway(open: boolean, close: () => void) {
 
 export function DatePicker({ value, onChange, tomorrow, label = 'Date', min, tomorrowLabel = 'Tomorrow', placeholder = 'Choose date', width, disabled }: { disabled?: boolean; value: string; onChange: (v: string) => void; tomorrow?: string; label?: string; min?: string; tomorrowLabel?: string; placeholder?: string; width?: number | string }) {
   const [open, setOpen] = useState(false);
+  const [flip, setFlip] = useState(false);
   const [view, setView] = useState(() => { const d = value ? parse(value) : new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const ref = useAway(open, () => setOpen(false));
   const today = iso(new Date());
@@ -44,11 +45,11 @@ export function DatePicker({ value, onChange, tomorrow, label = 'Date', min, tom
   }
   return (
     <div className="nt nt-pick" ref={ref} style={{ display: 'inline-block', ...(width ? { width } : {}) }}>
-      <div className="nt-pickbtn" role="button" tabIndex={0} aria-haspopup="dialog" aria-expanded={open} aria-label={label} onClick={() => { if (!disabled) setOpen((o) => !o); }} style={disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((o) => !o); } }}>
+      <div className="nt-pickbtn" role="button" tabIndex={0} aria-haspopup="dialog" aria-expanded={open} aria-label={label} onClick={(e) => { if (disabled) return; const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setFlip(r.left + 320 > window.innerWidth); setOpen((o) => !o); }} style={disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((o) => !o); } }}>
         <span>{value ? niceDate(value) : placeholder}</span><span className="nt-ico"><CalIcon /></span>
       </div>
       {open && (
-        <div className="nt-pop nt-cal" role="dialog" aria-label="Choose a date">
+        <div className={`nt-pop nt-cal${flip ? ' nt-flip' : ''}`} role="dialog" aria-label="Choose a date">
           <div className="nt-calh">
             <button type="button" aria-label="Previous month" onClick={() => setView(new Date(y, m - 1, 1))}>‹</button>
             <span>{MN[m]} {y}</span>

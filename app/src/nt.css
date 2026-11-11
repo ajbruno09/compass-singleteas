@@ -56,6 +56,7 @@
 .nt .nt-row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .nt .nt-pick,.nt.nt-pick{position:relative}
 .nt .nt-pickbtn{display:flex;align-items:center;gap:8px;border:1px solid var(--line2);background:#fff;border-radius:10px;padding:7px 12px;font:450 13.5px var(--font);color:var(--ink);cursor:pointer;min-width:150px;justify-content:space-between}
+.nt .nt-pop.nt-flip{left:auto;right:0}
 .nt .nt-pop{position:absolute;z-index:20;top:calc(100% + 6px);left:0;background:#fff;border:1px solid var(--line2);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.14);padding:12px}
 .nt .nt-cal{width:276px}
 .nt .nt-calh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-weight:500}
@@ -77,7 +78,7 @@
 .nt .nt-tph{font-size:11px;color:var(--mut);text-align:center;margin-bottom:4px}
 .nt .nt-sum{margin-top:8px;font-size:13px;color:var(--brand)}
 @media(max-width:900px){.nt .nt-layout{grid-template-columns:1fr}}
-@media(max-width:560px){.nt .nt-pop{position:fixed;left:16px;right:16px;top:auto;bottom:16px;width:auto}.nt .nt-cal{width:auto}}
+@media(max-width:560px){.nt .nt-pop.nt-flip{left:16px;right:16px}.nt .nt-pop{position:fixed;left:16px;right:16px;top:auto;bottom:16px;width:auto}.nt .nt-cal{width:auto}}
 .nt .nt-chp:disabled{opacity:.4;cursor:default}
 
 @media (prefers-color-scheme: dark) {
