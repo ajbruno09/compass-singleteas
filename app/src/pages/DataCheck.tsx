@@ -195,10 +195,10 @@ export function DataCheck() {
           {pack.length === 0 ? <p className="muted">All clear.</p> : <div className="tablewrap"><table className="table">
             <thead><tr><th>Item</th><th>One {'unit'} holds</th><th></th></tr></thead>
             <tbody>{pack.map((r) => {
-              const q = val(r.item_id, 'q', ''); const u = val(r.item_id, 'u', 'ml');
+              const q = val(r.item_id, 'q', ''); const u = val(r.item_id, 'u', r.unit === 'roll' ? 'pcs' : 'ml');
               return <tr key={r.item_id}>
                 {nameCell(r, `Counted as 1 ${r.unit}`)}
-                <td><div style={FX}><input className="num" style={{ width: 90, flex: 'none' }} inputMode="decimal" placeholder="Size" value={q} onChange={(e) => set(r.item_id, 'q', e.target.value)} /><select style={{ width: 76, flex: 'none' }} value={u} onChange={(e) => set(r.item_id, 'u', e.target.value)}>{['ml', 'L', 'g', 'kg'].map((x) => <option key={x}>{x}</option>)}</select></div></td>
+                <td><div style={FX}><input className="num" style={{ width: 90, flex: 'none' }} inputMode="decimal" placeholder="Size" value={q} onChange={(e) => set(r.item_id, 'q', e.target.value)} /><select style={{ width: 76, flex: 'none' }} value={u} onChange={(e) => set(r.item_id, 'u', e.target.value)}>{['ml', 'L', 'g', 'kg', 'pcs'].map((x) => <option key={x}>{x}</option>)}</select></div></td>
                 <td className="r"><button className="btn primary" disabled={busy || !(Number(q) > 0)} onClick={() => saveRows([{ item_id: r.item_id, content_qty: q, content_unit: u }])}>Save</button></td>
               </tr>;
             })}</tbody></table></div>}
