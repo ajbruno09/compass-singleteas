@@ -28,6 +28,8 @@ export function DataCheck() {
   const [tab, setTab] = useState<Tab>('cost');
   const [costs, setCosts] = useState<Cost[]>([]);
   const [rq, setRq] = useState('');
+  const [renId, setRenId] = useState<number | null>(null);
+  const [renVal, setRenVal] = useState('');
   const [ed, setEd] = useState<Record<string, Record<string, string>>>({});
   const [skip, setSkip] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
@@ -83,7 +85,22 @@ export function DataCheck() {
 
   if (profile?.role !== 'owner') return <div className="page"><p className="muted">Only the owner can open this page.</p></div>;
 
-  const nameCell = (r: Row, why: string) => <td><b>{r.name}</b><div className="muted small">{why}</div></td>;
+  const nameBlock = (id: number, name: string, why: string) => renId === id ? (
+    <div>
+      <div className="row" style={{ gap: 6 }}>
+        <input autoFocus style={{ minWidth: 180 }} value={renVal} onChange={(e) => setRenVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && renVal.trim().length > 1) { void rpc('dc_rename_item', { p_item: id, p_name: renVal }, 'Renamed'); setRenId(null); } if (e.key === 'Escape') setRenId(null); }} />
+        <button className="btn primary" disabled={busy || renVal.trim().length < 2} onClick={() => { void rpc('dc_rename_item', { p_item: id, p_name: renVal }, 'Renamed'); setRenId(null); }}>Save name</button>
+        <button className="btn secondary" onClick={() => setRenId(null)}>Cancel</button>
+      </div>
+      <div className="muted small">{why}</div>
+    </div>
+  ) : (
+    <div>
+      <button title="Tap to correct the name" onClick={() => { setRenId(id); setRenVal(name); }} style={{ background: 'none', border: 0, padding: 0, font: 'inherit', fontWeight: 600, cursor: 'text', textAlign: 'left', borderBottom: '1px dashed var(--muted, #8a9a91)' }}>{name}</button>
+      <div className="muted small">{why}</div>
+    </div>
+  );
+  const nameCell = (r: Row, why: string) => <td>{nameBlock(r.item_id, r.name, why)}</td>;
 
   return (
     <div className="page">
@@ -97,7 +114,7 @@ export function DataCheck() {
 
       {tab === 'ren' && (
         <div className="card">
-          <p className="muted small" style={{ marginBottom: 8 }}>Fix a spelling or a wrong name. Recipes, stock, prices and history stay attached, and the old name is kept so bills and reports still match.</p>
+          <p className="muted small" style={{ marginBottom: 8 }}>Fix a spelling or a wrong name. You can also tap any item name on the other tabs to correct it there. Recipes, stock, prices and history stay attached, and the old name is kept so bills and reports still match.</p>
           <input placeholder="Search for an item" value={rq} onChange={(e) => setRq(e.target.value)} style={{ width: 280, marginBottom: 10 }} />
           <div className="tablewrap"><table className="table">
             <tbody>{rows.filter((r) => !rq || r.name.toLowerCase().includes(rq.toLowerCase())).slice(0, 40).map((r) => {
@@ -121,7 +138,7 @@ export function DataCheck() {
               const m = val(c.item_id, 'm', String(c.markup)); const un = c.unit === 'kg' ? 'kg' : 'pc';
               const miss = [...new Map(c.missing.map((x) => [x.id, x.name])).values()];
               return <tr key={c.item_id}>
-                <td><b>{c.name}</b><div className="muted small">per {un}</div></td>
+                <td>{nameBlock(c.item_id, c.name, `per ${un}`)}</td>
                 <td className="r num">{c.cost != null ? '₹' + c.cost.toFixed(2) : '-'}</td>
                 <td className="r"><input className="num" style={{ width: 60 }} inputMode="decimal" value={m} onChange={(e) => set(c.item_id, 'm', e.target.value)} />
                   {m !== String(c.markup) && <button className="btn primary" style={{ marginLeft: 6 }} disabled={busy || !(Number(m) >= 0)} onClick={() => rpc('dc_set_markup', { p_item: c.item_id, p_pct: Number(m) }, 'Markup saved')}>Save</button>}</td>
@@ -192,7 +209,7 @@ export function DataCheck() {
           <p className="muted small" style={{ marginBottom: 8 }}>Merging moves every recipe line to one item and switches the other off. An item with stock, orders or price history is never merged.</p>
           {dups.length === 0 ? <p className="muted">All clear.</p> : dups.map(([a, b, why]) => (
             <div key={a} className="row" style={{ gap: 12, flexWrap: 'wrap', justifyContent: 'space-between', padding: '10px 0' }}>
-              <div><b>{a} and {b}</b><div className="muted small">{why}</div></div>
+              <div>{nameBlock(byName.get(a)!.item_id, a, why)}</div>
               <div className="row" style={{ gap: 8 }}>
                 <button className="btn primary" disabled={busy} onClick={() => rpc('dc_merge_item', { p_from: byName.get(a)!.item_id, p_to: byName.get(b)!.item_id }, `Merged into ${b}`)}>Merge into {b}</button>
                 <button className="btn secondary" onClick={() => setSkip({ ...skip, ['dup' + a]: true })}>Keep both</button>
@@ -207,7 +224,7 @@ export function DataCheck() {
           {grp.length === 0 ? <p className="muted">All clear.</p> : grp.map((r) => {
             const g = val(r.item_id, 'g', GROUP_FIX[r.name][0]);
             return <div key={r.item_id} className="row" style={{ gap: 12, flexWrap: 'wrap', justifyContent: 'space-between', padding: '10px 0' }}>
-              <div><b>{r.name}</b><div className="muted small">Now in {gName.get(r.group_id ?? -1)}</div></div>
+              <div>{nameBlock(r.item_id, r.name, `Now in ${gName.get(r.group_id ?? -1)}`)}</div>
               <div className="row" style={{ gap: 8 }}>
                 <select value={g} onChange={(e) => set(r.item_id, 'g', e.target.value)}>{groups.map((x) => <option key={x.id}>{x.name}</option>)}</select>
                 <button className="btn primary" disabled={busy} onClick={() => { const id = groups.find((x) => x.name === g)?.id; if (id) void rpc('dc_set_group', { p_item: r.item_id, p_group: id }, 'Group changed'); }}>Save</button>
