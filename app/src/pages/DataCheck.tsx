@@ -10,7 +10,8 @@ interface Row {
 }
 interface Vendor { id: string; name: string }
 interface Group { id: number; name: string }
-type Tab = 'price' | 'buy' | 'pack' | 'dup' | 'grp' | 'inh' | 'cln';
+type Tab = 'cost' | 'price' | 'buy' | 'pack' | 'dup' | 'grp' | 'inh' | 'cln';
+interface Cost { item_id: number; name: string; unit: string; kind: string; cost: number | null; missing: { id: number; name: string }[]; markup: number; rate: number | null }
 const PACKS = ['kg', 'g', 'L', 'ml', 'pack', 'tray', 'case', 'bag', 'box', 'bottle', 'piece', 'roll', 'dozen', 'can'];
 const SMALL = ['g', 'ml'];
 const CONTAINERS = ['bottle', 'pkt', 'tub', 'roll'];
@@ -24,7 +25,8 @@ export function DataCheck() {
   const [rows, setRows] = useState<Row[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [tab, setTab] = useState<Tab>('price');
+  const [tab, setTab] = useState<Tab>('cost');
+  const [costs, setCosts] = useState<Cost[]>([]);
   const [ed, setEd] = useState<Record<string, Record<string, string>>>({});
   const [skip, setSkip] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
@@ -35,6 +37,7 @@ export function DataCheck() {
       supabase.from('vendors').select('id, name').eq('active', true).order('name'),
       supabase.from('item_groups').select('id, name').order('sort'),
     ]);
+    const c = await supabase.rpc('cost_overview'); setCosts((c.data as Cost[]) ?? []);
     setRows((b.data as Row[]) ?? []); setVendors((v.data as Vendor[]) ?? []); setGroups((g.data as Group[]) ?? []);
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -46,16 +49,18 @@ export function DataCheck() {
   const wrongPack = rows.filter((r) => SMALL.includes(r.unit) && r.pack_qty != null && r.price != null && (
     (r.pack_qty > 0 && r.pack_qty <= 5 && r.price >= 20) || (r.unit_cost != null && r.unit_cost > 5)));
   const wrongIds = new Set(wrongPack.map((r) => r.item_id));
-  const buy = rows.filter((r) => !wrongIds.has(r.item_id) && !(r.default_vendor_id && inHouse.has(r.default_vendor_id)) && (!r.price || !r.default_vendor_id || !r.pack_label || !(r.pack_qty && r.pack_qty > 0)) && !CONTAINERS.includes(r.unit) || (!wrongIds.has(r.item_id) && CONTAINERS.includes(r.unit) && !(r.default_vendor_id && inHouse.has(r.default_vendor_id)) && (!r.price || !r.default_vendor_id)));
+  const gapIds = new Set(costs.flatMap((c) => c.missing.map((m) => m.id)));
+  const buy = rows.filter((r) => !wrongIds.has(r.item_id) && !(r.default_vendor_id && inHouse.has(r.default_vendor_id) && !gapIds.has(r.item_id)) && (!r.price || !r.default_vendor_id || !r.pack_label || !(r.pack_qty && r.pack_qty > 0)) && !CONTAINERS.includes(r.unit) || (!wrongIds.has(r.item_id) && CONTAINERS.includes(r.unit) && !(r.default_vendor_id && inHouse.has(r.default_vendor_id)) && (!r.price || !r.default_vendor_id)));
   const pack = rows.filter((r) => CONTAINERS.includes(r.unit) && !(r.content_qty && r.content_qty > 0));
   const dups = DUPS.filter(([a, b]) => byName.has(a) && byName.has(b) && !skip['dup' + a]);
   const grp = rows.filter((r) => GROUP_FIX[r.name] && gName.get(r.group_id ?? -1) === 'Oil, Sugar & Salt');
   const inh = rows.filter((r) => r.default_vendor_id && inHouse.has(r.default_vendor_id) && !r.price);
   const stray = rows.filter((r) => r.content_unit && !(r.content_qty && r.content_qty > 0));
 
-  const counts: Record<Tab, number> = { price: wrongPack.length, buy: buy.length, pack: pack.length, dup: dups.length, grp: grp.length, inh: 0, cln: stray.length };
-  const left = counts.price + counts.buy + counts.pack + counts.dup + counts.grp + (stray.length ? 1 : 0);
-  const TABS: [Tab, string][] = [['price', 'Wrong price'], ['buy', 'Missing price'], ['pack', 'Pack sizes'], ['dup', 'Possible duplicates'], ['grp', 'Wrong group'], ['inh', 'Made in house'], ['cln', 'Cleanup']];
+  const incomplete = costs.filter((c) => c.missing.length > 0);
+  const counts: Record<Tab, number> = { cost: incomplete.length, price: wrongPack.length, buy: buy.length, pack: pack.length, dup: dups.length, grp: grp.length, inh: 0, cln: stray.length };
+  const left = counts.cost + counts.price + counts.buy + counts.pack + counts.dup + counts.grp + (stray.length ? 1 : 0);
+  const TABS: [Tab, string][] = [['cost', 'Costing'], ['price', 'Wrong price'], ['buy', 'Missing price'], ['pack', 'Pack sizes'], ['dup', 'Possible duplicates'], ['grp', 'Wrong group'], ['inh', 'Made in house'], ['cln', 'Cleanup']];
 
   const val = (id: number, k: string, dflt: string) => ed[id]?.[k] ?? dflt;
   const set = (id: number, k: string, v: string) => setEd((e) => ({ ...e, [id]: { ...e[id], [k]: v } }));
@@ -88,6 +93,26 @@ export function DataCheck() {
       <div className="seg" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
         {TABS.map(([k, l]) => <button key={k} aria-pressed={tab === k} onClick={() => setTab(k)}>{l}{k !== 'inh' ? ` (${counts[k]})` : ` (${inh.length})`}</button>)}
       </div>
+
+      {tab === 'cost' && (
+        <div className="card">
+          <p className="muted small" style={{ marginBottom: 8 }}>What each in-house item costs to make, worked out from its recipe and the prices in Buying setup. The rate is the cost plus the markup, and it is the only figure counters see. Set the markup for each item.</p>
+          {costs.length === 0 ? <p className="muted">No recipes yet.</p> : <div className="tablewrap"><table className="table">
+            <thead><tr><th>Item</th><th className="r">Cost to make</th><th className="r">Markup %</th><th className="r">Rate for counters</th><th>Status</th></tr></thead>
+            <tbody>{costs.map((c) => {
+              const m = val(c.item_id, 'm', String(c.markup)); const un = c.unit === 'kg' ? 'kg' : 'pc';
+              const miss = [...new Map(c.missing.map((x) => [x.id, x.name])).values()];
+              return <tr key={c.item_id}>
+                <td><b>{c.name}</b><div className="muted small">per {un}</div></td>
+                <td className="r num">{c.cost != null ? '₹' + c.cost.toFixed(2) : '-'}</td>
+                <td className="r"><input className="num" style={{ width: 60 }} inputMode="decimal" value={m} onChange={(e) => set(c.item_id, 'm', e.target.value)} />
+                  {m !== String(c.markup) && <button className="btn primary" style={{ marginLeft: 6 }} disabled={busy || !(Number(m) >= 0)} onClick={() => rpc('dc_set_markup', { p_item: c.item_id, p_pct: Number(m) }, 'Markup saved')}>Save</button>}</td>
+                <td className="r num">{c.rate != null && miss.length === 0 ? '₹' + c.rate.toFixed(2) : '-'}</td>
+                <td>{miss.length === 0 ? <span className="chip done">Complete</span> : <span className="muted small">Cannot price yet: {miss.slice(0, 6).join(', ')}{miss.length > 6 ? ` and ${miss.length - 6} more` : ''}. Add the price under Missing price.</span>}</td>
+              </tr>;
+            })}</tbody></table></div>}
+        </div>
+      )}
 
       {tab === 'price' && (
         <div className="card">

@@ -5,7 +5,7 @@ import { useToast } from '../components/Toast';
 import '../production.css';
 
 type Kind = 'gravy' | 'snack' | 'continental';
-interface Recipe { item_id: number; base_qty: number; min_qty: number; max_qty: number; multiple_of?: number; kind: Kind; chips: number[] | null; items: { name: string; unit: string } | null }
+interface Recipe { item_id: number; base_qty: number; min_qty: number; max_qty: number; multiple_of?: number; kind: Kind; chips: number[] | null; rate?: number | null; items: { name: string; unit: string } | null }
 interface RLine { recipe_item_id: number; ingredient_id: number; qty_per_base: number; unit_ok: boolean; name: string; unit: string; ask_default?: boolean; per_unit?: number; pack?: boolean }
 interface Cat { recipes: (Omit<Recipe, 'items'> & { name: string; unit: string })[]; lines: RLine[] }
 interface IItem { id: number; name: string; unit: string }
@@ -81,7 +81,7 @@ export function Production() {
     const FIRST = [661, 608, 662, 584, 560, 657, 660, 641, 574, 458, 443];
     const pos = (x: Recipe) => { const i = FIRST.indexOf(x.item_id); return i < 0 ? 1000 : i; };
     const cd = (cat.data as Cat | null) ?? { recipes: [], lines: [] };
-    const rs: Recipe[] = cd.recipes.map((x) => ({ item_id: x.item_id, base_qty: x.base_qty, min_qty: x.min_qty, max_qty: x.max_qty, multiple_of: x.multiple_of ?? 1, kind: x.kind, chips: x.chips, items: { name: x.name, unit: x.unit } }))
+    const rs: Recipe[] = cd.recipes.map((x) => ({ item_id: x.item_id, base_qty: x.base_qty, min_qty: x.min_qty, max_qty: x.max_qty, multiple_of: x.multiple_of ?? 1, kind: x.kind, chips: x.chips, rate: x.rate ?? null, items: { name: x.name, unit: x.unit } }))
       .sort((a2, c) => pos(a2) - pos(c) || (a2.items?.name ?? '').localeCompare(c.items?.name ?? ''));
     setRecipes(rs);
     setLines(cd.lines);
@@ -188,7 +188,7 @@ export function Production() {
     const ing = need(r.item_id, q || chips[0]);
     return (
       <div key={r.item_id} className={'pd-card pd-it' + (q ? ' pd-sel' : '')}>
-        <div className="pd-hd"><span className="pd-nm">{r.items?.name}</span><span className="pd-sub">{r.items?.unit === 'kg' ? 'kg' : 'pcs'}</span></div>
+        <div className="pd-hd"><span className="pd-nm">{r.items?.name}</span><span className="pd-sub">{r.items?.unit === 'kg' ? 'kg' : 'pcs'}{r.rate ? ` · ₹${r.rate % 1 === 0 ? r.rate : r.rate.toFixed(2)} per ${r.items?.unit === 'kg' ? 'kg' : 'pc'}` : ''}</span></div>
         <div className="pd-chips">
           {chips.map((s) => <button key={s} className={'pd-q' + (q === s ? ' pd-on' : '')} onClick={() => { const n = { ...pick }; if (n[r.item_id] === s) delete n[r.item_id]; else n[r.item_id] = s; setPick(n); }}>{s}{r.items?.unit === 'kg' ? ' kg' : ''}</button>)}
           <input className="pd-cq" type="number" min={r.min_qty} max={r.max_qty} step={r.multiple_of ?? 1} placeholder="Other" value={q && !chips.includes(q) ? q : ''} onChange={(e) => { const v = Number(e.target.value); const n = { ...pick }; if (v > 0) n[r.item_id] = Math.min(v, r.max_qty); else delete n[r.item_id]; setPick(n); }} onBlur={(e) => { const m = r.multiple_of ?? 1; const v = Number(e.target.value); if (m > 1 && v > 0 && v % m !== 0) { const n = { ...pick, [r.item_id]: Math.min(r.max_qty, Math.max(m, Math.round(v / m) * m)) }; setPick(n); toast(`${r.items?.name} is made in portions of ${m}, so I set it to ${n[r.item_id]}`); } }} />
@@ -237,6 +237,7 @@ export function Production() {
                 {o.status === 'requested' && can
                   ? <span className="pd-stp"><button disabled={busy} onClick={() => stepBy(o, -1)} aria-label="Less">−</button><span className="pd-num">{o.qty}{u}</span><button disabled={busy} onClick={() => stepBy(o, 1)} aria-label="More">+</button></span>
                   : <span className="pd-num">{o.qty}{u}</span>}
+                {rec.get(o.item_id)?.rate ? <span className="pd-sm pd-mut">₹{Math.round((rec.get(o.item_id)?.rate ?? 0) * o.qty).toLocaleString('en-IN')}</span> : null}
                 <span className={'pd-chip ' + (o.status === 'requested' ? 'pd-wait' : 'pd-ok')}>{STEPS[o.status]}</span>
                 <span className="pd-row">
                   <button className="pd-btn" onClick={() => setOpen({ ...open, [-o.id]: !open[-o.id] })}>{open[-o.id] ? 'Hide' : 'Ingredients'}</button>
