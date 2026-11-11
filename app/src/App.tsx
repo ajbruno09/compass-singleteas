@@ -54,12 +54,13 @@ import { MyCompass } from './pages/MyCompass';
 import { ProfilePage } from './pages/Profile';
 import { OpenInChrome, inAppBrowser } from './pages/OpenInChrome';
 import { OfflineBar } from './components/OfflineBar';
+import { KeepReady } from './pages/KeepReady';
 import { SalesEntry } from './pages/SalesEntry';
 import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/buying-setup': <BuyingSetup />, '/data-check': <DataCheck />, '/store-levels': <StoreLevels />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/gas': <Gas />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/maint-requests': <MaintRequests />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />
+  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/buying-setup': <BuyingSetup />, '/data-check': <DataCheck />, '/keep-ready': <KeepReady />, '/store-levels': <StoreLevels />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/gas': <Gas />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/maint-requests': <MaintRequests />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />
 };
 
 // After signing in, people with more than one app choose which to open. Once per visit.
