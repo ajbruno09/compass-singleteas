@@ -8,7 +8,7 @@ import '../price-check.css';
 const APPS = ['Blinkit', 'Zepto', 'Instamart', 'BigBasket'] as const;
 const DOMAIN: Record<string, string> = { Blinkit: 'blinkit', Zepto: 'zepto', Instamart: 'instamart', BigBasket: 'bigbasket' };
 interface Cell { price: number | null; status: 'ok' | 'oos' | 'nf' | 'fail'; note: string | null; at: string; tried?: string }
-interface PItem { id: number | null; key: string; item_id: number; name: string; brand: string; pack: string; links: Record<string, string>; prices: Record<string, Cell>; stopped?: boolean; changed?: boolean; checking_since?: string | null }
+interface PItem { id: number | null; key: string; item_id: number; name: string; brand: string; pack: string; links: Record<string, string>; prices: Record<string, Cell>; stopped?: boolean; changed?: boolean; checking_since?: string | null; checking_apps?: string[] | null }
 interface Data { items: Omit<PItem, 'key'>[]; brands: string[]; packs: string[]; settings: { daily: boolean; hour: number; last_full: string | null; connected: boolean } }
 interface CatItem { id: number; name: string; group_id: number | null }
 
@@ -69,7 +69,7 @@ export function PriceCheck() {
   const [token, setToken] = useState('');
   const [err, setErr] = useState('');
   const [now, setNow] = useState(Date.now());
-  const sinceOf = (it: { checking_since?: string | null }) => (it.checking_since ? new Date(it.checking_since).getTime() : 0);
+  const sinceOf = (it: { checking_since?: string | null; checking_apps?: string[] | null }) => (it.checking_since ? new Date(it.checking_since).getTime() : 0);
   const checkingItems = (data?.items ?? []).filter((i) => sinceOf(i) > 0);
   const running = checkingItems.length > 0;
   const all = running && checkingItems.length > 1;
@@ -107,14 +107,14 @@ export function PriceCheck() {
 
   function toggleManual() { setManual(!manual); }
 
-  async function run(ids: number[] | null) {
+  async function run(ids: number[] | null, apps?: string[]) {
     const { data: sess } = await supabase.auth.getSession();
     const token2 = sess.session?.access_token;
-    const { error } = await supabase.functions.invoke('price-check', { body: ids ? { ids } : { all: true }, headers: token2 ? { Authorization: `Bearer ${token2}` } : undefined });
+    const { error } = await supabase.functions.invoke('price-check', { body: ids ? (apps ? { ids, apps } : { ids }) : { all: true }, headers: token2 ? { Authorization: `Bearer ${token2}` } : undefined });
     if (error) throw error;
     await load();
   }
-  async function checkOne(id: number) { try { await run([id]); } catch (e) { toast(errText(e)); } }
+  async function checkOne(id: number, app?: string) { try { await run([id], app ? [app] : undefined); } catch (e) { toast(errText(e)); } }
   async function checkAll() { try { await run(null); } catch (e) { toast(errText(e)); } }
 
   // Every change is saved straight away, so nothing is lost if the page reloads.
@@ -138,10 +138,10 @@ export function PriceCheck() {
   }
 
   const attention = useMemo(() => {
-    const out: { key: string; it: PItem; text: string; act: 'retry' | 'check' | 'fix' }[] = [];
+    const out: { key: string; it: PItem; text: string; act: 'retry' | 'check' | 'fix'; apps?: string[] }[] = [];
     for (const it of live) {
       const fails = APPS.filter((a) => it.prices[a]?.status === 'fail');
-      if (fails.length) out.push({ key: `f${it.id}`, it, text: `${fails.join(', ')} did not answer`, act: 'retry' });
+      if (fails.length) out.push({ key: `f${it.id}`, it, text: `${fails.join(', ')} did not answer`, act: 'retry', apps: fails });
       const h = hoursOld(lastAt(it));
       if (h != null && h >= 24) out.push({ key: `s${it.id}`, it, text: `Last checked ${ago(lastAt(it))}`, act: 'check' });
     }
@@ -214,8 +214,8 @@ export function PriceCheck() {
                     {APPS.map((a, i) => {
                       const c = it.prices[a];
                       let body;
-                      if (isBusy && !(c?.tried && new Date(c.tried).getTime() >= since - 1000)) body = <span className="pc-spin" />;
-                      else if (c?.status === 'fail') body = <span className="pc-fail">Could not fetch<br /><a role="button" onClick={() => it.id != null && void checkOne(it.id)}>Try again</a></span>;
+                      if (isBusy && (!it.checking_apps || it.checking_apps.includes(a)) && !(c?.tried && new Date(c.tried).getTime() >= since - 1000)) body = <span className="pc-spin" />;
+                      else if (c?.status === 'fail') body = <span className="pc-fail">Could not fetch<br /><a role="button" onClick={() => it.id != null && void checkOne(it.id, a)}>Try again</a></span>;
                       else if (c?.status === 'oos') body = <span className="pc-oos">Out of stock</span>;
                       else if (c?.status === 'nf') body = <span className="pc-oos" title="The app does not list this product right now, usually because it is out of stock">Out of stock</span>;
                       else if (!c || c.price == null) body = <span className="pc-dash">–</span>;
@@ -238,7 +238,7 @@ export function PriceCheck() {
           {attention.map((a) => (
             <div className="pc-it" key={a.key}><span className="pc-dot" style={{ background: a.act === 'fix' ? 'var(--info)' : '#C77B1E' }} />
               <div className="pc-t">{a.it.name} · {a.it.brand}<span className="pc-sub">{a.text}</span></div>
-              <button className="btn pc-sm" onClick={() => (a.act === 'fix' ? (canEdit && setEdit(a.it)) : a.it.id != null && void checkOne(a.it.id))}>{a.act === 'retry' ? 'Retry' : a.act === 'check' ? 'Check' : 'Fix'}</button></div>))}
+              <button className="btn pc-sm" onClick={() => (a.act === 'fix' ? (canEdit && setEdit(a.it)) : a.it.id != null && void (a.apps?.length === 1 ? checkOne(a.it.id, a.apps[0]) : a.apps ? run([a.it.id], a.apps).catch((e) => toast(errText(e))) : checkOne(a.it.id)))}>{a.act === 'retry' ? 'Retry' : a.act === 'check' ? 'Check' : 'Fix'}</button></div>))}
         </div>
       </div>
 
