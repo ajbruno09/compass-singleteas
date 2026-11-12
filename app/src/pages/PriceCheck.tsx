@@ -113,12 +113,10 @@ export function PriceCheck() {
   const attention = useMemo(() => {
     const out: { key: string; it: PItem; text: string; act: 'retry' | 'check' | 'fix' }[] = [];
     for (const it of live) {
-      const fails = APPS.filter((a) => it.links[a] && it.prices[a]?.status === 'fail');
+      const fails = APPS.filter((a) => it.prices[a]?.status === 'fail');
       if (fails.length) out.push({ key: `f${it.id}`, it, text: `${fails.join(', ')} did not answer`, act: 'retry' });
       const h = hoursOld(lastAt(it));
       if (h != null && h >= 24) out.push({ key: `s${it.id}`, it, text: `Last checked ${ago(lastAt(it))}`, act: 'check' });
-      const miss = APPS.filter((a) => !it.links[a]);
-      if (miss.length) out.push({ key: `m${it.id}`, it, text: `${miss.join(', ')} link missing`, act: 'fix' });
     }
     return out;
   }, [live]);
@@ -189,8 +187,7 @@ export function PriceCheck() {
                     {APPS.map((a, i) => {
                       const c = it.prices[a];
                       let body;
-                      if (isBusy && it.links[a]) body = <span className="pc-spin" />;
-                      else if (!it.links[a]) body = manual ? <button className="pc-unmapped" onClick={() => setEdit(it)}>Add link</button> : <span className="pc-nm">Not linked</span>;
+                      if (isBusy) body = <span className="pc-spin" />;
                       else if (c?.status === 'fail') body = <span className="pc-fail">Could not fetch<br /><a role="button" onClick={() => it.id != null && void checkOne(it.id)}>Try again</a></span>;
                       else if (c?.status === 'oos') body = <span className="pc-nm">Out of stock</span>;
                       else if (!c || c.price == null) body = <span className="pc-dash">–</span>;
@@ -248,10 +245,10 @@ function EditSheet({ item, brands, packs, onClose, onDone, onStop }: { item: PIt
         <label className="field" style={{ flex: 1 }}><span>Brand to check</span><Combo value={brand} list={brands} kind="brand" placeholder="Type or pick a brand" onChange={setBrand} /></label>
         <label className="field" style={{ width: 130 }}><span>Pack size</span><Combo value={pack} list={packs} kind="size" placeholder="e.g. 500 g" onChange={setPack} /></label>
       </div>
-      <p className="small muted">For each app, open this product, tap Share, copy the link and paste it here once. Compass then looks for this exact brand and size every time.</p>
+      <p className="small muted">Links are optional. Compass finds the product by brand, item and pack size. If an app ever shows the wrong product, open the right one in that app, tap Share, copy the link and paste it here.</p>
       {APPS.map((a) => (
-        <label key={a} className="field"><span>{a} {(links[a] ?? '').trim() ? <span className="chip done">Linked</span> : <span className="chip due">Not linked</span>}</span>
-          <input value={links[a] ?? ''} onChange={(e) => setLinks({ ...links, [a]: e.target.value })} placeholder={`Paste the ${a} product link`} /></label>))}
+        <label key={a} className="field"><span>{a} {(links[a] ?? '').trim() ? <span className="chip done">Link added</span> : <span className="chip off">Finds it automatically</span>}</span>
+          <input value={links[a] ?? ''} onChange={(e) => setLinks({ ...links, [a]: e.target.value })} placeholder={`Optional: ${a} product link`} /></label>))}
       {msg && <p className="pc-fail" style={{ textAlign: 'left' }}>{msg}</p>}
       <div className="row" style={{ marginTop: 'auto' }}>
         <button className="btn danger" style={{ marginRight: 'auto' }} onClick={onStop}>Stop checking</button>
