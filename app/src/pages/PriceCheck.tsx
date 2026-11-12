@@ -234,6 +234,7 @@ function EditSheet({ item, brands, packs, onClose, onDone, onStop }: { item: PIt
     if (!brand.trim() || !pack.trim()) { setMsg('Please give a brand and a pack size.'); return; }
     for (const a of APPS) { const v = (links[a] ?? '').trim(); if (v && !(/^https?:\/\//i.test(v) && v.toLowerCase().includes(DOMAIN[a]))) { setMsg(`The ${a} link does not look right. Copy it with Share in the ${a} app and paste it again.`); return; } }
     const clean: Record<string, string> = {}; APPS.forEach((a) => { const v = (links[a] ?? '').trim(); if (v) clean[a] = v; });
+    if ((links._name ?? '').trim()) clean._name = links._name.trim();
     onDone({ ...item, brand: brand.trim(), pack: pack.trim(), links: clean });
   }
   return (
@@ -244,6 +245,7 @@ function EditSheet({ item, brands, packs, onClose, onDone, onStop }: { item: PIt
         <label className="field" style={{ flex: 1 }}><span>Brand to check</span><Combo value={brand} list={brands} kind="brand" placeholder="Type or pick a brand" onChange={setBrand} /></label>
         <label className="field" style={{ width: 130 }}><span>Pack size</span><Combo value={pack} list={packs} kind="size" placeholder="e.g. 500 g" onChange={setPack} /></label>
       </div>
+      <label className="field"><span>Product name on the apps (optional)</span><input value={links._name ?? ''} onChange={(e) => setLinks({ ...links, _name: e.target.value })} placeholder={`If the apps call it something else, e.g. Filter Coffee`} /></label>
       <p className="small muted">Links are optional. Compass finds the product by brand, item and pack size. If an app ever shows the wrong product, open the right one in that app, tap Share, copy the link and paste it here.</p>
       {APPS.map((a) => (
         <label key={a} className="field"><span>{a} {(links[a] ?? '').trim() ? <span className="chip done">Link added</span> : <span className="chip off">Finds it automatically</span>}</span>
