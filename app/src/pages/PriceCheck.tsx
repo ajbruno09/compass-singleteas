@@ -53,12 +53,10 @@ export function PriceCheck() {
   const isOwner = profile?.role === 'owner';
   const canEdit = isOwner || profile?.role === 'store';
   const [data, setData] = useState<Data | null>(null);
-  const [draft, setDraft] = useState<PItem[]>([]);
-  const [manual, setManual] = useState(false);
+    const [manual, setManual] = useState(false);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [all, setAll] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [edit, setEdit] = useState<PItem | null>(null);
+    const [edit, setEdit] = useState<PItem | null>(null);
   const [picker, setPicker] = useState(false);
   const [settings, setSettings] = useState(false);
   const [token, setToken] = useState('');
@@ -72,13 +70,9 @@ export function PriceCheck() {
   useEffect(() => { void load(); }, [load]);
 
   const live: PItem[] = useMemo(() => (data?.items ?? []).map((i) => ({ ...i, key: `i${i.id}` })), [data]);
-  const rows = manual ? draft.filter((d) => !d.stopped) : live;
-  const dirty = manual && (draft.some((d) => d.stopped || d.changed || d.id == null));
+  const rows = live;
 
-  function toggleManual() {
-    if (manual && dirty && !window.confirm('Leave without saving? Your changes will be lost.')) return;
-    setManual(!manual); setDraft(live.map((x) => ({ ...x })));
-  }
+  function toggleManual() { setManual(!manual); }
 
   async function run(ids: number[] | null) {
     const { data: sess } = await supabase.auth.getSession();
@@ -98,16 +92,24 @@ export function PriceCheck() {
     setAll(false);
   }
 
-  async function saveAll() {
-    setSaving(true);
-    try {
-      for (const d of draft) {
-        if (d.stopped && d.id != null) { const { error } = await supabase.rpc('pc_stop', { p_id: d.id }); if (error) throw error; }
-        else if (!d.stopped && (d.id == null || d.changed)) { const { error } = await supabase.rpc('pc_save_item', { p_id: d.id, p_item_id: d.item_id, p_brand: d.brand, p_pack: d.pack, p_links: d.links }); if (error) throw error; }
-      }
-      await load(); setManual(false); toast('Saved');
-    } catch (e) { toast(errText(e)); }
-    setSaving(false);
+  // Every change is saved straight away, so nothing is lost if the page reloads.
+  async function saveItem(n: PItem) {
+    const { error } = await supabase.rpc('pc_save_item', { p_id: n.id, p_item_id: n.item_id, p_brand: n.brand, p_pack: n.pack, p_links: n.links });
+    if (error) { toast(errText(error)); return false; }
+    await load(); toast('Saved'); return true;
+  }
+  async function stopItem(n: PItem) {
+    if (n.id == null) return;
+    const { error } = await supabase.rpc('pc_stop', { p_id: n.id });
+    if (error) { toast(errText(error)); return; }
+    await load(); toast('Taken off the price check. It stays in your Items list.');
+  }
+  async function addItems(list: { item_id: number; name: string; brand: string; pack: string }[]) {
+    for (const x of list) {
+      const { error } = await supabase.rpc('pc_save_item', { p_id: null, p_item_id: x.item_id, p_brand: x.brand, p_pack: x.pack, p_links: {} });
+      if (error) { toast(errText(error)); await load(); return; }
+    }
+    await load(); setPicker(false); toast(`${list.length} item${list.length > 1 ? 's' : ''} added and saved`);
   }
 
   const attention = useMemo(() => {
@@ -162,7 +164,7 @@ export function PriceCheck() {
         </div>
       </div>
 
-      {manual && <div className="pc-warn">Manual update is on. You can add items from your Items list, change brands and links, or stop checking an item. Nothing is deleted from your Items list. Press Save when done.</div>}
+      {manual && <div className="pc-warn">Manual update is on. You can add items from your Items list, change brands and links, or stop checking an item. Each change is saved as you make it. Nothing is deleted from your Items list.</div>}
 
       <div className="pc-toolbar">
         <div className="row"><button className="btn primary" disabled={all || manual || !live.length} onClick={() => void checkAll()}>{all ? 'Checking…' : 'Check all now'}</button>
@@ -210,24 +212,21 @@ export function PriceCheck() {
           {attention.map((a) => (
             <div className="pc-it" key={a.key}><span className="pc-dot" style={{ background: a.act === 'fix' ? 'var(--info)' : '#C77B1E' }} />
               <div className="pc-t">{a.it.name} · {a.it.brand}<span className="pc-sub">{a.text}</span></div>
-              <button className="btn pc-sm" onClick={() => (a.act === 'fix' ? (canEdit && (setManual(true), setDraft(live.map((x) => ({ ...x }))), setEdit(a.it))) : a.it.id != null && void checkOne(a.it.id))}>{a.act === 'retry' ? 'Retry' : a.act === 'check' ? 'Check' : 'Fix'}</button></div>))}
+              <button className="btn pc-sm" onClick={() => (a.act === 'fix' ? (canEdit && setEdit(a.it)) : a.it.id != null && void checkOne(a.it.id))}>{a.act === 'retry' ? 'Retry' : a.act === 'check' ? 'Check' : 'Fix'}</button></div>))}
         </div>
       </div>
 
-      {manual && dirty && (
-        <div className="pc-savebar"><span className="small">Changes not saved yet</span>
-          <span className="row"><button className="btn" disabled={saving} onClick={() => setDraft(live.map((x) => ({ ...x })))}>Discard</button><button className="btn primary" disabled={saving} onClick={() => void saveAll()}>{saving ? 'Saving…' : 'Save changes'}</button></span></div>)}
 
       {edit && <EditSheet item={edit} brands={data.brands} packs={data.packs} onClose={() => setEdit(null)}
-        onDone={(n) => { setDraft((d) => d.map((x) => (x.key === n.key ? { ...n, changed: true } : x))); setEdit(null); }}
-        onStop={() => { setDraft((d) => d.map((x) => (x.key === edit.key ? { ...x, stopped: true } : x))); setEdit(null); }} />}
-      {picker && <PickerSheet brands={data.brands} packs={data.packs} taken={draft.filter((d) => !d.stopped).map((d) => d.item_id)} onClose={() => setPicker(false)}
-        onAdd={(list) => { setDraft((d) => [...d, ...list.map((x, i) => ({ id: null, key: `n${Date.now()}${i}`, item_id: x.item_id, name: x.name, brand: x.brand, pack: x.pack, links: {}, prices: {} } as PItem))]); setPicker(false); toast(`${list.length} item${list.length > 1 ? 's' : ''} added. Add the app links next, then Save.`); }} />}
+        onDone={async (n) => { if (await saveItem(n)) setEdit(null); }}
+        onStop={() => { void stopItem(edit); setEdit(null); }} />}
+      {picker && <PickerSheet brands={data.brands} packs={data.packs} taken={live.map((d) => d.item_id)} onClose={() => setPicker(false)}
+        onAdd={(list) => void addItems(list)} />}
     </div>
   );
 }
 
-function EditSheet({ item, brands, packs, onClose, onDone, onStop }: { item: PItem; brands: string[]; packs: string[]; onClose: () => void; onDone: (n: PItem) => void; onStop: () => void }) {
+function EditSheet({ item, brands, packs, onClose, onDone, onStop }: { item: PItem; brands: string[]; packs: string[]; onClose: () => void; onDone: (n: PItem) => void | Promise<void>; onStop: () => void }) {
   const [brand, setBrand] = useState(item.brand); const [pack, setPack] = useState(item.pack);
   const [links, setLinks] = useState<Record<string, string>>({ ...item.links });
   const [msg, setMsg] = useState('');
