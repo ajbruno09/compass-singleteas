@@ -22,6 +22,7 @@ export function Items() {
   const [ctr, setCtr] = useState<number | 'all'>('all');
   const [groupList, setGroupList] = useState<{ id: number; name: string }[]>([]);
   const [q, setQ] = useState('');
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<ItemRow | 'new' | null>(null);
   const canEdit = profile?.role === 'owner' || profile?.role === 'manager';
 
@@ -31,6 +32,18 @@ export function Items() {
     setLoading(false);
   }
   useEffect(() => { load(); supabase.from('item_groups').select('id, name').eq('active', true).order('sort').then(({ data }) => setGroupList((data as { id: number; name: string }[]) ?? [])); }, []);
+  // small photos for the list: one batch request for all items that have a photo
+  useEffect(() => {
+    const paths = rows.map((r) => r.photo_path).filter((x): x is string => !!x && !thumbs[x]);
+    if (!paths.length) return;
+    supabase.storage.from('item-photos').createSignedUrls(paths, 3600).then(({ data }) => {
+      if (!data) return;
+      const m: Record<string, string> = {};
+      data.forEach((d) => { if (d.path && d.signedUrl) m[d.path] = d.signedUrl; });
+      setThumbs((t) => ({ ...t, ...m }));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
   const tabCats = useMemo(() => categories.filter((c) => rows.some((r) => r.category_id === c.id)), [categories, rows]);
   const groupsHere = useMemo(() => groupList.filter((g) => rows.some((r) => (cat === 'all' || r.category_id === cat) && (r as { group_id?: number | null }).group_id === g.id)), [groupList, rows, cat]);
   const ctrsHere = useMemo(() => locations.filter((l) => rows.some((r) => r.item_locations.some((x) => x.location_id === l.id))), [locations, rows]);
@@ -74,8 +87,8 @@ export function Items() {
           <tbody>
             {shown.map((r) => (
               <tr key={r.id} className={canEdit ? 'click' : ''} onClick={() => canEdit && setEditing(r)}>
-                <td><strong>{r.name}</strong>{!r.active && <span className="chip off" style={{ marginLeft: 8 }}>Inactive</span>}
-                  {!!profile?.extra_language && Object.values(r.local_names ?? {}).filter(Boolean).length > 0 && <div className="small muted">{Object.values(r.local_names).join(' · ')}</div>}</td>
+                <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><img src={(r.photo_path && thumbs[r.photo_path]) || '/no-image.jpg'} alt="" loading="lazy" width={40} height={40} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8, flex: 'none', background: '#f1f1ee' }} onError={(e) => { const i = e.currentTarget; if (!i.src.endsWith('/no-image.jpg')) i.src = '/no-image.jpg'; }} /><div style={{ minWidth: 0 }}><strong>{r.name}</strong>{!r.active && <span className="chip off" style={{ marginLeft: 8 }}>Inactive</span>}
+                  {!!profile?.extra_language && Object.values(r.local_names ?? {}).filter(Boolean).length > 0 && <div className="small muted">{Object.values(r.local_names).join(' · ')}</div>}</div></div></td>
                 <td className="small">{categories.find((c) => c.id === r.category_id)?.name}</td>
                 <td>{r.unit}</td>
                 <td className="small num">{(r.quick_amounts ?? []).map((n) => quick(Number(n), r.unit)).join('  ')}</td>
