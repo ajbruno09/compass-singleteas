@@ -9,6 +9,7 @@ import { Sheet } from '../components/Sheet';
 import { Icon } from '../components/Icon';
 import { downloadWorkbook } from '../lib/sheets';
 import { useToast } from '../components/Toast';
+import { thumbFromBlob, thumbPath } from '../lib/photo';
 
 interface ItemRow extends Item { item_locations: { location_id: number; par_level: number | null }[] }
 
@@ -32,16 +33,30 @@ export function Items() {
     setLoading(false);
   }
   useEffect(() => { load(); supabase.from('item_groups').select('id, name').eq('active', true).order('sort').then(({ data }) => setGroupList((data as { id: number; name: string }[]) ?? [])); }, []);
-  // small photos for the list: one batch request for all items that have a photo
+  // small photos for the list. Each item has a tiny copy of its photo; any that are missing are made once, in the background.
   useEffect(() => {
     const paths = rows.map((r) => r.photo_path).filter((x): x is string => !!x && !thumbs[x]);
     if (!paths.length) return;
-    supabase.storage.from('item-photos').createSignedUrls(paths, 3600).then(({ data }) => {
-      if (!data) return;
-      const m: Record<string, string> = {};
-      data.forEach((d) => { if (d.path && d.signedUrl) m[d.path] = d.signedUrl; });
-      setThumbs((t) => ({ ...t, ...m }));
-    });
+    let dead = false;
+    (async () => {
+      const bucket = supabase.storage.from('item-photos');
+      const { data } = await bucket.createSignedUrls(paths.map(thumbPath), 3600);
+      const m: Record<string, string> = {}; const missing: string[] = [];
+      (data ?? []).forEach((d, i) => { if (d.signedUrl && !d.error) m[paths[i]] = d.signedUrl; else missing.push(paths[i]); });
+      if (!dead && Object.keys(m).length) setThumbs((t) => ({ ...t, ...m }));
+      if (!(canEdit || profile?.role === 'store')) return;
+      for (const p of missing) {
+        if (dead) return;
+        try {
+          const dl = await bucket.download(p); if (dl.error || !dl.data) continue;
+          const t = await thumbFromBlob(dl.data);
+          const up = await bucket.upload(thumbPath(p), t, { upsert: true, contentType: 'image/jpeg' }); if (up.error) continue;
+          const sg = await bucket.createSignedUrl(thumbPath(p), 3600);
+          if (sg.data?.signedUrl && !dead) setThumbs((x) => ({ ...x, [p]: sg.data.signedUrl }));
+        } catch { /* leave the placeholder */ }
+      }
+    })();
+    return () => { dead = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows]);
   const tabCats = useMemo(() => categories.filter((c) => rows.some((r) => r.category_id === c.id)), [categories, rows]);
@@ -182,6 +197,7 @@ function ItemForm({ item, onClose, onSaved }: { item: ItemRow | null; onClose: (
         const path = `${id}/${Date.now()}.${(file.name.split('.').pop() || 'jpg').toLowerCase()}`;
         const up = await supabase.storage.from('item-photos').upload(path, file, { upsert: true });
         if (up.error) throw up.error;
+        try { await supabase.storage.from('item-photos').upload(thumbPath(path), await thumbFromBlob(file), { upsert: true, contentType: 'image/jpeg' }); } catch { /* the list makes it later */ }
         const { error } = await supabase.from('items').update({ photo_path: path }).eq('id', id); if (error) throw error;
       }
       const del = await supabase.from('item_locations').delete().eq('item_id', id); if (del.error) throw del.error;
