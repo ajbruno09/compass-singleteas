@@ -53,8 +53,8 @@ export function Items() {
     const catName = (id: number) => categories.find((c) => c.id === id)?.name ?? '';
     const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
     await downloadWorkbook(`Items_${day}.xlsx`, `Single Teas items, ${day}`, [`${shown.length} items${cat !== 'all' || grp !== 'all' || ctr !== 'all' || q ? ' (filtered as on screen)' : ''}.`],
-      [{ name: 'Items', cols: [{ label: 'Item', width: 34 }, { label: 'Category', width: 22 }, { label: 'Unit', width: 8 }, { label: 'Counted', width: 10 }, { label: 'Used at', width: 34 }, { label: 'Last cost', width: 11 }, { label: 'Pack', width: 20 }, { label: 'Active', width: 8 }],
-        rows: shown.map((r) => [r.name, catName(r.category_id), r.unit, r.count_frequency === 'daily' ? 'Daily' : 'Weekly', r.item_locations.map((l) => locName(l.location_id)).join(', '), r.last_cost ?? null, (r as { pack_note?: string }).pack_note || '', r.active ? 'Yes' : 'No']) }]);
+      [{ name: 'Items', cols: [{ label: 'Item', width: 34 }, { label: 'Category', width: 22 }, { label: 'Unit', width: 8 }, { label: 'Counted', width: 10 }, { label: 'Used at', width: 34 }, { label: 'Last cost', width: 11 }, { label: 'Pack', width: 20 }, { label: 'Image', width: 12 }, { label: 'Active', width: 8 }],
+        rows: shown.map((r) => [r.name, catName(r.category_id), r.unit, r.count_frequency === 'daily' ? 'Daily' : 'Weekly', r.item_locations.map((l) => locName(l.location_id)).join(', '), r.last_cost ?? null, (r as { pack_note?: string }).pack_note || '', r.photo_path ? 'Yes' : 'No', r.active ? 'Yes' : 'No']) }]);
   }
   const locName = (id: number) => locations.find((l) => l.id === id)?.name ?? '';
 
