@@ -11,7 +11,7 @@ import { useToast } from '../components/Toast';
 interface It { id: number; name: string; local_names: Record<string, string> | null; unit: string; group_id: number | null; quick_amounts: number[] | null; count_frequency: string; base_unit?: string | null; pieceG?: number; portionKg?: number }
 
 // Shown per kg stored: grams for weighed items, pieces for chicken counted by the piece.
-const CAT_PHOTO: Record<number, string> = { 1: 'veg', 2: 'dairy', 3: 'chicken', 4: 'atta', 5: 'spices', 6: 'sauces', 7: 'frozen', 17: 'kitchen', 18: 'oilsalt', 9: 'bread', 10: 'drinks', 11: 'icecream', 12: 'packaging', 13: 'cleaning', 14: 'gas', 15: 'stationery', 16: 'dryfruits' };
+const CAT_PHOTO: Record<number, string> = { 20: 'cleaningsupplies', 1: 'veg', 2: 'dairy', 3: 'chicken', 4: 'atta', 5: 'spices', 6: 'sauces', 7: 'frozen', 17: 'kitchen', 18: 'oilsalt', 9: 'bread', 10: 'drinks', 11: 'icecream', 12: 'packaging', 13: 'cleaning', 14: 'gas', 15: 'stationery', 16: 'dryfruits' };
 const mult = (i: { unit: string; base_unit?: string | null; pieceG?: number }) => (i.pieceG ? 1000 / i.pieceG : i.unit === 'kg' && i.base_unit === 'g' ? 1000 : 1);
 
 export function CountPage() {
