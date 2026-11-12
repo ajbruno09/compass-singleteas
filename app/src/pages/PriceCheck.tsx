@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { errText } from '../lib/format';
 import { useToast } from '../components/Toast';
@@ -7,8 +7,8 @@ import '../price-check.css';
 
 const APPS = ['Blinkit', 'Zepto', 'Instamart', 'BigBasket'] as const;
 const DOMAIN: Record<string, string> = { Blinkit: 'blinkit', Zepto: 'zepto', Instamart: 'instamart', BigBasket: 'bigbasket' };
-interface Cell { price: number | null; status: 'ok' | 'oos' | 'nf' | 'fail'; note: string | null; at: string }
-interface PItem { id: number | null; key: string; item_id: number; name: string; brand: string; pack: string; links: Record<string, string>; prices: Record<string, Cell>; stopped?: boolean; changed?: boolean }
+interface Cell { price: number | null; status: 'ok' | 'oos' | 'nf' | 'fail'; note: string | null; at: string; tried?: string }
+interface PItem { id: number | null; key: string; item_id: number; name: string; brand: string; pack: string; links: Record<string, string>; prices: Record<string, Cell>; stopped?: boolean; changed?: boolean; checking_since?: string | null }
 interface Data { items: Omit<PItem, 'key'>[]; brands: string[]; packs: string[]; settings: { daily: boolean; hour: number; last_full: string | null; connected: boolean } }
 interface CatItem { id: number; name: string; group_id: number | null }
 
@@ -63,18 +63,20 @@ export function PriceCheck() {
   const canEdit = isOwner || profile?.role === 'store';
   const [data, setData] = useState<Data | null>(null);
     const [manual, setManual] = useState(false);
-  const [busy, setBusy] = useState<Record<string, boolean>>({});
-  const [all, setAll] = useState(false);
     const [edit, setEdit] = useState<PItem | null>(null);
   const [picker, setPicker] = useState(false);
   const [settings, setSettings] = useState(false);
   const [token, setToken] = useState('');
   const [err, setErr] = useState('');
-  const [t0, setT0] = useState<Record<string, number>>({});
   const [now, setNow] = useState(Date.now());
-  const running = all || Object.values(busy).some(Boolean);
+  const sinceOf = (it: { checking_since?: string | null }) => (it.checking_since ? new Date(it.checking_since).getTime() : 0);
+  const checkingItems = (data?.items ?? []).filter((i) => sinceOf(i) > 0);
+  const running = checkingItems.length > 0;
+  const all = running && checkingItems.length > 1;
+  const allStart = running ? Math.min(...checkingItems.map(sinceOf)) : 0;
+  const wasRunning = useRef<{ on: boolean; start: number; all: boolean }>({ on: false, start: 0, all: false });
   useEffect(() => { if (!running) return; setNow(Date.now()); const t = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(t); }, [running]);
-  const secs = (k: string | number) => (t0[String(k)] ? Math.max(0, Math.round((now - t0[String(k)]) / 1000)) : 0);
+  const secsFrom = (t: number) => (t ? Math.max(0, Math.round((now - t) / 1000)) : 0);
 
   const load = useCallback(async () => {
     const { data: d, error } = await supabase.rpc('pc_list');
@@ -82,6 +84,23 @@ export function PriceCheck() {
     setErr(''); setData(d as Data);
   }, []);
   useEffect(() => { void load(); }, [load]);
+  // the check runs on the server, so keep looking while it is going, and say so when it ends
+  useEffect(() => {
+    if (!running) return;
+    const t = window.setInterval(() => void load(), 4000);
+    return () => window.clearInterval(t);
+  }, [running, load]);
+  useEffect(() => {
+    const w = wasRunning.current;
+    if (running) { w.on = true; w.start = allStart; w.all = all; return; }
+    if (w.on) {
+      w.on = false;
+      const d = Math.max(1, Math.round((Date.now() - w.start) / 1000));
+      remember(w.all ? 'all' : 'one', d);
+      const failed = (data?.items ?? []).reduce((n, i) => n + Object.values(i.prices).filter((c) => c.status === 'fail' && c.tried && new Date(c.tried).getTime() >= w.start - 2000).length, 0);
+      toast(failed ? `Done in ${words(d)}. ${failed} could not be fetched.` : `Prices refreshed in ${words(d)}`);
+    }
+  }, [running, allStart, all, data, toast]);
 
   const live: PItem[] = useMemo(() => (data?.items ?? []).map((i) => ({ ...i, key: `i${i.id}` })), [data]);
   const rows = live;
@@ -91,23 +110,12 @@ export function PriceCheck() {
   async function run(ids: number[] | null) {
     const { data: sess } = await supabase.auth.getSession();
     const token2 = sess.session?.access_token;
-    const { data: res, error } = await supabase.functions.invoke('price-check', { body: ids ? { ids } : { all: true }, headers: token2 ? { Authorization: `Bearer ${token2}` } : undefined });
+    const { error } = await supabase.functions.invoke('price-check', { body: ids ? { ids } : { all: true }, headers: token2 ? { Authorization: `Bearer ${token2}` } : undefined });
     if (error) throw error;
-    return res as { checked: number; failed: number };
+    await load();
   }
-  async function checkOne(id: number) {
-    const start = Date.now(); setT0((t) => ({ ...t, [id]: start })); setBusy((b) => ({ ...b, [id]: true }));
-    try { await run([id]); await load(); const d = Math.round((Date.now() - start) / 1000); remember('one', d); toast(`Done in ${words(d)}`); } catch (e) { toast(errText(e)); }
-    setBusy((b) => ({ ...b, [id]: false }));
-  }
-  async function checkAll() {
-    const start = Date.now(); setT0((t) => ({ ...t, all: start })); setAll(true);
-    try {
-      const r = await run(null); await load(); const d = Math.round((Date.now() - start) / 1000); remember('all', d);
-      toast(r.failed ? `Done in ${words(d)}. ${r.failed} could not be fetched.` : `All prices refreshed in ${words(d)}`);
-    } catch (e) { toast(errText(e)); }
-    setAll(false);
-  }
+  async function checkOne(id: number) { try { await run([id]); } catch (e) { toast(errText(e)); } }
+  async function checkAll() { try { await run(null); } catch (e) { toast(errText(e)); } }
 
   // Every change is saved straight away, so nothing is lost if the page reloads.
   async function saveItem(n: PItem) {
@@ -184,8 +192,8 @@ export function PriceCheck() {
       {manual && <div className="pc-warn">Manual update is on. You can add items from your Items list, change brands and links, or stop checking an item. Each change is saved as you make it. Nothing is deleted from your Items list.</div>}
 
       <div className="pc-toolbar">
-        <div className="row"><button className="btn primary" disabled={all || manual || !live.length} onClick={() => void checkAll()}>{all ? `Checking… ${clock(secs('all'))}` : 'Check all now'}</button>
-          <span className="small muted">{all ? `${usual('all') ? `Usually about ${words(usual('all') as number)}. ` : ''}You can do other things. The prices will be here when you come back.` : notChecked ? `${notChecked} item${notChecked > 1 ? 's' : ''} not checked yet` : s.last_full ? `Last full check: ${ago(s.last_full).toLowerCase()}` : ''}</span></div>
+        <div className="row"><button className="btn primary" disabled={running || manual || !live.length} onClick={() => void checkAll()}>{running ? `Checking… ${clock(secsFrom(allStart))}` : 'Check all now'}</button>
+          <span className="small muted">{running ? `${usual(all ? 'all' : 'one') ? `Usually about ${words(usual(all ? 'all' : 'one') as number)}. ` : ''}It keeps running if you leave this page. Prices appear here as each app answers.` : notChecked ? `${notChecked} item${notChecked > 1 ? 's' : ''} not checked yet` : s.last_full ? `Last full check: ${ago(s.last_full).toLowerCase()}` : ''}</span></div>
         {manual && <button className="btn" onClick={() => setPicker(true)}>+ Add items from Items list</button>}
       </div>
 
@@ -199,14 +207,14 @@ export function PriceCheck() {
               {rows.map((it) => {
                 const ps = prices(it); const nums = ps.filter((v): v is number => v != null);
                 const mn = nums.length ? Math.min(...nums) : null; const saves = nums.length > 1 ? Math.max(...nums) - (mn as number) : 0;
-                const at = lastAt(it); const h = hoursOld(at); const isBusy = !!(it.id != null && busy[it.id]) || all;
+                const at = lastAt(it); const h = hoursOld(at); const since = sinceOf(it); const isBusy = since > 0;
                 return (
                   <tr key={it.key}>
                     <td className="pc-item"><span>{it.name}</span><span className="pc-sub"><span className="pc-tag">{it.brand}</span><span className="pc-tag">{it.pack}</span></span></td>
                     {APPS.map((a, i) => {
                       const c = it.prices[a];
                       let body;
-                      if (isBusy) body = <span className="pc-spin" />;
+                      if (isBusy && !(c?.tried && new Date(c.tried).getTime() >= since - 1000)) body = <span className="pc-spin" />;
                       else if (c?.status === 'fail') body = <span className="pc-fail">Could not fetch<br /><a role="button" onClick={() => it.id != null && void checkOne(it.id)}>Try again</a></span>;
                       else if (c?.status === 'oos') body = <span className="pc-oos">Out of stock</span>;
                       else if (c?.status === 'nf') body = <span className="pc-oos" title="The app does not list this product right now, usually because it is out of stock">Out of stock</span>;
@@ -216,7 +224,7 @@ export function PriceCheck() {
                     })}
                     <td className="pc-cheap">{mn == null ? <span className="pc-nm">Nothing to compare</span> : <><span>{APPS.filter((_, i) => ps[i] === mn).join(' and ')}</span><span className="pc-sub">₹{mn}{saves > 0 ? `, saves up to ₹${saves}` : ''}</span></>}</td>
                     <td className="r pc-chk"><span>{!at ? <span className="chip due">Not checked yet</span> : <span className={h != null && h >= 24 ? 'chip late' : 'muted small'}>{ago(at)}</span>}</span>
-                      <span style={{ display: 'block', marginTop: 4 }}>{manual ? <button className="btn pc-sm" onClick={() => setEdit(it)}>Edit</button> : <button className="btn pc-sm" disabled={isBusy || it.id == null} onClick={() => it.id != null && void checkOne(it.id)}>{it.id != null && busy[it.id] ? `Checking ${clock(secs(it.id))}` : 'Check'}</button>}</span></td>
+                      <span style={{ display: 'block', marginTop: 4 }}>{manual ? <button className="btn pc-sm" onClick={() => setEdit(it)}>Edit</button> : <button className="btn pc-sm" disabled={isBusy || it.id == null} onClick={() => it.id != null && void checkOne(it.id)}>{isBusy ? `Checking ${clock(secsFrom(since))}` : 'Check'}</button>}</span></td>
                   </tr>);
               })}
             </tbody>
