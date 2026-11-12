@@ -217,7 +217,7 @@ export function PriceCheck() {
                       if (isBusy && (!it.checking_apps || it.checking_apps.includes(a)) && !(c?.tried && new Date(c.tried).getTime() >= since - 1000)) body = <span className="pc-spin" />;
                       else if (c?.status === 'fail') body = <span className="pc-fail">Could not fetch<br /><a role="button" onClick={() => it.id != null && void checkOne(it.id, a)}>Try again</a></span>;
                       else if (c?.status === 'oos') body = <span className="pc-oos">Out of stock</span>;
-                      else if (c?.status === 'nf') body = <span className="pc-oos" title="The app does not list this product right now, usually because it is out of stock">Out of stock</span>;
+                      else if (c?.status === 'nf') body = <span className="pc-oos" title="The data service did not see this product on this app. It may be out of stock, or the service may see a different store than your app. Check the app yourself before trusting this.">Not found</span>;
                       else if (!c || c.price == null) body = <span className="pc-dash">–</span>;
                       else body = <><span className={`pc-price${ps[i] === mn ? ' low' : ''}`}>₹{c.price}</span>{ps[i] === mn && <span className="pc-sub low">Lowest</span>}</>;
                       return <td key={a} className="pc-app r" data-l={a}>{body}</td>;
