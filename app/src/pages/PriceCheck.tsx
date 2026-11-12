@@ -185,7 +185,7 @@ export function PriceCheck() {
                 const at = lastAt(it); const h = hoursOld(at); const isBusy = !!(it.id != null && busy[it.id]) || all;
                 return (
                   <tr key={it.key}>
-                    <td className="item"><span>{it.name}</span><span className="pc-sub"><span className="pc-tag">{it.brand}</span><span className="pc-tag">{it.pack}</span></span></td>
+                    <td className="pc-item"><span>{it.name}</span><span className="pc-sub"><span className="pc-tag">{it.brand}</span><span className="pc-tag">{it.pack}</span></span></td>
                     {APPS.map((a, i) => {
                       const c = it.prices[a];
                       let body;
@@ -195,10 +195,10 @@ export function PriceCheck() {
                       else if (c?.status === 'oos') body = <span className="pc-nm">Out of stock</span>;
                       else if (!c || c.price == null) body = <span className="pc-dash">–</span>;
                       else body = <><span className={`pc-price${ps[i] === mn ? ' low' : ''}`}>₹{c.price}</span>{ps[i] === mn && <span className="pc-sub low">Lowest</span>}</>;
-                      return <td key={a} className="app r" data-l={a}>{body}</td>;
+                      return <td key={a} className="pc-app r" data-l={a}>{body}</td>;
                     })}
-                    <td className="cheap">{mn == null ? <span className="pc-nm">Nothing to compare</span> : <><span>{APPS.filter((_, i) => ps[i] === mn).join(' and ')}</span><span className="pc-sub">₹{mn}{saves > 0 ? `, saves up to ₹${saves}` : ''}</span></>}</td>
-                    <td className="r chk"><span>{!at ? <span className="chip due">Not checked yet</span> : <span className={h != null && h >= 24 ? 'chip late' : 'muted small'}>{ago(at)}</span>}</span>
+                    <td className="pc-cheap">{mn == null ? <span className="pc-nm">Nothing to compare</span> : <><span>{APPS.filter((_, i) => ps[i] === mn).join(' and ')}</span><span className="pc-sub">₹{mn}{saves > 0 ? `, saves up to ₹${saves}` : ''}</span></>}</td>
+                    <td className="r pc-chk"><span>{!at ? <span className="chip due">Not checked yet</span> : <span className={h != null && h >= 24 ? 'chip late' : 'muted small'}>{ago(at)}</span>}</span>
                       <span style={{ display: 'block', marginTop: 4 }}>{manual ? <button className="btn pc-sm" onClick={() => setEdit(it)}>Edit</button> : <button className="btn pc-sm" disabled={isBusy || it.id == null} onClick={() => it.id != null && void checkOne(it.id)}>Check</button>}</span></td>
                   </tr>);
               })}
@@ -208,11 +208,11 @@ export function PriceCheck() {
         </div>
 
         <div className="card pc-attn">
-          <div className="hd"><b>Needs a look</b><span className={`pc-badge${attention.length ? '' : ' zero'}`}>{attention.length || '✓'}</span></div>
-          {attention.length === 0 && <div className="it"><span className="pc-dot" /><div className="t">Everything checked is up to date.</div></div>}
+          <div className="pc-hd"><b>Needs a look</b><span className={`pc-badge${attention.length ? '' : ' zero'}`}>{attention.length || '✓'}</span></div>
+          {attention.length === 0 && <div className="pc-it"><span className="pc-dot" /><div className="pc-t">Everything checked is up to date.</div></div>}
           {attention.map((a) => (
-            <div className="it" key={a.key}><span className="pc-dot" style={{ background: a.act === 'fix' ? 'var(--info)' : '#C77B1E' }} />
-              <div className="t">{a.it.name} · {a.it.brand}<span className="pc-sub">{a.text}</span></div>
+            <div className="pc-it" key={a.key}><span className="pc-dot" style={{ background: a.act === 'fix' ? 'var(--info)' : '#C77B1E' }} />
+              <div className="pc-t">{a.it.name} · {a.it.brand}<span className="pc-sub">{a.text}</span></div>
               <button className="btn pc-sm" onClick={() => (a.act === 'fix' ? (canEdit && (setManual(true), setDraft(live.map((x) => ({ ...x }))), setEdit(a.it))) : a.it.id != null && void checkOne(a.it.id))}>{a.act === 'retry' ? 'Retry' : a.act === 'check' ? 'Check' : 'Fix'}</button></div>))}
         </div>
       </div>
