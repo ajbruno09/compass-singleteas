@@ -7,7 +7,7 @@ import '../price-check.css';
 
 const APPS = ['Blinkit', 'Zepto', 'Instamart', 'BigBasket'] as const;
 const DOMAIN: Record<string, string> = { Blinkit: 'blinkit', Zepto: 'zepto', Instamart: 'instamart', BigBasket: 'bigbasket' };
-interface Cell { price: number | null; status: 'ok' | 'oos' | 'fail'; note: string | null; at: string }
+interface Cell { price: number | null; status: 'ok' | 'oos' | 'nf' | 'fail'; note: string | null; at: string }
 interface PItem { id: number | null; key: string; item_id: number; name: string; brand: string; pack: string; links: Record<string, string>; prices: Record<string, Cell>; stopped?: boolean; changed?: boolean }
 interface Data { items: Omit<PItem, 'key'>[]; brands: string[]; packs: string[]; settings: { daily: boolean; hour: number; last_full: string | null; connected: boolean } }
 interface CatItem { id: number; name: string; group_id: number | null }
@@ -192,6 +192,7 @@ export function PriceCheck() {
                       if (isBusy) body = <span className="pc-spin" />;
                       else if (c?.status === 'fail') body = <span className="pc-fail">Could not fetch<br /><a role="button" onClick={() => it.id != null && void checkOne(it.id)}>Try again</a></span>;
                       else if (c?.status === 'oos') body = <span className="pc-nm">Out of stock</span>;
+                      else if (c?.status === 'nf') body = <span className="pc-nm">Not available</span>;
                       else if (!c || c.price == null) body = <span className="pc-dash">–</span>;
                       else body = <><span className={`pc-price${ps[i] === mn ? ' low' : ''}`}>₹{c.price}</span>{ps[i] === mn && <span className="pc-sub low">Lowest</span>}</>;
                       return <td key={a} className="pc-app r" data-l={a}>{body}</td>;
