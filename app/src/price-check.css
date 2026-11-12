@@ -62,3 +62,4 @@
   .pc-pop { right: auto; left: 0; max-width: calc(100vw - 32px); }
   .btn.pc-sm { min-height: 34px; }
 }
+.pc-oos { color: var(--ink-3); font-size: 12px; background: var(--sunken); border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
