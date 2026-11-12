@@ -24,6 +24,15 @@ function ago(iso: string | null): string {
   }
   return `${Math.round(h / 24)} days ago`;
 }
+const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+const words = (sec: number) => (sec < 60 ? `${sec} s` : `${Math.floor(sec / 60)} min${sec % 60 ? ` ${sec % 60} s` : ''}`);
+// Remember how long the last few checks took, so people know what to expect.
+function usual(kind: 'all' | 'one'): number | null {
+  try { const a = JSON.parse(localStorage.getItem(`pc_t_${kind}`) ?? '[]') as number[]; if (!a.length) return null; return Math.round(a.reduce((x, y) => x + y, 0) / a.length); } catch { return null; }
+}
+function remember(kind: 'all' | 'one', sec: number) {
+  try { const a = JSON.parse(localStorage.getItem(`pc_t_${kind}`) ?? '[]') as number[]; a.push(sec); localStorage.setItem(`pc_t_${kind}`, JSON.stringify(a.slice(-5))); } catch { /* storage may be unavailable */ }
+}
 const lastAt = (it: PItem): string | null => Object.values(it.prices).filter((c) => c.status !== 'fail' || c.price != null).map((c) => c.at).sort().pop() ?? null;
 const hoursOld = (iso: string | null) => (iso ? (Date.now() - new Date(iso).getTime()) / 3600000 : null);
 const prices = (it: PItem) => APPS.map((a) => { const c = it.prices[a]; return c && c.status === 'ok' && c.price != null ? c.price : null; });
@@ -61,6 +70,11 @@ export function PriceCheck() {
   const [settings, setSettings] = useState(false);
   const [token, setToken] = useState('');
   const [err, setErr] = useState('');
+  const [t0, setT0] = useState<Record<string, number>>({});
+  const [now, setNow] = useState(Date.now());
+  const running = all || Object.values(busy).some(Boolean);
+  useEffect(() => { if (!running) return; setNow(Date.now()); const t = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(t); }, [running]);
+  const secs = (k: string | number) => (t0[String(k)] ? Math.max(0, Math.round((now - t0[String(k)]) / 1000)) : 0);
 
   const load = useCallback(async () => {
     const { data: d, error } = await supabase.rpc('pc_list');
@@ -82,13 +96,16 @@ export function PriceCheck() {
     return res as { checked: number; failed: number };
   }
   async function checkOne(id: number) {
-    setBusy((b) => ({ ...b, [id]: true }));
-    try { await run([id]); await load(); } catch (e) { toast(errText(e)); }
+    const start = Date.now(); setT0((t) => ({ ...t, [id]: start })); setBusy((b) => ({ ...b, [id]: true }));
+    try { await run([id]); await load(); const d = Math.round((Date.now() - start) / 1000); remember('one', d); toast(`Done in ${words(d)}`); } catch (e) { toast(errText(e)); }
     setBusy((b) => ({ ...b, [id]: false }));
   }
   async function checkAll() {
-    setAll(true);
-    try { const r = await run(null); await load(); toast(r.failed ? `Checked. ${r.failed} could not be fetched.` : 'All prices refreshed'); } catch (e) { toast(errText(e)); }
+    const start = Date.now(); setT0((t) => ({ ...t, all: start })); setAll(true);
+    try {
+      const r = await run(null); await load(); const d = Math.round((Date.now() - start) / 1000); remember('all', d);
+      toast(r.failed ? `Done in ${words(d)}. ${r.failed} could not be fetched.` : `All prices refreshed in ${words(d)}`);
+    } catch (e) { toast(errText(e)); }
     setAll(false);
   }
 
@@ -167,8 +184,8 @@ export function PriceCheck() {
       {manual && <div className="pc-warn">Manual update is on. You can add items from your Items list, change brands and links, or stop checking an item. Each change is saved as you make it. Nothing is deleted from your Items list.</div>}
 
       <div className="pc-toolbar">
-        <div className="row"><button className="btn primary" disabled={all || manual || !live.length} onClick={() => void checkAll()}>{all ? 'Checking…' : 'Check all now'}</button>
-          <span className="small muted">{notChecked ? `${notChecked} item${notChecked > 1 ? 's' : ''} not checked yet` : s.last_full ? `Last full check: ${ago(s.last_full).toLowerCase()}` : ''}</span></div>
+        <div className="row"><button className="btn primary" disabled={all || manual || !live.length} onClick={() => void checkAll()}>{all ? `Checking… ${clock(secs('all'))}` : 'Check all now'}</button>
+          <span className="small muted">{all ? `${usual('all') ? `Usually about ${words(usual('all') as number)}. ` : ''}You can do other things. The prices will be here when you come back.` : notChecked ? `${notChecked} item${notChecked > 1 ? 's' : ''} not checked yet` : s.last_full ? `Last full check: ${ago(s.last_full).toLowerCase()}` : ''}</span></div>
         {manual && <button className="btn" onClick={() => setPicker(true)}>+ Add items from Items list</button>}
       </div>
 
@@ -199,7 +216,7 @@ export function PriceCheck() {
                     })}
                     <td className="pc-cheap">{mn == null ? <span className="pc-nm">Nothing to compare</span> : <><span>{APPS.filter((_, i) => ps[i] === mn).join(' and ')}</span><span className="pc-sub">₹{mn}{saves > 0 ? `, saves up to ₹${saves}` : ''}</span></>}</td>
                     <td className="r pc-chk"><span>{!at ? <span className="chip due">Not checked yet</span> : <span className={h != null && h >= 24 ? 'chip late' : 'muted small'}>{ago(at)}</span>}</span>
-                      <span style={{ display: 'block', marginTop: 4 }}>{manual ? <button className="btn pc-sm" onClick={() => setEdit(it)}>Edit</button> : <button className="btn pc-sm" disabled={isBusy || it.id == null} onClick={() => it.id != null && void checkOne(it.id)}>Check</button>}</span></td>
+                      <span style={{ display: 'block', marginTop: 4 }}>{manual ? <button className="btn pc-sm" onClick={() => setEdit(it)}>Edit</button> : <button className="btn pc-sm" disabled={isBusy || it.id == null} onClick={() => it.id != null && void checkOne(it.id)}>{it.id != null && busy[it.id] ? `Checking ${clock(secs(it.id))}` : 'Check'}</button>}</span></td>
                   </tr>);
               })}
             </tbody>
