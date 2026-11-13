@@ -4,6 +4,7 @@ import { qty as fmtQty, errText, date as fdate, packFactor, round3 } from '../li
 import { Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { useSession } from '../lib/session';
+import { readBill, type BillRead } from '../lib/readBill';
 
 interface Item { id: number; name: string; unit: string; show_as?: string | null; purchase_factor?: number | null; pack_name?: string | null; count_unit?: string | null; pcs_per_portion?: number | null }
 // Chicken portions are for counters. The store receives those in kg.
@@ -43,6 +44,28 @@ async function uploadBills(uid: string, files: File[]): Promise<string[]> {
   return out;
 }
 
+// Reads the bill photo in the background and hands the result back so the boxes fill themselves.
+function useBillRead(files: File[], apply: (r: BillRead) => void) {
+  const [reading, setReading] = useState(false);
+  const [note, setNote] = useState('');
+  const key = files.map((f) => f.name + f.size).join('|');
+  useEffect(() => {
+    if (!files.length) { setNote(''); return; }
+    let live = true;
+    setReading(true); setNote('');
+    readBill(files).then((r) => {
+      if (!live) return;
+      apply(r);
+      const bits = [r.vendor && `Vendor: ${r.vendor}`].filter(Boolean);
+      setNote(`Read from the bill. Please check it.${bits.length ? ' ' + bits.join('. ') + '.' : ''}${r.unclear.length ? ' Could not read: ' + r.unclear.join(', ').replace(/_/g, ' ') + '.' : ''}`);
+    }).catch((e) => { if (live) setNote((e as Error).message + ' Type the details yourself.'); })
+      .finally(() => { if (live) setReading(false); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return { reading, note };
+}
+
 function BillPicker({ files, setFiles }: { files: File[]; setFiles: (f: File[]) => void }) {
   return (
     <div className="stack" style={{ gap: 6 }}>
@@ -72,6 +95,7 @@ function AddBillSheet({ grn, vendorName, onClose, onDone }: { grn: Pending; vend
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const br = useBillRead(files, (r) => { if (r.bill_number) setNo((v) => v || r.bill_number!); if (r.total != null) setAmount((v) => v || String(r.total)); });
   async function save() {
     setErr('');
     if (!files.length) return setErr('Add a photo of the bill.');
@@ -86,6 +110,7 @@ function AddBillSheet({ grn, vendorName, onClose, onDone }: { grn: Pending; vend
   return (
     <Sheet title={`Bill for ${vendorName} · ${grn.grn_number}`} onClose={onClose} footer={<button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save bill'}</button>}>
       <BillPicker files={files} setFiles={setFiles} />
+      {(br.reading || br.note) && <p className="small muted" role="status">{br.reading ? 'Reading the bill…' : br.note}</p>}
       <div className="row" style={{ gap: 12 }}>
         <label className="field" style={{ flex: 1 }}><span>Bill number (optional)</span><input value={no} onChange={(e) => setNo(e.target.value)} /></label>
         <label className="field" style={{ flex: 1 }}><span>Bill amount (optional)</span><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
@@ -187,6 +212,8 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
   const [note, setNote] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [later, setLater] = useState(false);
+  const [billDate, setBillDate] = useState('');
+  const br = useBillRead(files, (r) => { if (r.bill_number) setBill((v) => v || r.bill_number!); if (r.total != null) setAmount((v) => v || String(r.total)); if (r.bill_date) setBillDate((v) => v || r.bill_date!); });
   const { profile } = useSession();
   const [find, setFind] = useState('');
   const [busy, setBusy] = useState(false);
@@ -226,7 +253,7 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
     setBusy(true);
     let paths: string[] = [];
     try { paths = await uploadBills(profile?.id ?? 'x', files); } catch (e) { setBusy(false); return setErr(errText(e)); }
-    const { error } = await supabase.rpc('receive_goods', { p_po_id: po?.id ?? null, p_vendor_id: po ? null : vendor, p_bill_number: bill, p_bill_date: null, p_bill_amount: amount ? Number(amount) : null, p_note: note, p_lines: lines, p_bill_paths: paths, p_bill_later: later && !paths.length });
+    const { error } = await supabase.rpc('receive_goods', { p_po_id: po?.id ?? null, p_vendor_id: po ? null : vendor, p_bill_number: bill, p_bill_date: billDate || null, p_bill_amount: amount ? Number(amount) : null, p_note: note, p_lines: lines, p_bill_paths: paths, p_bill_later: later && !paths.length });
     setBusy(false);
     if (error) return setErr(errText(error));
     toast('Goods received. Stock updated.'); onDone();
@@ -257,12 +284,14 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
       {matches.length > 0 && <div className="row">{matches.map((m) => <button key={m.id} className="qchip" onClick={() => { setExtra((p) => [...p, m.id]); setFind(''); }}>{m.name}</button>)}</div>}
       <div className="field"><span>Bill</span>
         {!later && <BillPicker files={files} setFiles={setFiles} />}
+        {(br.reading || br.note) && <p className="small muted" role="status">{br.reading ? 'Reading the bill…' : br.note}</p>}
         {files.length === 0 && <label className="row small" style={{ gap: 8, marginTop: 6 }}><input type="checkbox" checked={later} onChange={(e) => setLater(e.target.checked)} />Bill will come later. Remind us to add it.</label>}
       </div>
       <div className="row" style={{ gap: 12 }}>
         <label className="field" style={{ flex: 1 }}><span>Bill number (optional)</span><input value={bill} onChange={(e) => setBill(e.target.value)} /></label>
         <label className="field" style={{ flex: 1 }}><span>Bill amount (optional)</span><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
       </div>
+      <label className="field"><span>Bill date (optional)</span><input type="date" value={billDate} onChange={(e) => setBillDate(e.target.value)} /></label>
       <label className="field"><span>Note (optional)</span><input value={note} onChange={(e) => setNote(e.target.value)} /></label>
       {err && <p className="banner bad" role="alert">{err}</p>}
     </Sheet>
