@@ -22,6 +22,7 @@ export const NAV: NavItem[] = [
   { to: '/buying', label: 'Buying', icon: 'cart', roles: ['owner', 'store'], group: 'Buying and money' },
   { to: '/price-check', label: 'Price check', icon: 'tag', roles: ['owner', 'store'], group: 'Buying and money' },
   { to: '/receive', label: 'Receive goods', icon: 'truck', roles: ['owner', 'store'], group: 'Buying and money' },
+  { to: '/counter-sales', label: 'Counter sales', icon: 'receipt', roles: ['owner', 'manager', 'store'], group: 'Today' },
   { to: '/sos', label: 'SOS requests', icon: 'bell', roles: ['owner', 'manager', 'store'], group: 'Today' },
   { to: '/keep-ready', label: 'Keep ready', icon: 'layers', roles: ['owner', 'store'], group: 'Today' },
   { to: '/issue', label: 'Issue to counters', icon: 'box', roles: ['owner', 'store'], group: 'Today' },
