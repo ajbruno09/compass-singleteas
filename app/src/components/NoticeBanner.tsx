@@ -25,7 +25,7 @@ export function NoticeBanner() {
   useEffect(() => { void load(); const t = window.setInterval(() => { void load(); }, 60000); return () => window.clearInterval(t); }, [load]);
   const shown = rows.filter((n) => !read.has(n.id));
   const seenSent = useRef<Set<string>>(new Set());
-  useEffect(() => { for (const n of shown) if (!seenSent.current.has(n.id)) { seenSent.current.add(n.id); void supabase.rpc('mark_notice_seen', { p_id: n.id }); } }, [shown.map((n) => n.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { for (const n of shown) if (!seenSent.current.has(n.id)) { seenSent.current.add(n.id); void supabase.rpc('mark_notice_seen', { p_id: n.id }).then(() => undefined); } }, [shown.map((n) => n.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!shown.length) return null;
   async function got(id: string) { setRead((s) => new Set(s).add(id)); await supabase.rpc('mark_notice_read', { p_id: id }); }
   return (

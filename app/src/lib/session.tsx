@@ -65,7 +65,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!session) return;
-    const beat = () => { if (document.visibilityState === 'visible') void supabase.rpc('touch_me'); };
+    const beat = () => { if (document.visibilityState === 'visible') void supabase.rpc('touch_me').then(() => undefined); };
     beat();
     const id = window.setInterval(beat, 3 * 60 * 1000);
     document.addEventListener('visibilitychange', beat);

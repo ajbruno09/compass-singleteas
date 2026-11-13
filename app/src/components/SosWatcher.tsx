@@ -95,7 +95,7 @@ export function SosWatcher() {
     if (!sure) { setSure(true); window.setTimeout(() => setSure(false), 5000); return; }
     setSure(false);
     setMutedUntil(Date.now() + MUTE_MINUTES * 60000);
-    void supabase.rpc('log_sos_mute', { p_minutes: MUTE_MINUTES });
+    void supabase.rpc('log_sos_mute', { p_minutes: MUTE_MINUTES }).then(() => undefined);
   }
 
   useEffect(() => {

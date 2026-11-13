@@ -1,0 +1,2 @@
+-- usage_summary: days opened and last opened also count indents raised before time tracking began.
+-- (applied in the Supabase editor; function body lives in the database)

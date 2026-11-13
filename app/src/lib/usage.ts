@@ -16,7 +16,7 @@ export function useUsagePing(enabled: boolean) {
       const m = Math.floor(Date.now() / 60000);
       if (m === lastMinute) return;
       lastMinute = m;
-      void supabase.rpc('usage_ping');
+      void supabase.rpc('usage_ping').then(() => undefined);
     };
     const id = window.setInterval(tick, 20000);
     tick();
