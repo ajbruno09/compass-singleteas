@@ -25,8 +25,8 @@ Deno.serve(async (req) => {
     const pages: { b64: string; type: string }[] = (body.pages ?? []).slice(0, 3);
     if (!pages.length) return json({ error: 'No bill pages sent.' }, 400);
 
-    const { data: cfg } = await admin.from('private_config').select('value').eq('key', 'anthropic_key').maybeSingle();
-    if (!cfg?.value) return json({ error: 'Bill reading is not set up yet.' }, 503);
+    const apiKey = Deno.env.get('ANTHROPIC_KEY');
+    if (!apiKey) return json({ error: 'Bill reading is not set up yet.' }, 503);
 
     const content: unknown[] = pages.map((p) => p.type === 'application/pdf'
       ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: p.b64 } }
@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
 
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'x-api-key': cfg.value, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({ model: MODEL, max_tokens: 400, messages: [{ role: 'user', content }] }),
     });
     const j = await r.json();
