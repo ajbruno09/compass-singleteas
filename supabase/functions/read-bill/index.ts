@@ -44,21 +44,23 @@ Deno.serve(async (req) => {
     const { count } = await admin.from('bill_reads').select('id', { count: 'exact', head: true }).gte('at', since);
     if ((count ?? 0) >= DAILY_CAP) return json({ error: 'Daily bill reading limit reached. Type the details yourself.' }, 429);
 
-    let inTok = 0, outTok = 0, cost = 0, retried = false;
+    let inTok = 0, outTok = 0, cost = 0, retried = false, lastText = '';
     const ask = async (model: string) => {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model, max_tokens: 400, messages: [{ role: 'user', content }] }),
+        body: JSON.stringify({ model, max_tokens: 1500, system: 'You read bills. Reply with one JSON object only. No explanation, no markdown, no list of items.', messages: [{ role: 'user', content }] }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error?.message ?? String(r.status));
       const i = j.usage?.input_tokens ?? 0, o = j.usage?.output_tokens ?? 0;
       inTok += i; outTok += o; cost += (i * PRICE[model][0] + o * PRICE[model][1]) / 1e6;
       const text: string = (j.content ?? []).map((c: { text?: string }) => c.text ?? '').join('');
-      const m = text.match(/\{[\s\S]*\}/);
-      if (!m) return null;
-      try { return JSON.parse(m[0]); } catch { return null; }
+      lastText = text;
+      const a = text.lastIndexOf('{"bill_number"') >= 0 ? text.lastIndexOf('{"bill_number"') : text.indexOf('{');
+      const k = text.lastIndexOf('}');
+      if (a < 0 || k < a) return null;
+      try { return JSON.parse(text.slice(a, k + 1)); } catch { return null; }
     };
     const doubtful = (x: Record<string, unknown> | null) => !x || !x.bill_number || x.total == null || (Array.isArray(x.unclear) && x.unclear.length > 0);
     const log = async (tier: string, ok: boolean, error?: string) => {
@@ -77,7 +79,7 @@ Deno.serve(async (req) => {
       await log(tier, false, e instanceof Error ? e.message.slice(0, 200) : 'error');
       return json({ error: 'Could not read the bill (' + (e instanceof Error ? e.message : 'error') + ').' }, 502);
     }
-    if (!o) { await log(tier, false, 'unreadable reply'); return json({ error: 'Could not read the bill.' }, 502); }
+    if (!o) { await log(tier, false, 'unreadable reply: ' + lastText.slice(0, 160).replace(/\s+/g, ' ')); return json({ error: 'Could not read the bill.' }, 502); }
     await log(tier, true);
     const date = typeof o.bill_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.bill_date) ? o.bill_date : null;
     const total = o.total != null && isFinite(Number(o.total)) ? Number(o.total) : null;
