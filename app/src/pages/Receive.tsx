@@ -7,6 +7,22 @@ import { useSession } from '../lib/session';
 
 interface Item { id: number; name: string; unit: string; show_as?: string | null; purchase_factor?: number | null; pack_name?: string | null; count_unit?: string | null; pcs_per_portion?: number | null }
 // Chicken portions are for counters. The store receives those in kg.
+// People type "1 kg" or "500 g" in the arrived box. Read the number and the unit, and give back the number in the item's own unit.
+function cleanQty(raw: string, unit: string): string | null {
+  const t = raw.trim().toLowerCase().replace(/,/g, '');
+  if (!t) return '';
+  const m = t.match(/^(\d+(?:\.\d+)?|\.\d+)\s*(kg|kgs|g|gm|gms|gram|grams|l|ltr|litre|litres|ml|pcs|pc|piece|pieces)?$/);
+  if (!m) return null;
+  let n = parseFloat(m[1]); const u = m[2] ?? '';
+  const mass = ['kg', 'kgs'].includes(u) ? 1000 : ['g', 'gm', 'gms', 'gram', 'grams'].includes(u) ? 1 : 0;
+  const vol = ['l', 'ltr', 'litre', 'litres'].includes(u) ? 1000 : u === 'ml' ? 1 : 0;
+  const un = unit.toLowerCase();
+  if (mass && ['kg'].includes(un)) n = (n * mass) / 1000;
+  else if (mass && un === 'g') n = n * mass;
+  else if (vol && ['l', 'ltr'].includes(un)) n = (n * vol) / 1000;
+  else if (vol && un === 'ml') n = n * vol;
+  return String(Math.round(n * 1000) / 1000);
+}
 const rf = (i: Item) => (i.pack_name === 'portion' ? 0 : packFactor(i));
 interface Vendor { id: string; name: string }
 interface Po { id: string; po_number: string; vendor_id: string; status: string; order_date: string; required_date: string | null; po_lines: { item_id: number; qty: number }[] }
@@ -192,6 +208,7 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
 
   async function save() {
     setErr('');
+    for (const id of ids) { const v = vals[id]; if (v && !(Number(v) >= 0) && items[id]) { const c = cleanQty(v, items[id].unit); if (c === null) return setErr(`${items[id].name}: type just the number, like 1.5`); vals[id] = c; } }
     for (const id of ids) {
       if (!isCount(id)) continue;
       const kg = Number(vals[id]) > 0, c = Number(cnt[id]) > 0;
@@ -226,12 +243,12 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
             <tr key={id}><td><b>{it.name}</b> <span className="muted small">weight and {bird ? 'birds' : 'count'}</span>{pt && <div className="small" style={{ color: 'var(--brand)', marginTop: 3 }}>{pt}</div>}</td>
               {po && <td className="r num">{line ? <>{fmtQty(Number(line.qty), 'kg')}{ordBirds != null && <div className="small muted">{ordBirds} birds</div>}{already > 0 && <div className="small muted">got {fmtQty(already, 'kg')}</div>}</> : <span className="muted small">extra</span>}</td>}
               <td className="r"><div className="stack" style={{ gap: 6, alignItems: 'flex-end' }}>
-                <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 74, borderColor: Number(cnt[id]) > 0 && !(Number(vals[id]) > 0) ? 'var(--bad)' : undefined }} aria-label={`${it.name} weight in kg`} placeholder="kg" value={vals[id] ?? ''}  onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} /><span className="muted small" style={{ width: 38, textAlign: 'left' }}>kg</span></span>
+                <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 74, borderColor: Number(cnt[id]) > 0 && !(Number(vals[id]) > 0) ? 'var(--bad)' : undefined }} aria-label={`${it.name} weight in kg`} placeholder="kg" value={vals[id] ?? ''}  onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} onBlur={(e) => { const c = cleanQty(e.target.value, 'kg'); if (c !== null && c !== e.target.value) setVals((p) => ({ ...p, [id]: c })); }} /><span className="muted small" style={{ width: 38, textAlign: 'left' }}>kg</span></span>
                 <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><input inputMode="numeric" className="num" style={{ textAlign: 'right', width: 74, borderColor: Number(vals[id]) > 0 && !(Number(cnt[id]) > 0) ? 'var(--bad)' : undefined }} aria-label={`${it.name} ${bird ? 'birds' : 'pieces'}`} placeholder={bird ? 'birds' : 'pcs'} value={cnt[id] ?? ''} onChange={(e) => setCnt((p) => ({ ...p, [id]: e.target.value.replace(/[^0-9]/g, '') }))} /><span className="muted small" style={{ width: 38, textAlign: 'left' }}>{bird ? 'birds' : 'pcs'}</span></span>
               </div></td></tr>); }
           return <tr key={id}><td><b>{it.name}</b> <span className="muted small">{f ? it.show_as : it.unit}</span></td>
             {po && <td className="r num">{line ? <>{d(Number(line.qty))}{already > 0 && <div className="small muted">got {d(already)}</div>}</> : <span className="muted small">extra</span>}</td>}
-            <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110 }} aria-label={`Arrived ${it.name}`} value={vals[id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} /></td></tr>; })}
+            <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110 }} aria-label={`Arrived ${it.name}`} placeholder={f ? it.show_as ?? '' : it.unit} value={vals[id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} onBlur={(e) => { const c = cleanQty(e.target.value, f ? '' : it.unit); if (c !== null && c !== e.target.value) setVals((p) => ({ ...p, [id]: c })); }} /></td></tr>; })}
           {hasCount && neckItem && (
             <tr style={{ background: 'var(--warn-soft, #FBF0D5)' }}><td><b>Chicken neck</b> <span className="muted small">kg only. Not on the order. Type 0 if none came.</span></td>{po && <td className="r muted small">extra</td>}
               <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110, borderColor: neck.trim() === '' ? 'var(--bad)' : undefined }} aria-label="Chicken neck weight in kg" placeholder="kg" value={neck} onChange={(e) => setNeck(e.target.value)} /></td></tr>)}</tbody>
