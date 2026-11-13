@@ -2,15 +2,25 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { money2, date } from '../lib/format';
 
-interface Row { id: number; at: string; vendor: string | null; tier: 'light' | 'strong'; pages: number; cost_usd: number; retried: boolean; ok: boolean; error: string | null }
+interface Row { id: number; at: string; vendor: string | null; tier: 'light' | 'strong'; pages: number; cost_usd: number; retried: boolean; ok: boolean; error: string | null; paths: string[] | null; style: string | null }
 const RATE = 88; // rupees per US dollar, an estimate
 
 export function BillSpend() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [err, setErr] = useState('');
+  const [links, setLinks] = useState<Record<number, { name: string; url: string }[]>>({});
+  async function viewBill(r: Row) {
+    const out: { name: string; url: string }[] = [];
+    for (const [i, p] of (r.paths ?? []).entries()) {
+      const { data } = await supabase.storage.from('bill-photos').createSignedUrl(p, 600);
+      if (data?.signedUrl) out.push({ name: `${p.endsWith('.pdf') ? 'PDF' : 'Photo'} ${i + 1}`, url: data.signedUrl });
+    }
+    setLinks((l) => ({ ...l, [r.id]: out }));
+    if (out[0]) window.open(out[0].url, '_blank', 'noopener');
+  }
   useEffect(() => {
     const since = new Date(Date.now() - 62 * 24 * 3600 * 1000).toISOString();
-    supabase.from('bill_reads').select('id, at, vendor, tier, pages, cost_usd, retried, ok, error').gte('at', since).order('at', { ascending: false }).limit(1000)
+    supabase.from('bill_reads').select('id, at, vendor, tier, pages, cost_usd, retried, ok, error, paths, style').gte('at', since).order('at', { ascending: false }).limit(1000)
       .then(({ data, error }) => { if (error) setErr('Could not load. ' + error.message); else setRows((data as Row[]) ?? []); });
   }, []);
 
@@ -51,9 +61,9 @@ export function BillSpend() {
       )}
       {rows && rows.length > 0 && (
         <div className="tablewrap">
-          <table><thead><tr><th>When</th><th>Vendor</th><th>Reader</th><th className="r">Pages</th><th className="r">Cost</th><th>Note</th></tr></thead>
+          <table><thead><tr><th>When</th><th>Vendor</th><th>Reader</th><th>Bill looks</th><th className="r">Pages</th><th className="r">Cost</th><th>Note</th><th>Bill</th></tr></thead>
             <tbody>{rows.slice(0, 25).map((r) => (
-              <tr key={r.id}><td className="num small">{date(r.at)} {new Date(r.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</td><td>{r.vendor || <span className="muted">none</span>}</td><td>{r.tier === 'light' ? 'Light' : 'Strong'}</td><td className="r num">{r.pages}</td><td className="r num">{money2(Number(r.cost_usd) * RATE)}</td><td className="small">{!r.ok ? 'Could not read' : r.retried ? 'Re-read by strong reader' : ''}</td></tr>))}</tbody></table>
+              <tr key={r.id}><td className="num small">{date(r.at)} {new Date(r.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</td><td>{r.vendor || <span className="muted">none</span>}</td><td>{r.tier === 'light' ? 'Light' : 'Strong'}</td><td>{r.style === 'handwritten' ? 'Handwritten' : r.style === 'printed' ? 'Printed' : <span className="muted">not known</span>}</td><td className="r num">{r.pages}</td><td className="r num">{money2(Number(r.cost_usd) * RATE)}</td><td className="small">{!r.ok ? 'Could not read' : r.retried ? 'Re-read by strong reader' : ''}{r.error && <div className="muted">{r.error}</div>}</td><td className="small">{r.paths && r.paths.length ? (links[r.id] ? links[r.id].map((l) => <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer" style={{ marginRight: 8 }}>{l.name}</a>) : <button className="btn quiet" onClick={() => void viewBill(r)}>View bill</button>) : <span className="muted">no copy</span>}</td></tr>))}</tbody></table>
         </div>
       )}
     </>

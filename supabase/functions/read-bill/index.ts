@@ -12,8 +12,8 @@ const PRINTED = /hyperpure|zepto|blinkit|instamart|swiggy|bigbasket/i;
 const DAILY_CAP = 60;
 
 const PROMPT = `This is a supplier bill or invoice received at a cafe in India (it may be handwritten). Read it and reply with ONLY one JSON object, no other text:
-{"bill_number": string|null, "bill_date": "YYYY-MM-DD"|null, "vendor": string|null, "total": number|null, "unclear": string[]}
-Rules: bill_number is the invoice or bill number printed or written on it. bill_date uses Indian day-month-year order when written as numbers. total is the final payable amount in rupees as a plain number (no commas or symbols). vendor is the seller's name. If a field cannot be read with confidence use null and add its name to "unclear". Never guess.`;
+{"bill_number": string|null, "bill_date": "YYYY-MM-DD"|null, "vendor": string|null, "total": number|null, "style": "printed"|"handwritten", "unclear": string[]}
+Rules: bill_number is the invoice or bill number printed or written on it. bill_date uses Indian day-month-year order when written as numbers. total is the final payable amount in rupees as a plain number (no commas or symbols). vendor is the seller's name. If a field cannot be read with confidence use null and add its name to "unclear". style is "handwritten" if the main details are written by hand, otherwise "printed". Never guess.`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -44,7 +44,20 @@ Deno.serve(async (req) => {
     const { count } = await admin.from('bill_reads').select('id', { count: 'exact', head: true }).gte('at', since);
     if ((count ?? 0) >= DAILY_CAP) return json({ error: 'Daily bill reading limit reached. Type the details yourself.' }, 429);
 
-    let inTok = 0, outTok = 0, cost = 0, retried = false, lastText = '';
+    // Keep a copy of the bill so the owner can open it later and see if it was printed or handwritten.
+    const paths: string[] = [];
+    const stamp = Date.now();
+    for (let n = 0; n < pages.length; n++) {
+      try {
+        const t = pages[n].type || 'image/jpeg';
+        const ext = t === 'application/pdf' ? 'pdf' : t.includes('png') ? 'png' : t.includes('webp') ? 'webp' : 'jpg';
+        const bin = Uint8Array.from(atob(pages[n].b64), (ch) => ch.charCodeAt(0));
+        const path = `reads/${stamp}-${n + 1}.${ext}`;
+        const up = await admin.storage.from('bill-photos').upload(path, bin, { contentType: t, upsert: false });
+        if (!up.error) paths.push(path);
+      } catch { /* keep going without the copy */ }
+    }
+    let inTok = 0, outTok = 0, cost = 0, retried = false, lastText = '', note = '';
     const ask = async (model: string) => {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -62,16 +75,17 @@ Deno.serve(async (req) => {
       if (a < 0 || k < a) return null;
       try { return JSON.parse(text.slice(a, k + 1)); } catch { return null; }
     };
-    const doubtful = (x: Record<string, unknown> | null) => !x || !x.bill_number || x.total == null || (Array.isArray(x.unclear) && x.unclear.length > 0);
-    const log = async (tier: string, ok: boolean, error?: string) => {
-      await admin.from('bill_reads').insert({ user_id: u.user!.id, vendor, tier, pages: pages.length, input_tokens: inTok, output_tokens: outTok, cost_usd: cost, retried, ok, error: error ?? null });
+    const why = (x: Record<string, unknown> | null) => !x ? 'light reply not readable' : !x.bill_number ? 'light: no bill number' : x.total == null ? 'light: no total' : '';
+    const doubtful = (x: Record<string, unknown> | null) => why(x) !== '';
+    const log = async (tier: string, ok: boolean, error?: string, style?: string) => {
+      await admin.from('bill_reads').insert({ user_id: u.user!.id, vendor, tier, paths, style: style ?? null, pages: pages.length, input_tokens: inTok, output_tokens: outTok, cost_usd: cost, retried, ok, error: error ?? (note || null) });
     };
     let o: Record<string, unknown> | null = null;
     let tier = PRINTED.test(vendor) ? 'light' : 'strong';
     try {
       if (tier === 'light') {
-        try { o = await ask(LIGHT); } catch { o = null; }
-        if (doubtful(o)) { retried = true; tier = 'strong'; o = await ask(STRONG); }
+        try { o = await ask(LIGHT); } catch (e) { o = null; note = 'light error: ' + (e instanceof Error ? e.message.slice(0, 120) : ''); }
+        if (doubtful(o)) { retried = true; note = note || why(o); tier = 'strong'; o = await ask(STRONG); }
       } else {
         o = await ask(STRONG);
       }
@@ -80,7 +94,7 @@ Deno.serve(async (req) => {
       return json({ error: 'Could not read the bill (' + (e instanceof Error ? e.message : 'error') + ').' }, 502);
     }
     if (!o) { await log(tier, false, 'unreadable reply: ' + lastText.slice(0, 160).replace(/\s+/g, ' ')); return json({ error: 'Could not read the bill.' }, 502); }
-    await log(tier, true);
+    await log(tier, true, undefined, o.style === 'handwritten' ? 'handwritten' : o.style === 'printed' ? 'printed' : undefined);
     const date = typeof o.bill_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.bill_date) ? o.bill_date : null;
     const total = o.total != null && isFinite(Number(o.total)) ? Number(o.total) : null;
     return json({ bill_number: o.bill_number ? String(o.bill_number) : null, bill_date: date, vendor: o.vendor ? String(o.vendor) : null, total, unclear: Array.isArray(o.unclear) ? o.unclear : [], reader: tier });

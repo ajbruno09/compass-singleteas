@@ -20,3 +20,4 @@ grant select on public.bill_reads to authenticated;
 grant select, insert on public.bill_reads to service_role;
 grant usage, select on sequence public.bill_reads_id_seq to service_role;
 create index if not exists bill_reads_at_idx on public.bill_reads (at desc);
+alter table public.bill_reads add column if not exists paths text[], add column if not exists style text;

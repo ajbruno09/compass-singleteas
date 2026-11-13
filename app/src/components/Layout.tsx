@@ -6,6 +6,7 @@ import { AvatarButton } from './AvatarButton';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useSession } from '../lib/session';
+import { useUsagePing } from '../lib/usage';
 import { ROLE_LABEL, type Role } from '../lib/types';
 import { Icon } from './Icon';
 import { appsFor } from '../lib/apps';
@@ -53,11 +54,13 @@ export const NAV: NavItem[] = [
   { to: '/reasons', label: 'Indent reasons', icon: 'clip', roles: ['owner'], group: 'Setup' },
   { to: '/scorecard', label: 'Counter record', icon: 'scale', roles: ['owner', 'manager', 'store'], group: 'Reports' },
   { to: '/schedules', label: 'Weekly offs', icon: 'clock', roles: ['owner', 'manager'], group: 'Team' },
-  { to: '/people', label: 'People', icon: 'users', roles: ['owner', 'manager'], group: 'Team' }
+  { to: '/people', label: 'People', icon: 'users', roles: ['owner', 'manager'], group: 'Team' },
+  { to: '/team-usage', label: 'Who uses Compass', icon: 'users', roles: ['owner'], group: 'Team' }
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
   const { profile, signOut } = useSession();
+  useUsagePing(!!profile);
   const nav = NAV.filter((n) => profile && n.roles.includes(profile.role));
   const navigate = useNavigate();
   const loc = useLocation();

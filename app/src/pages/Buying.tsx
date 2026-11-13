@@ -1,5 +1,5 @@
 import { PoCancelBox, PoCancelInbox } from '../components/PoCancel';
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { dayLabel, timeOf } from '../lib/ist';
@@ -254,6 +254,27 @@ export function Buying() {
   const needsDecision = (r: Row) => isDouble(r) && !keeps.includes(r.item.id);
   const doubleRows = rows.filter((r) => needsDecision(r) && !vendorMap.get(vOf(r) ?? '')?.is_store);
   const pendingDrops = drops.filter((d) => d.status === 'asked' || d.status === 'question');
+  // Items the counters need that the store has not ordered, put off, or asked to drop yet.
+  const undecidedRows = rows.filter((r) => r.sug > 1e-9 && !vendorMap.get(vOf(r) ?? '')?.is_store && !dropOf(r.item.id));
+  const undecided = undecidedRows.length;
+  const [dayClosed, setDayClosed] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const lastRep = useRef('');
+  useEffect(() => {
+    if (loading || !date) return;
+    const k = `${date}:${undecided}`;
+    if (lastRep.current === k) return;
+    lastRep.current = k;
+    void supabase.rpc('buy_report_undecided', { p_date: date, p_n: undecided }).then(() => supabase.rpc('buy_day_status', { p_date: date })).then(({ data }) => setDayClosed(!!(data as { closed?: boolean } | null)?.closed));
+  }, [loading, date, undecided]);
+  async function finishDay() {
+    setFinishing(true);
+    await supabase.rpc('buy_report_undecided', { p_date: date, p_n: undecided });
+    const { error } = await supabase.rpc('buy_finish_day', { p_date: date });
+    setFinishing(false);
+    if (error) return toast(errText(error));
+    setDayClosed(true); toast('Ordering finished for today. Nothing is left open.');
+  }
   const doneDrops = drops.filter((d) => d.status === 'approved');
   const dayTotal = placed + vendorIds.reduce((t, id) => t + (vendorMap.get(id)?.is_store ? 0 : estimate(byVendor.get(id) ?? [])), 0);
   const over = limit > 0 ? Math.max(0, Math.round(dayTotal - limit)) : 0;
@@ -357,6 +378,17 @@ export function Buying() {
           <p className="muted small" style={{ marginTop: 2 }}>Built from what the counters asked for, less what is already in the store.</p></div>
         <div className="row"><DatePicker value={date} onChange={setDate} tomorrow={target} label="Buying date" /></div>
       </div>
+      {!loading && rows.length > 0 && (dayClosed && undecided === 0
+        ? <div className="banner good" style={{ marginBottom: 12 }}>Ordering is finished for {dayLabel(date)}. Nothing is left open.</div>
+        : <div className={`banner ${undecided > 0 ? 'warn' : 'good'}`} style={{ marginBottom: 12 }}>
+            <div className="row" style={{ justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+              <div>{undecided > 0
+                ? <><b>{undecided} {undecided === 1 ? 'item' : 'items'} the counters need {undecided === 1 ? 'is' : 'are'} not ordered yet.</b> For each one, order it, put it off to another day, or say you will not buy it.
+                    <div className="small" style={{ marginTop: 4 }}>{undecidedRows.slice(0, 8).map((r) => r.item.name).join(', ')}{undecidedRows.length > 8 ? ` and ${undecidedRows.length - 8} more` : ''}</div></>
+                : <><b>Everything is decided.</b> You can finish today's ordering.</>}</div>
+              <button className="btn primary" disabled={undecided > 0 || finishing} onClick={() => void finishDay()}>{finishing ? 'Finishing…' : "Finish today's ordering"}</button>
+            </div>
+          </div>)}
 
       <PoCancelInbox onChanged={() => { void load(); }} />
 
@@ -394,7 +426,7 @@ export function Buying() {
 
       {!loading && shortRows.length > 0 && (
         <div className="banner warn" style={{ marginBottom: 12 }}>
-          <div><b>Decide every item before sending.</b> {shortRows.length === 1 ? 'This item is' : 'These items are'} short of what the counters asked. The store can buy extra, but not less without a reason. Buy the full quantity, push the rest to tomorrow, or ask the owner to drop it.</div>
+          <div><b>Decide every item before sending.</b> {shortRows.length === 1 ? 'This item is' : 'These items are'} short of what the counters asked. The store can buy extra, but not less without a reason. Buy the full quantity, put the rest off to tomorrow, or say you will not buy it (the owner has to agree).</div>
           <div className="stack" style={{ gap: 6, marginTop: 8 }}>
             {shortRows.map((r) => { const dp = dropOf(r.item.id); return (
               <div key={'sh' + r.item.id}>
@@ -403,8 +435,8 @@ export function Buying() {
                   {dp ? <span className="chip due">Waiting for the owner to approve dropping {packText(r.item, dp.qty)}</span> : (
                     <span className="row" style={{ gap: 6 }}>
                       <button className="btn quiet" onClick={() => setEdit((e) => { const n = { ...e }; delete n[r.item.id]; return n; })}>Buy all</button>
-                      <button className="btn" onClick={(e) => openPush(r, r.sug - r.qty, e.currentTarget)}>Push the rest</button>
-                      <button className="btn" onClick={() => { setShortFor(shortFor === r.item.id ? null : r.item.id); setDropWhy(''); setDropNote(''); }}>Ask owner to drop the rest</button>
+                      <button className="btn" onClick={(e) => openPush(r, r.sug - r.qty, e.currentTarget)}>Put off the rest</button>
+                      <button className="btn" onClick={() => { setShortFor(shortFor === r.item.id ? null : r.item.id); setDropWhy(''); setDropNote(''); }}>Will not buy the rest</button>
                     </span>)}
                 </div>
                 {!dp && shortFor === r.item.id && (
@@ -560,7 +592,7 @@ export function Buying() {
                                   <button aria-label="More" onClick={() => setEdit((p) => ({ ...p, [r.item.id]: r.qty + r.step }))}>+</button>
                                 </div></td>
                                 <td className="r num">{r.rate != null ? money(r.qty * r.rate) : '—'}</td>
-                                <td style={{ whiteSpace: 'nowrap' }}><button className="btn quiet" onClick={(e) => openPush(r, r.qty, e.currentTarget)}>Push</button><button className="btn quiet" onClick={(e) => { const bb = (e.currentTarget as HTMLElement).getBoundingClientRect(); setMovePos({ x: bb.right, y: bb.bottom }); setMoveFor(moveFor === r.item.id ? null : r.item.id); setMoveTo(''); }}>Move</button></td>
+                                <td style={{ whiteSpace: 'nowrap' }}><button className="btn quiet" onClick={(e) => openPush(r, r.qty, e.currentTarget)}>Put off</button><button className="btn quiet" onClick={(e) => { const bb = (e.currentTarget as HTMLElement).getBoundingClientRect(); setMovePos({ x: bb.right, y: bb.bottom }); setMoveFor(moveFor === r.item.id ? null : r.item.id); setMoveTo(''); }}>Move</button></td>
                               </tr>
                               {r.carried > 0 && (openRow === r.item.id || needsDecision(r)) && (
                                 <tr style={{ background: 'var(--warn-soft, #FBF0D5)' }}><td colSpan={8} style={{ paddingTop: 0 }}>
@@ -660,7 +692,7 @@ export function Buying() {
 
       {!loading && pushedOut.length > 0 && (
         <div className="card" style={{ marginTop: 12 }}>
-          <b>Pushed to tomorrow ({pushedOut.length})</b>
+          <b>Put off to tomorrow ({pushedOut.length})</b>
           <div className="stack" style={{ gap: 4, marginTop: 6 }}>
             {pushedOut.map((h) => { const it = itemMap.get(h.item_id); return (
               <div key={h.id} className="row small" style={{ justifyContent: 'space-between' }}>
@@ -675,7 +707,7 @@ export function Buying() {
         <>
           <div onClick={() => setPushFor(null)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
           <div role="dialog" aria-label="Push to tomorrow" style={{ position: 'fixed', zIndex: 41, top: Math.min(pushPos.y + 6, window.innerHeight - 320), left: Math.max(8, Math.min(pushPos.x - 300, window.innerWidth - 316)), width: 300, background: 'var(--surface, #fff)', border: '1px solid var(--line, #ddd)', borderRadius: 12, boxShadow: 'var(--shadow-2)', padding: 12 }}>
-            <div className="small" style={{ marginBottom: 6 }}><b>Push {itemMap.get(pushFor)?.name} to tomorrow</b></div>
+            <div className="small" style={{ marginBottom: 6 }}><b>Put off {itemMap.get(pushFor)?.name} to tomorrow</b></div>
             <div className="muted small" style={{ marginBottom: 6 }}>The counter will see it is pending. It shows on tomorrow's list until it is bought.</div>
             <label className="small">How much to push</label>
             <input inputMode="decimal" aria-label="Quantity to push" value={pushQty} onChange={(e) => setPushQty(e.target.value.replace(/[^0-9.]/g, ''))} style={{ width: '100%', marginBottom: 8 }} />
@@ -684,7 +716,7 @@ export function Buying() {
               {REASONS.map((x) => <option key={x} value={x}>{x}</option>)}
             </select>
             <div className="row" style={{ gap: 8, marginTop: 10 }}>
-              <button className="btn primary" disabled={!pushWhy || !(Number(pushQty) > 0)} onClick={() => void doPush()}>Push to tomorrow</button>
+              <button className="btn primary" disabled={!pushWhy || !(Number(pushQty) > 0)} onClick={() => void doPush()}>Put off to tomorrow</button>
               <button className="btn quiet" onClick={() => setPushFor(null)}>Cancel</button>
             </div>
           </div>
