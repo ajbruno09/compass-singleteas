@@ -45,7 +45,7 @@ async function uploadBills(uid: string, files: File[]): Promise<string[]> {
 }
 
 // Reads the bill photo in the background and hands the result back so the boxes fill themselves.
-function useBillRead(files: File[], apply: (r: BillRead) => void) {
+function useBillRead(files: File[], vendor: string, apply: (r: BillRead) => void) {
   const [reading, setReading] = useState(false);
   const [note, setNote] = useState('');
   const key = files.map((f) => f.name + f.size).join('|');
@@ -53,7 +53,7 @@ function useBillRead(files: File[], apply: (r: BillRead) => void) {
     if (!files.length) { setNote(''); return; }
     let live = true;
     setReading(true); setNote('');
-    readBill(files).then((r) => {
+    readBill(files, vendor).then((r) => {
       if (!live) return;
       apply(r);
       const bits = [r.vendor && `Vendor: ${r.vendor}`].filter(Boolean);
@@ -95,7 +95,7 @@ function AddBillSheet({ grn, vendorName, onClose, onDone }: { grn: Pending; vend
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const br = useBillRead(files, (r) => { if (r.bill_number) setNo((v) => v || r.bill_number!); if (r.total != null) setAmount((v) => v || String(r.total)); });
+  const br = useBillRead(files, vendorName, (r) => { if (r.bill_number) setNo((v) => v || r.bill_number!); if (r.total != null) setAmount((v) => v || String(r.total)); });
   async function save() {
     setErr('');
     if (!files.length) return setErr('Add a photo of the bill.');
@@ -213,7 +213,7 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
   const [files, setFiles] = useState<File[]>([]);
   const [later, setLater] = useState(false);
   const [billDate, setBillDate] = useState('');
-  const br = useBillRead(files, (r) => { if (r.bill_number) setBill((v) => v || r.bill_number!); if (r.total != null) setAmount((v) => v || String(r.total)); if (r.bill_date) setBillDate((v) => v || r.bill_date!); });
+  const br = useBillRead(files, po ? vendors[po.vendor_id]?.name ?? '' : vendors[vendor]?.name ?? '', (r) => { if (r.bill_number) setBill((v) => v || r.bill_number!); if (r.total != null) setAmount((v) => v || String(r.total)); if (r.bill_date) setBillDate((v) => v || r.bill_date!); });
   const { profile } = useSession();
   const [find, setFind] = useState('');
   const [busy, setBusy] = useState(false);

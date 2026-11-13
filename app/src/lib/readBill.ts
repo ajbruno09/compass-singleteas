@@ -19,10 +19,10 @@ async function shrink(file: File): Promise<{ b64: string; type: string }> {
   } finally { URL.revokeObjectURL(url); }
 }
 
-export async function readBill(files: File[]): Promise<BillRead> {
+export async function readBill(files: File[], vendor = ''): Promise<BillRead> {
   const pages = await Promise.all(files.slice(0, 3).map(shrink));
   const { data: sess } = await supabase.auth.getSession();
-  const { data, error } = await supabase.functions.invoke('read-bill', { body: { pages }, headers: sess.session ? { Authorization: `Bearer ${sess.session.access_token}` } : undefined });
+  const { data, error } = await supabase.functions.invoke('read-bill', { body: { pages, vendor }, headers: sess.session ? { Authorization: `Bearer ${sess.session.access_token}` } : undefined });
   if (error) {
     let msg = 'Could not read the bill.';
     try { const b = await (error as { context?: Response }).context?.json(); if (b?.error) msg = b.error; } catch { /* keep default */ }
