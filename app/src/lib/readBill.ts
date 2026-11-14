@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
-export interface BillRead { bill_number: string | null; bill_date: string | null; vendor: string | null; total: number | null; unclear: string[] }
+export interface BillLine { name: string; item_id: number | null; qty: number | null; unit: string | null; rate: number | null; amount: number | null }
+export interface BillRead { bill_number: string | null; bill_date: string | null; vendor: string | null; total: number | null; unclear: string[]; lines?: BillLine[] }
 
 // Shrinks a phone photo so it uploads fast and costs little to read.
 async function shrink(file: File): Promise<{ b64: string; type: string }> {
@@ -19,10 +20,10 @@ async function shrink(file: File): Promise<{ b64: string; type: string }> {
   } finally { URL.revokeObjectURL(url); }
 }
 
-export async function readBill(files: File[], vendor = ''): Promise<BillRead> {
+export async function readBill(files: File[], vendor = '', items: { id: number; name: string; unit: string }[] = []): Promise<BillRead> {
   const pages = await Promise.all(files.slice(0, 3).map(shrink));
   const { data: sess } = await supabase.auth.getSession();
-  const { data, error } = await supabase.functions.invoke('read-bill', { body: { pages, vendor }, headers: sess.session ? { Authorization: `Bearer ${sess.session.access_token}` } : undefined });
+  const { data, error } = await supabase.functions.invoke('read-bill', { body: { pages, vendor, items }, headers: sess.session ? { Authorization: `Bearer ${sess.session.access_token}` } : undefined });
   if (error) {
     let msg = 'Could not read the bill.';
     try { const b = await (error as { context?: Response }).context?.json(); if (b?.error) msg = b.error; } catch { /* keep default */ }

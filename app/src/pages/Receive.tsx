@@ -4,9 +4,9 @@ import { qty as fmtQty, errText, date as fdate, packFactor, round3 } from '../li
 import { Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { useSession } from '../lib/session';
-import { readBill, type BillRead } from '../lib/readBill';
+import { readBill, type BillRead, type BillLine } from '../lib/readBill';
 
-interface Item { id: number; name: string; unit: string; show_as?: string | null; purchase_factor?: number | null; pack_name?: string | null; count_unit?: string | null; pcs_per_portion?: number | null }
+interface Item { id: number; name: string; unit: string; show_as?: string | null; purchase_factor?: number | null; pack_name?: string | null; count_unit?: string | null; pcs_per_portion?: number | null; last_cost?: number | null }
 // Chicken portions are for counters. The store receives those in kg.
 // People type "1 kg" or "500 g" in the arrived box. Read the number and the unit, and give back the number in the item's own unit.
 function cleanQty(raw: string, unit: string): string | null {
@@ -30,6 +30,25 @@ interface Po { id: string; po_number: string; vendor_id: string; status: string;
 interface Pending { id: string; grn_number: string; vendor_id: string; received_at: string }
 interface Grn { po_id: string; grn_lines: { item_id: number; qty_received: number }[] }
 
+// Price before and now, per the unit the item is bought in. Red up arrow when it went up, green down arrow when it came down.
+function PriceMark({ prev, now }: { prev: number | null | undefined; now: number }) {
+  if (!(now > 0)) return null;
+  if (prev == null || !(prev > 0)) return <div className="small" style={{ color: 'var(--info, #1D4F91)' }}>New price</div>;
+  const p = Math.round(prev * 100) / 100;
+  if (Math.abs(now - p) < 0.005) return <div className="small muted">= ₹{p} same</div>;
+  const up = now > p; const pc = Math.round(Math.abs(now - p) / p * 100);
+  return <div className="small" style={{ color: up ? 'var(--bad, #B02A1E)' : 'var(--ok, #1B6A4D)', fontWeight: 600, whiteSpace: 'nowrap' }}>{up ? '▲' : '▼'} ₹{p} → ₹{now} <span style={{ fontWeight: 500 }}>{pc}% {up ? 'up' : 'down'}</span></div>;
+}
+const fam = (u: string | null | undefined) => { const t = (u ?? '').toLowerCase().replace(/[^a-z]/g, ''); if (['kg', 'kgs'].includes(t)) return ['m', 1000]; if (['g', 'gm', 'gms', 'gram', 'grams'].includes(t)) return ['m', 1]; if (['l', 'ltr', 'litre', 'litres'].includes(t)) return ['v', 1000]; if (['ml'].includes(t)) return ['v', 1]; return [t, 1]; };
+// Bill rate is for one billed unit. Give back the rate for the item's own unit, or null when the units do not line up.
+function rateFor(it: Item, l: BillLine, packed: boolean): number | null {
+  if (l.rate == null || !(l.rate > 0)) return null;
+  if (packed || !l.unit) return l.rate;
+  const [bf, bs] = fam(l.unit), [if_, is] = fam(it.unit);
+  if (bf === if_) return Math.round(l.rate * (is as number) / (bs as number) * 100) / 100;
+  return null;
+}
+
 const MAX_BILLS = 3;
 async function uploadBills(uid: string, files: File[]): Promise<string[]> {
   const out: string[] = [];
@@ -45,7 +64,7 @@ async function uploadBills(uid: string, files: File[]): Promise<string[]> {
 }
 
 // Reads the bill photo in the background and hands the result back so the boxes fill themselves.
-function useBillRead(files: File[], vendor: string, apply: (r: BillRead) => void) {
+function useBillRead(files: File[], vendor: string, apply: (r: BillRead) => void, names: { id: number; name: string; unit: string }[] = []) {
   const [reading, setReading] = useState(false);
   const [note, setNote] = useState('');
   const key = files.map((f) => f.name + f.size).join('|');
@@ -53,7 +72,7 @@ function useBillRead(files: File[], vendor: string, apply: (r: BillRead) => void
     if (!files.length) { setNote(''); return; }
     let live = true;
     setReading(true); setNote('');
-    readBill(files, vendor).then((r) => {
+    readBill(files, vendor, names).then((r) => {
       if (!live) return;
       apply(r);
       const bits = [r.vendor && `Vendor: ${r.vendor}`].filter(Boolean);
@@ -136,7 +155,7 @@ export function Receive() {
   const load = useCallback(async () => {
     const [p, i, v] = await Promise.all([
       supabase.from('purchase_orders').select('id, po_number, vendor_id, status, order_date, required_date, po_lines(item_id, qty)').in('status', ['sent', 'partly_received']).order('order_date', { ascending: false }),
-      supabase.from('items').select('id, name, unit, show_as, purchase_factor, pack_name, count_unit, pcs_per_portion').eq('active', true).order('name'),
+      supabase.from('items').select('id, name, unit, show_as, purchase_factor, pack_name, count_unit, pcs_per_portion, last_cost').eq('active', true).order('name'),
       supabase.from('vendors').select('id, name').eq('active', true).order('name')
     ]);
     const list = (p.data as Po[]) ?? [];
@@ -213,7 +232,37 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
   const [files, setFiles] = useState<File[]>([]);
   const [later, setLater] = useState(false);
   const [billDate, setBillDate] = useState('');
-  const br = useBillRead(files, po ? vendors[po.vendor_id]?.name ?? '' : vendors[vendor]?.name ?? '', (r) => { if (r.bill_number) setBill((v) => v || r.bill_number!); if (r.total != null) setAmount((v) => v || String(r.total)); if (r.bill_date) setBillDate((v) => v || r.bill_date!); });
+  const [rates, setRates] = useState<Record<number, string>>({});
+  const [needRate, setNeedRate] = useState<number[]>([]);
+  const [offBill, setOffBill] = useState<BillLine[]>([]);
+  const [noMatch, setNoMatch] = useState<BillLine[]>([]);
+  const [vitemIds, setVitemIds] = useState<number[]>([]);
+  const vId = po ? po.vendor_id : vendor;
+  useEffect(() => { if (!vId) { setVitemIds([]); return; } supabase.from('vendor_items').select('item_id').eq('vendor_id', vId).then(({ data }) => setVitemIds(((data as { item_id: number }[]) ?? []).map((x) => x.item_id))); }, [vId]);
+  const orderedIds = po ? po.po_lines.map((l) => l.item_id) : [];
+  const nameList = [...new Set([...orderedIds, ...vitemIds])].filter((i) => items[i]).slice(0, 150).map((i) => ({ id: i, name: items[i].name, unit: items[i].count_unit ? 'kg' : (rf(items[i]) ? items[i].show_as ?? items[i].unit : items[i].unit) }));
+  function takeLine(id: number, l: BillLine) {
+    const it = items[id]; if (!it) return;
+    const f = rf(it); const count = !!it.count_unit;
+    if (!count && l.qty != null && l.qty > 0) {
+      const q = f ? String(l.qty) : cleanQty(`${l.qty}${(l.unit ?? '').toLowerCase().replace(/[^a-z]/g, '')}`, it.unit);
+      if (q) setVals((p) => (p[id] ? p : { ...p, [id]: q }));
+    }
+    const r = rateFor(it, l, !!f && !count);
+    if (r != null) setRates((p) => (p[id] ? p : { ...p, [id]: String(r) }));
+    else setNeedRate((p) => (p.includes(id) ? p : [...p, id]));
+  }
+  const br = useBillRead(files, po ? vendors[po.vendor_id]?.name ?? '' : vendors[vendor]?.name ?? '', (r) => {
+    if (r.bill_number) setBill((v) => v || r.bill_number!); if (r.total != null) setAmount((v) => v || String(r.total)); if (r.bill_date) setBillDate((v) => v || r.bill_date!);
+    const off: BillLine[] = [], none: BillLine[] = [];
+    for (const l of r.lines ?? []) {
+      if (l.item_id == null || !items[l.item_id]) { none.push(l); continue; }
+      if (po && !orderedIds.includes(l.item_id)) { off.push(l); continue; }
+      if (!po) setExtra((p) => (p.includes(l.item_id!) ? p : [...p, l.item_id!]));
+      takeLine(l.item_id, l);
+    }
+    setOffBill(off); setNoMatch(none);
+  }, nameList);
   const { profile } = useSession();
   const [find, setFind] = useState('');
   const [busy, setBusy] = useState(false);
@@ -233,8 +282,17 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
   };
   const matches = useMemo(() => find.trim().length < 2 ? [] : Object.values(items).filter((i) => i.name.toLowerCase().includes(find.toLowerCase()) && !ids.includes(i.id) && i.name !== 'Chicken Neck').slice(0, 6), [find, items, ids]);
 
+  const rateOf = (id: number) => { const n = parseFloat(rates[id] ?? ''); return n > 0 ? n : 0; };
+  const prevOf = (id: number) => { const it = items[id]; if (!it || it.last_cost == null) return null; return Number(it.last_cost) * (rf(it) && !it.count_unit ? rf(it) : 1); };
+  const qtyOf = (id: number) => { const n = Number(vals[id]); return n > 0 ? n : 0; };
+  const billed = ids.filter((id) => qtyOf(id) > 0 && rateOf(id) > 0);
+  const calc = billed.reduce((a, id) => a + qtyOf(id) * rateOf(id), 0);
+  const noRate = ids.filter((id) => qtyOf(id) > 0 && !(rateOf(id) > 0));
+  const totalNum = Number(amount) || 0;
+
   async function save() {
     setErr('');
+    for (const id of needRate) if (ids.includes(id) && qtyOf(id) > 0 && !(rateOf(id) > 0)) return setErr(`Type the rate for ${items[id]?.name} from the bill.`);
     for (const id of ids) { const v = vals[id]; if (v && !(Number(v) >= 0) && items[id]) { const c = cleanQty(v, items[id].unit); if (c === null) return setErr(`${items[id].name}: type just the number, like 1.5`); vals[id] = c; } }
     for (const id of ids) {
       if (!isCount(id)) continue;
@@ -253,18 +311,38 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
     setBusy(true);
     let paths: string[] = [];
     try { paths = await uploadBills(profile?.id ?? 'x', files); } catch (e) { setBusy(false); return setErr(errText(e)); }
-    const { error } = await supabase.rpc('receive_goods', { p_po_id: po?.id ?? null, p_vendor_id: po ? null : vendor, p_bill_number: bill, p_bill_date: billDate || null, p_bill_amount: amount ? Number(amount) : null, p_note: note, p_lines: lines, p_bill_paths: paths, p_bill_later: later && !paths.length });
+    const { data: rg, error } = await supabase.rpc('receive_goods', { p_po_id: po?.id ?? null, p_vendor_id: po ? null : vendor, p_bill_number: bill, p_bill_date: billDate || null, p_bill_amount: amount ? Number(amount) : null, p_note: note, p_lines: lines, p_bill_paths: paths, p_bill_later: later && !paths.length });
+    if (error) { setBusy(false); return setErr(errText(error)); }
+    // The rate on the bill (or typed here) becomes the current price. The old price stays in the price history.
+    let priceFail = 0;
+    const ref = (rg as { grn_number?: string } | null)?.grn_number ?? null;
+    for (const id of ids) {
+      const r = rateOf(id), it = items[id]; if (!(r > 0) || !it || !(qtyOf(id) > 0)) continue;
+      const pk = rf(it) && !it.count_unit ? rf(it) : 1;
+      const { error: pe } = await supabase.rpc('set_item_price', { p_item: id, p_price: r, p_label: pk > 1 ? (it.show_as ?? it.unit) : it.unit, p_qty: pk, p_vendor: po ? po.vendor_id : vendor, p_date: billDate || null, p_source: 'bill', p_ref: ref });
+      if (pe) priceFail++;
+    }
     setBusy(false);
-    if (error) return setErr(errText(error));
-    toast('Goods received. Stock updated.'); onDone();
+    toast(priceFail ? 'Goods received. Stock updated. Some prices could not be saved.' : 'Goods received. Stock and prices updated.'); onDone();
   }
+
+  const rateInput = (id: number) => {
+    const it = items[id]; if (!it) return null;
+    const per = rf(it) && !it.count_unit ? it.show_as ?? it.unit : it.count_unit ? 'kg' : it.unit;
+    const need = needRate.includes(id) && qtyOf(id) > 0 && !(rateOf(id) > 0);
+    return <div className="stack" style={{ gap: 2, alignItems: 'flex-end' }}>
+      <input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 86, borderColor: need ? 'var(--bad, #B02A1E)' : undefined }} aria-label={`Rate for ${it.name}`} placeholder={`per ${per}`} value={rates[id] ?? ''} onChange={(e) => setRates((p) => ({ ...p, [id]: e.target.value.replace(/[^0-9.]/g, '') }))} />
+      {need && <span className="small" style={{ color: 'var(--bad, #B02A1E)' }}>Could not read the rate. Please type it.</span>}
+      <PriceMark prev={prevOf(id)} now={rateOf(id)} />
+    </div>;
+  };
 
   return (
     <Sheet title={po ? `Receive ${vendors[po.vendor_id]?.name ?? ''} · ${po.po_number}` : 'Received without an order'} onClose={onClose}
       footer={<button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save and add to stock'}</button>}>
       {!po && <label className="field"><span>Vendor</span><select value={vendor} onChange={(e) => setVendor(e.target.value)}><option value="">Choose…</option>{Object.values(vendors).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label>}
       <div className="tablewrap"><table>
-        <thead><tr><th>Item</th>{po && <th className="r">Ordered</th>}<th className="r" style={{ width: 130 }}>Arrived now</th></tr></thead>
+        <thead><tr><th>Item</th>{po && <th className="r">Ordered</th>}<th className="r" style={{ width: 130 }}>Arrived now</th><th className="r" style={{ width: 150 }}>Rate ₹</th></tr></thead>
         <tbody>{ids.map((id) => { const it = items[id]; if (!it) return null; const line = po?.po_lines.find((l) => l.item_id === id); const already = po && line ? got(po, id) : 0; const f = rf(it); const d = (n: number) => (f ? `${Math.round((n / f) * 10) / 10} ${it.show_as}` : fmtQty(n, it.unit));
           if (isCount(id)) { const bird = it.count_unit === 'bird'; const pt = portionText(id); const ordBirds = bird && line && it.purchase_factor ? Math.round((Number(line.qty) / Number(it.purchase_factor)) * 10) / 10 : null; return (
             <tr key={id}><td><b>{it.name}</b> <span className="muted small">weight and {bird ? 'birds' : 'count'}</span>{pt && <div className="small" style={{ color: 'var(--brand)', marginTop: 3 }}>{pt}</div>}</td>
@@ -272,14 +350,30 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
               <td className="r"><div className="stack" style={{ gap: 6, alignItems: 'flex-end' }}>
                 <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 74, borderColor: Number(cnt[id]) > 0 && !(Number(vals[id]) > 0) ? 'var(--bad)' : undefined }} aria-label={`${it.name} weight in kg`} placeholder="kg" value={vals[id] ?? ''}  onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} onBlur={(e) => { const c = cleanQty(e.target.value, 'kg'); if (c !== null && c !== e.target.value) setVals((p) => ({ ...p, [id]: c })); }} /><span className="muted small" style={{ width: 38, textAlign: 'left' }}>kg</span></span>
                 <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><input inputMode="numeric" className="num" style={{ textAlign: 'right', width: 74, borderColor: Number(vals[id]) > 0 && !(Number(cnt[id]) > 0) ? 'var(--bad)' : undefined }} aria-label={`${it.name} ${bird ? 'birds' : 'pieces'}`} placeholder={bird ? 'birds' : 'pcs'} value={cnt[id] ?? ''} onChange={(e) => setCnt((p) => ({ ...p, [id]: e.target.value.replace(/[^0-9]/g, '') }))} /><span className="muted small" style={{ width: 38, textAlign: 'left' }}>{bird ? 'birds' : 'pcs'}</span></span>
-              </div></td></tr>); }
+              </div></td><td className="r">{rateInput(id)}</td></tr>); }
           return <tr key={id}><td><b>{it.name}</b> <span className="muted small">{f ? it.show_as : it.unit}</span></td>
             {po && <td className="r num">{line ? <>{d(Number(line.qty))}{already > 0 && <div className="small muted">got {d(already)}</div>}</> : <span className="muted small">extra</span>}</td>}
-            <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110 }} aria-label={`Arrived ${it.name}`} placeholder={f ? it.show_as ?? '' : it.unit} value={vals[id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} onBlur={(e) => { const c = cleanQty(e.target.value, f ? '' : it.unit); if (c !== null && c !== e.target.value) setVals((p) => ({ ...p, [id]: c })); }} /></td></tr>; })}
+            <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110 }} aria-label={`Arrived ${it.name}`} placeholder={f ? it.show_as ?? '' : it.unit} value={vals[id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} onBlur={(e) => { const c = cleanQty(e.target.value, f ? '' : it.unit); if (c !== null && c !== e.target.value) setVals((p) => ({ ...p, [id]: c })); }} /></td><td className="r">{rateInput(id)}</td></tr>; })}
           {hasCount && neckItem && (
             <tr style={{ background: 'var(--warn-soft, #FBF0D5)' }}><td><b>Chicken neck</b> <span className="muted small">kg only. Not on the order. Type 0 if none came.</span></td>{po && <td className="r muted small">extra</td>}
-              <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110, borderColor: neck.trim() === '' ? 'var(--bad)' : undefined }} aria-label="Chicken neck weight in kg" placeholder="kg" value={neck} onChange={(e) => setNeck(e.target.value)} /></td></tr>)}</tbody>
+              <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110, borderColor: neck.trim() === '' ? 'var(--bad)' : undefined }} aria-label="Chicken neck weight in kg" placeholder="kg" value={neck} onChange={(e) => setNeck(e.target.value)} /></td><td /></tr>)}</tbody>
       </table></div>
+      {offBill.length > 0 && (
+        <div className="banner warn" style={{ display: 'grid', gap: 6 }}>
+          <b>On the bill, but not on the order</b>
+          {offBill.map((l, i) => (
+            <div key={i} className="row" style={{ justifyContent: 'space-between' }}>
+              <span>{items[l.item_id!]?.name} <span className="muted small">{l.qty != null ? `${l.qty} ${l.unit ?? ''}` : ''}{l.rate != null ? ` at ₹${l.rate}` : ''}</span></span>
+              <span className="row" style={{ gap: 6 }}>
+                <button className="btn" onClick={() => { setExtra((p) => (p.includes(l.item_id!) ? p : [...p, l.item_id!])); takeLine(l.item_id!, l); setOffBill((p) => p.filter((x) => x !== l)); }}>Take it in</button>
+                <button className="btn quiet" onClick={() => setOffBill((p) => p.filter((x) => x !== l))}>Leave it out</button></span>
+            </div>))}
+        </div>
+      )}
+      {noMatch.length > 0 && <p className="small muted">Not matched to an item: {noMatch.map((l) => `${l.name}${l.qty != null ? ` ${l.qty}${l.unit ? ' ' + l.unit : ''}` : ''}`).join(', ')}. Add them with the box below if they arrived.</p>}
+      {billed.length > 0 && totalNum > 0 && (Math.abs(calc - totalNum) < 1
+        ? <p className="banner ok">Lines add up to ₹{Math.round(calc).toLocaleString('en-IN')}. The bill total is ₹{Math.round(totalNum).toLocaleString('en-IN')}.</p>
+        : <p className="banner warn">What arrived adds up to ₹{Math.round(calc).toLocaleString('en-IN')}. The bill says ₹{Math.round(totalNum).toLocaleString('en-IN')}.{calc < totalNum ? ` You may be paying ₹${Math.round(totalNum - calc).toLocaleString('en-IN')} for things that did not arrive or have no rate${noRate.length ? ` (no rate for ${noRate.length} ${noRate.length === 1 ? 'item' : 'items'})` : ''}. Ask the vendor for a credit note.` : ' Check the quantities and rates above.'}</p>)}
       <label className="field"><span>Add another item</span><input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Type a few letters" /></label>
       {matches.length > 0 && <div className="row">{matches.map((m) => <button key={m.id} className="qchip" onClick={() => { setExtra((p) => [...p, m.id]); setFind(''); }}>{m.name}</button>)}</div>}
       <div className="field"><span>Bill</span>
