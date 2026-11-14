@@ -17,7 +17,8 @@ const mult = (i: { unit: string; base_unit?: string | null; pieceG?: number }) =
 export function CountPage() {
   const [sp] = useSearchParams();
   const loc = Number(sp.get('loc'));
-  const freq = sp.get('freq') === 'weekly' ? 'weekly' : 'daily';
+  const freqParam = sp.get('freq');
+  const freq = freqParam === 'weekly' ? 'weekly' : freqParam === 'monthly' ? 'monthly' : 'daily';
   const { locations, profile } = useSession();
   const nav = useNavigate();
   const toast = useToast();
@@ -105,7 +106,7 @@ export function CountPage() {
   if (!loc) return <div className="phone"><p>Choose a counter first.</p></div>;
   return (
     <div className="phone">
-      <div className="phone-head"><button className="btn quiet" onClick={() => nav(office ? '/counts' : '/closing')}><Icon name="back" /> {t('Back')}</button><b>{freq === 'weekly' ? 'Weekly closing, all items' : t('Closing stock')} · {place}</b><AvatarButton /></div>
+      <div className="phone-head"><button className="btn quiet" onClick={() => nav(office ? '/counts' : '/closing')}><Icon name="back" /> {t('Back')}</button><b>{freq === 'weekly' ? 'Weekly closing, all items' : freq === 'monthly' ? 'Monthly closing' : t('Closing stock')} · {place}</b><AvatarButton /></div>
       {sentAlready ? <p className="banner">{t('Today\'s count is already sent. Thank you.')}</p> : <>
         <p className="muted small">{t('Count what is left. Every item must be counted. If you have none, enter 0.')} Each number you save updates stock straight away.</p>
         <div style={{ height: 8, borderRadius: 8, background: 'var(--line, #E3E8E5)', overflow: 'hidden' }}><div style={{ width: `${items.length ? (done / items.length) * 100 : 0}%`, height: '100%', background: 'var(--green, #1F6B4A)' }} /></div>

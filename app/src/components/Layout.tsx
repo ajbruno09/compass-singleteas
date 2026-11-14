@@ -30,6 +30,7 @@ export const NAV: NavItem[] = [
   { to: '/issue', label: 'Issue to counters', icon: 'box', roles: ['owner', 'store'], group: 'Today' },
   { to: '/stockview', label: 'Stock in hand', icon: 'layers', roles: ['owner', 'manager', 'store'], group: 'Stock' },
   { to: '/counts', label: 'Closing counts', icon: 'moon', roles: ['owner', 'manager', 'store'], group: 'Stock' },
+  { to: '/count-frequency', label: 'Count frequency', icon: 'moon', roles: ['owner', 'manager', 'store'], group: 'Stock' },
   { to: '/items', label: 'Items', icon: 'tag', roles: ['owner', 'manager', 'store'], group: 'Items' },
   { to: '/buying-setup', label: 'Buying setup', icon: 'tag', roles: ['owner', 'manager', 'store', 'accounts'], group: 'Items' },
   { to: '/data-check', label: 'Data check', icon: 'scale', roles: ['owner'], group: 'Items' },

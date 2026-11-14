@@ -50,6 +50,7 @@ import { Scorecard } from './pages/Scorecard';
 import { Schedules } from './pages/Schedules';
 import { StockView } from './pages/StockView';
 import { Counts } from './pages/Counts';
+import { CountFrequency } from './pages/CountFrequency';
 import { CountPage } from './pages/Count';
 import { ReceivedPage } from './pages/Received';
 import { Setup } from './pages/Setup';
@@ -65,7 +66,7 @@ import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/buying-setup': <BuyingSetup />, '/data-check': <DataCheck />, '/keep-ready': <KeepReady />, '/store-levels': <StoreLevels />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/shelves': <Shelves />, '/price-check': <PriceCheck />, '/bill-spend': <BillSpend />, '/team-usage': <TeamUsage />, '/counter-sales': <CounterSales />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/gas': <Gas />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/maint-requests': <MaintRequests />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />
+  '/': <Dashboard />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/buying-setup': <BuyingSetup />, '/data-check': <DataCheck />, '/keep-ready': <KeepReady />, '/store-levels': <StoreLevels />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/shelves': <Shelves />, '/price-check': <PriceCheck />, '/bill-spend': <BillSpend />, '/team-usage': <TeamUsage />, '/counter-sales': <CounterSales />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/gas': <Gas />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/maint-requests': <MaintRequests />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/count-frequency': <CountFrequency />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />
 };
 
 // After signing in, people with more than one app choose which to open. Once per visit.

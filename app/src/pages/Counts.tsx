@@ -15,16 +15,19 @@ export function Counts() {
   const [items, setItems] = useState<Record<number, Item>>({});
   const [openId, setOpenId] = useState('');
   const [wo, setWo] = useState<{ sunday: boolean; all: boolean; locations: number[] }>({ sunday: false, all: false, locations: [] });
+  const [mo, setMo] = useState<{ first_of_month: boolean; all: boolean; locations: number[] }>({ first_of_month: false, all: false, locations: [] });
   const loadWo = useCallback(async () => { const { data } = await supabase.rpc('weekly_override_today'); if (data) setWo(data as typeof wo); }, []);
-  useEffect(() => { void loadWo(); }, [loadWo]);
+  const loadMo = useCallback(async () => { const { data } = await supabase.rpc('monthly_override_today'); if (data) setMo(data as typeof mo); }, []);
+  useEffect(() => { void loadWo(); void loadMo(); }, [loadWo, loadMo]);
   async function toggleWeekly(id: number, on: boolean) { await supabase.rpc('set_weekly_open', { p_location: id, p_on: on }); void loadWo(); }
+  async function toggleMonthly(id: number, on: boolean) { await supabase.rpc('set_monthly_open', { p_location: id, p_on: on }); void loadMo(); }
   useEffect(() => {
     supabase.rpc('business_date', { p_at: new Date().toISOString() }).then(({ data }) => setDay(String(data)));
     supabase.from('items').select('id, name, unit').then(({ data }) => setItems(Object.fromEntries(((data as Item[]) ?? []).map((i) => [i.id, i]))));
   }, []);
   const load = useCallback(async () => {
     if (!day) return;
-    const { data } = await supabase.from('stock_counts').select('id, location_id, status, submitted_at, stock_count_lines(item_id, qty, expected)').eq('business_date', day).in('frequency', ['daily', 'weekly']).order('frequency');
+    const { data } = await supabase.from('stock_counts').select('id, location_id, status, submitted_at, stock_count_lines(item_id, qty, expected)').eq('business_date', day).in('frequency', ['daily', 'weekly', 'monthly']).order('frequency');
     setRows((data as CountRow[]) ?? []);
   }, [day]);
   useEffect(() => { void load(); const p = window.setInterval(() => { void load(); }, 30000); return () => window.clearInterval(p); }, [load]);
@@ -32,18 +35,20 @@ export function Counts() {
   return (
     <>
       <div className="pagehead"><div><p className="label">Store</p><h1>Closing counts</h1><p className="muted small" style={{ marginTop: 2 }}>Each counter counts what is left at closing. Differences against the books show here and fix the stock.</p></div>
-        <Link to="/count?loc=1" className="btn">Count the store</Link></div>
+        <div className="row" style={{ gap: 8 }}><Link to="/count-frequency" className="btn secondary">Set count frequency</Link><Link to="/count?loc=1" className="btn">Count the store</Link></div></div>
       <div className="stack">{places.map((l) => {
         const r = rows.find((x) => x.location_id === l.id && x.status === 'submitted') ?? rows.find((x) => x.location_id === l.id);
         const wOn = wo.sunday || wo.all || wo.locations.includes(l.id);
+        const mOn = mo.first_of_month || mo.all || mo.locations.includes(l.id);
         const sent = r?.status === 'submitted';
         const diffs = (r?.stock_count_lines ?? []).filter((x) => x.expected != null && Math.abs(Number(x.qty) - Number(x.expected)) > 0.0005);
         const open = openId === l.id + (r?.id ?? '');
         return <div key={l.id} className="card">
           <div className="row" style={{ justifyContent: 'space-between', cursor: sent ? 'pointer' : 'default' }} onClick={() => sent && setOpenId(open ? '' : l.id + r!.id)}>
             <div><b>{l.name}</b> {sent && <span className="muted small">· {r!.stock_count_lines.length} items · {timeOf(r!.submitted_at)}</span>}</div>
-            <div className="row" style={{ gap: 8 }}>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               {l.id !== 1 && (wo.sunday ? <span className="chip off">Weekly day</span> : <button className={'btn small ' + (wOn ? 'secondary' : '')} onClick={(e) => { e.stopPropagation(); void toggleWeekly(l.id, !wo.locations.includes(l.id) && !wOn); }}>{wOn ? 'Weekly open · turn off' : 'Open weekly count today'}</button>)}
+              {l.id !== 1 && (mo.first_of_month ? <span className="chip off">Monthly day</span> : <button className={'btn small ' + (mOn ? 'secondary' : '')} onClick={(e) => { e.stopPropagation(); void toggleMonthly(l.id, !mo.locations.includes(l.id) && !mOn); }}>{mOn ? 'Monthly open · turn off' : 'Open monthly count today'}</button>)}
             {sent ? (diffs.length ? <span className="chip late">{diffs.length} differ</span> : <span className="chip done">Matches</span>) : r ? <span className="chip due">Counting</span> : <span className="chip off">Not counted</span>}
             </div>
           </div>

@@ -97,6 +97,12 @@
 .sl-root .sl-btn.sl-p{background:var(--acc);border-color:var(--acc);color:#fff}
 .sl-root .sl-toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none}
 .sl-root .sl-toast.sl-on{opacity:1}
+.sl-root .sl-fseg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.sl-root .sl-fseg button{border:0;border-left:1px solid var(--line);background:var(--card);color:var(--mut);padding:5px 10px;font:500 12px Manrope,system-ui,sans-serif;cursor:pointer}
+.sl-root .sl-fseg button:first-child{border-left:0}
+.sl-root .sl-fseg button.sl-fon.sl-f-daily{background:var(--goods);color:var(--good)}
+.sl-root .sl-fseg button.sl-fon.sl-f-weekly{background:var(--warns);color:var(--warn)}
+.sl-root .sl-fseg button.sl-fon.sl-f-monthly{background:#E3EAFB;color:#2A4DAA}
 .sl-root .sl-empty{padding:22px;text-align:center;color:var(--mut)}
 .sl-root .sl-note{font-size:12.5px;color:var(--mut)}
 @media(max-width:700px){.sl-root h1{font-size:21px}.sl-root .sl-hide-s{display:none}.sl-root td,.sl-root th{padding-left:10px;padding-right:10px}}
