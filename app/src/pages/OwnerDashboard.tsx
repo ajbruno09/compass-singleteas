@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { useHealth } from '../components/StoreCheck';
 import { MonthToDate } from '../components/MonthToDate';
+import { routeForAlert } from '../lib/alertRoutes';
 import '../te.css';
 
 // Owner dashboard: Tea Estate v2, as approved in the mock. Live data where it exists, "Waiting" where it does not yet.
@@ -18,11 +20,12 @@ const IC: Record<string, string> = {"Net sales": "M12 3a9 9 0 1 0 0 18 9 9 0 0 0
 const ic = (n: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${IC[n] ?? ''}"/></svg>`;
 const col = (k: string) => (k === 'dn' ? 'var(--bad)' : k === 'up' ? 'var(--good)' : 'var(--mut)');
 interface Ind { location_id: number; for_date: string; outcome: string | null; late: boolean }
-interface Al { id: string; level: string; title: string; body: string | null; created_at: string }
+interface Al { id: string; level: string; title: string; body: string | null; created_at: string; source: string | null }
 interface Dept { name: string; score: number | null; sub: string; rows: [string, string, string][] }
 
 export function OwnerDashboard() {
   const { profile, locations } = useSession();
+  const nav = useNavigate();
   const counters = useMemo(() => locations.filter((l) => l.kind === 'department' && l.active), [locations]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => istDate(i - 6)), []);
   const [sales, setSales] = useState<{ business_date: string; location_id: number; amount: number }[]>([]);
@@ -36,7 +39,7 @@ export function OwnerDashboard() {
   const [sheet, setSheet] = useState<{ title: string; html: string } | null>(null);
   const { items: health } = useHealth();
 
-  const loadAlerts = async () => { const { data } = await supabase.from('alerts').select('id, level, title, body, created_at').is('done_at', null).order('created_at', { ascending: false }).limit(8); setAlerts((data as Al[]) ?? []); };
+  const loadAlerts = async () => { const { data } = await supabase.from('alerts').select('id, level, title, body, created_at, source').is('done_at', null).order('created_at', { ascending: false }).limit(8); setAlerts((data as Al[]) ?? []); };
   useEffect(() => {
     (async () => {
       const today = istDate(0); const monthStart = today.slice(0, 8) + '01';
@@ -124,9 +127,9 @@ export function OwnerDashboard() {
     const dots = IND_NAMES.map((n) => { const c = counters.find((x) => x.name === n); if (!c) return ''; const r = dotRows.find((d) => d.name === n); const t = stat(c.id, today); const [k, l] = t === 'o' ? ['ok', 'On time'] : t === 'l' ? ['att', 'Late'] : t === 'm' ? ['crit', 'Missed'] : ['wait', 'No indent yet']; const pct = r?.pct ?? null; return `<div class="ir"><span class="n">${esc(n)}</span><span class="chip ${k}">${l}</span><span class="p" style="color:${pct == null ? 'var(--mut)' : pct < 70 ? 'var(--bad)' : pct < 90 ? 'var(--warn)' : 'var(--good)'}">${pct == null ? '—' : pct + '%'}</span></div>`; }).join('');
     const money = ([['Store stock', storeVal > 0 ? lakh(storeVal) : '—', storeVal > 0 ? 'Only items that have a price' : 'Needs prices and stock', storeVal > 0 ? 'part' : 'wait'], ['Counter stock', '—', 'Needs counters to count', 'wait'], ['Open purchase orders', lakh(openVal), `${openPos.length} orders. Not yet an expense`, 'live'], ['Due in 7 days', inr(due7amt), `${due7.length} bills`, 'live'], ['Wastage today', '—', 'Needs wastage entries', 'wait']] as [string, string, string, Tag][]).map((m) => `<div class="card"><div class="sm mut" style="display:flex;justify-content:space-between">${m[0]}${chip(m[3])}</div><div class="v">${m[1]}</div><div class="sm mut">${m[2]}</div></div>`).join('');
     const AL = [
-      ...overdueHealth.map((h) => ({ id: '', cls: 'm', t: `Store has not fixed: ${h.title.toLowerCase()}`, b: `Open ${h.age_days + 1} days.` })),
-      ...alerts.map((a) => ({ id: a.id, cls: ['urgent', 'critical', 'sos'].includes(a.level) ? 'c' : 'm', t: a.title, b: a.body ?? '' }))];
-    const al = AL.length ? AL.map((a) => `<div class="al ${a.cls === 'm' ? 'm' : ''}"><span class="sev"></span><div><b>${esc(a.t)}</b><div class="sm mut">${esc(a.b)}</div></div><div class="go">${a.id ? `<button class="btn p" data-done="${a.id}">Mark done</button>` : ''}</div></div>`).join('') : '<div class="sm mut">Nothing is waiting for you.</div>';
+      ...overdueHealth.map((h) => ({ id: '', cls: 'm', t: `Store has not fixed: ${h.title.toLowerCase()}`, b: `Open ${h.age_days + 1} days.`, route: h.route as string | null })),
+      ...alerts.map((a) => ({ id: a.id, cls: ['urgent', 'critical', 'sos'].includes(a.level) ? 'c' : 'm', t: a.title, b: a.body ?? '', route: routeForAlert(a)?.to ?? null }))];
+    const al = AL.length ? AL.map((a) => `<div class="al ${a.cls === 'm' ? 'm' : ''}"><span class="sev"></span><div>${a.route ? `<b class="golink" data-go="${a.route}">${esc(a.t)}</b>` : `<b>${esc(a.t)}</b>`}<div class="sm mut">${esc(a.b)}</div></div><div class="go">${a.route ? `<button class="btn" data-go="${a.route}">Fix it</button>` : ''}${a.id ? `<button class="btn p" data-done="${a.id}">Mark done</button>` : ''}</div></div>`).join('') : '<div class="sm mut">Nothing is waiting for you.</div>';
     const head = need ? `${hasSales && delta != null ? (delta >= 0 ? 'Sales are up' : 'Sales are down') + ', and ' : ''}${need} ${need === 1 ? 'thing needs' : 'things need'} you now.` : 'Nothing needs you right now.';
     return { csNote, latestLabel, kpis, bigA, depts, trend, tleg, cs, dots, money, al, head, dim: tot === 0, hasTot: tot > 0 };
   }, [sales, inds, bills, alerts, stock, cost, pos, issues, counters, days, health]);
@@ -136,6 +139,8 @@ export function OwnerDashboard() {
     const t = e.target as HTMLElement;
     const dep = t.closest('[data-dept]') as HTMLElement | null;
     if (dep) { const d = ((window as unknown as { __depts: Dept[] }).__depts)[Number(dep.dataset.dept)]; setSheet({ title: `${d.name}, how the score is made`, html: d.rows.length ? `<table><tr><th>Measure</th><th class="r">Target</th><th class="r">Result</th></tr>${d.rows.map((r) => `<tr><td>${r[0]}</td><td class="r">${r[1]}</td><td class="r">${r[2]}</td></tr>`).join('')}</table><p class="sm mut" style="margin-top:10px">Only delays this department caused count against it. More measures and reasons follow as the data comes in.</p>` : `<p class="sm mut">${d.sub}. This score starts once that data is coming in.</p>` }); return; }
+    const go = t.closest('[data-go]') as HTMLElement | null;
+    if (go) { nav(go.dataset.go!); return; }
     const done = t.closest('[data-done]') as HTMLElement | null;
     if (done) void supabase.rpc('finish_alert', { p_id: done.dataset.done }).then(() => loadAlerts());
   };
