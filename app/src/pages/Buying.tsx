@@ -56,7 +56,7 @@ async function copyText(t: string) { try { await navigator.clipboard.writeText(t
 
 interface Hold { status: string; drop_pending: boolean; id: string; item_id: number; qty: number; from_date: string; due_date: string; reason: string; counters: string | null; push_count: number }
 interface Drop { id: string; item_id: number; item_name: string; unit: string; for_date: string; qty: number; reason: string; note: string | null; status: string; owner_question: string | null; store_reply: string | null; requested_at: string; decided_at: string | null; requested_by_name: string | null; kind?: string }
-const DROP_WHY = ['Same item asked again, they only need the new quantity', 'Counter got it another way', 'No longer needed', 'Other'];
+const DROP_WHY = ['Same item asked again, they only need the new quantity', 'Counter got it another way', 'No longer needed', 'Over budget, not needed now', 'Other'];
 interface Approval { for_date: string; over_amount: number; status: string }
 const REASONS = ['Over the daily limit', 'Cash is tight', 'Vendor closed', 'Not available today', 'Other'];
 const daysBetween = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
@@ -106,6 +106,7 @@ export function Buying() {
   const [talk, setTalk] = useState<Record<string, string>>({});
   const [askOpen, setAskOpen] = useState<string | null>(null);
   const [shortFor, setShortFor] = useState<number | null>(null);
+  const [wontFor, setWontFor] = useState<number | null>(null);
   const [openRow, setOpenRow] = useState<number | null>(null);
   const [limEdit, setLimEdit] = useState<string | null>(null);
 
@@ -321,6 +322,16 @@ export function Buying() {
     const { error } = await supabase.rpc('buy_drop_short', { p_item: r.item.id, p_date: date, p_qty: amt, p_reason: dropWhy, p_note: dropNote });
     if (error) return toast(errText(error));
     toast('Sent to the owner'); setShortFor(null); setDropWhy(''); setDropNote(''); await load();
+  }
+  async function dropWhole(r: Row) {
+    if (!dropWhy) return;
+    const own = Math.max(0, r.asked - r.carried);
+    const amt = Math.min(r.sug, own);
+    if (!(amt > 0)) return toast('This is from an earlier ask. Use the earlier ask option on this item.');
+    const { error } = await supabase.rpc('buy_drop_short', { p_item: r.item.id, p_date: date, p_qty: amt, p_reason: dropWhy, p_note: dropNote });
+    if (error) return toast(errText(error));
+    setEdit((e) => { const n = { ...e }; if (n[r.item.id] != null) n[r.item.id] = Math.max(0, r.qty - amt); return n; });
+    toast('Sent to the owner'); setWontFor(null); setDropWhy(''); setDropNote(''); await load();
   }
   async function keepAll(r: Row) {
     const { error } = await supabase.rpc('buy_keep_all', { p_item: r.item.id, p_date: date });
@@ -592,8 +603,16 @@ export function Buying() {
                                   <button aria-label="More" onClick={() => setEdit((p) => ({ ...p, [r.item.id]: r.qty + r.step }))}>+</button>
                                 </div></td>
                                 <td className="r num">{r.rate != null ? money(r.qty * r.rate) : '—'}</td>
-                                <td style={{ whiteSpace: 'nowrap' }}><button className="btn quiet" onClick={(e) => openPush(r, r.qty, e.currentTarget)}>Put off</button><button className="btn quiet" onClick={(e) => { const bb = (e.currentTarget as HTMLElement).getBoundingClientRect(); setMovePos({ x: bb.right, y: bb.bottom }); setMoveFor(moveFor === r.item.id ? null : r.item.id); setMoveTo(''); }}>Move</button></td>
+                                <td style={{ whiteSpace: 'nowrap' }}><button className="btn quiet" onClick={(e) => openPush(r, r.qty, e.currentTarget)}>Put off</button>{!dropOf(r.item.id) && <button className="btn quiet" onClick={() => { setWontFor(wontFor === r.item.id ? null : r.item.id); setDropWhy(''); setDropNote(''); }}>Won't buy</button>}<button className="btn quiet" onClick={(e) => { const bb = (e.currentTarget as HTMLElement).getBoundingClientRect(); setMovePos({ x: bb.right, y: bb.bottom }); setMoveFor(moveFor === r.item.id ? null : r.item.id); setMoveTo(''); }}>Move</button></td>
                               </tr>
+                              {wontFor === r.item.id && (
+                                <tr><td colSpan={8} style={{ paddingTop: 0 }}>
+                                  <div className="stack" style={{ gap: 6, padding: '4px 0 8px 26px', maxWidth: 440 }}>
+                                    <div className="muted small">Not buying {r.item.name} needs the owner's yes. The counter is not told.</div>
+                                    <select aria-label="Why not buy" value={dropWhy} onChange={(e) => setDropWhy(e.target.value)}><option value="">Why will you not buy it? (required)</option>{DROP_WHY.map((x) => <option key={x} value={x}>{x}</option>)}</select>
+                                    <textarea rows={2} aria-label="Note for the owner" placeholder="Short note for the owner (optional)" value={dropNote} onChange={(e) => setDropNote(e.target.value)} />
+                                    <div className="row" style={{ gap: 8 }}><button className="btn primary" disabled={!dropWhy} onClick={() => void dropWhole(r)}>Send to owner</button><button className="btn quiet" onClick={() => setWontFor(null)}>Cancel</button></div>
+                                  </div></td></tr>)}
                               {r.carried > 0 && (openRow === r.item.id || needsDecision(r)) && (
                                 <tr style={{ background: 'var(--warn-soft, #FBF0D5)' }}><td colSpan={8} style={{ paddingTop: 0 }}>
                                   <div className="stack" style={{ gap: 4, padding: '4px 0 6px 26px' }}>
