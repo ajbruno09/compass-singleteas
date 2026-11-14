@@ -6,14 +6,15 @@ import { useToast } from '../components/Toast';
 import type { Group } from '../lib/types';
 import '../mock-levels.css';
 
-interface Item { id: number; name: string; unit: string; group_id: number | null; count_frequency: 'daily' | 'weekly' | 'monthly' }
-type Freq = 'daily' | 'weekly' | 'monthly';
-const FREQ: Freq[] = ['daily', 'weekly', 'monthly'];
-const LABEL: Record<Freq, string> = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
+interface Item { id: number; name: string; unit: string; group_id: number | null; count_frequency: 'daily' | 'weekly' | 'monthly' | 'off' }
+type Freq = 'daily' | 'weekly' | 'monthly' | 'off';
+const FREQ: Freq[] = ['daily', 'weekly', 'monthly', 'off'];
+const LABEL: Record<Freq, string> = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', off: 'Off' };
 
 // Lets Admin choose, per counter, how often each item there needs a closing count.
 // Daily items are asked every day. Weekly items wait for the weekly count (everything gets counted then too).
 // Monthly items get their own count, open on the 1st or whenever Admin opens it from Closing counts.
+// Off items are never asked for at this counter, not even on the weekly sweep.
 export function CountFrequency() {
   const { locations } = useSession();
   const toast = useToast();

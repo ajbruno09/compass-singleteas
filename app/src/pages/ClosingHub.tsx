@@ -22,7 +22,7 @@ export function ClosingHub() {
       if (!loc) return;
       const { data } = await supabase.rpc('department_items', { p_location_id: loc });
       const list = (data as It[]) ?? [];
-      setN({ daily: list.filter((i) => i.count_frequency === 'daily').length, weekly: list.length, monthly: list.filter((i) => i.count_frequency === 'monthly').length });
+      setN({ daily: list.filter((i) => i.count_frequency === 'daily').length, weekly: list.filter((i) => i.count_frequency !== 'off').length, monthly: list.filter((i) => i.count_frequency === 'monthly').length });
       const bd = String((await supabase.rpc('business_date', { p_at: new Date().toISOString() })).data);
       const [d, w, m, st, mst] = await Promise.all([
         supabase.from('stock_counts').select('status').eq('location_id', loc).eq('frequency', 'daily').eq('business_date', bd).eq('status', 'submitted').limit(1),
