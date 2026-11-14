@@ -57,6 +57,9 @@ async function copyText(t: string) { try { await navigator.clipboard.writeText(t
 interface Hold { status: string; drop_pending: boolean; id: string; item_id: number; qty: number; from_date: string; due_date: string; reason: string; counters: string | null; push_count: number }
 interface Drop { id: string; item_id: number; item_name: string; unit: string; for_date: string; qty: number; reason: string; note: string | null; status: string; owner_question: string | null; store_reply: string | null; requested_at: string; decided_at: string | null; requested_by_name: string | null; kind?: string }
 const DROP_WHY = ['Same item asked again, they only need the new quantity', 'Counter got it another way', 'No longer needed', 'Over budget, not needed now', 'Other'];
+interface ProdLine { item_id: number; name: string; unit: string; need: number; issued: number; mode: 'store' | 'buy' | null; have: number }
+interface ProdOrder { id: number; name: string; unit: string; qty: number; for_date: string; urgent: boolean; by: string; lines: ProdLine[] }
+interface ProdBuy { item_id: number; qty: number; label: string }
 interface Approval { for_date: string; over_amount: number; status: string }
 const REASONS = ['Over the daily limit', 'Cash is tight', 'Vendor closed', 'Not available today', 'Other'];
 const daysBetween = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
@@ -107,6 +110,10 @@ export function Buying() {
   const [askOpen, setAskOpen] = useState<string | null>(null);
   const [shortFor, setShortFor] = useState<number | null>(null);
   const [wontFor, setWontFor] = useState<number | null>(null);
+  const [prodOrders, setProdOrders] = useState<ProdOrder[]>([]);
+  const [prodBuy, setProdBuy] = useState<ProdBuy[]>([]);
+  const [pDraft, setPDraft] = useState<Record<string, 'store' | 'buy'>>({});
+  const [pBusy, setPBusy] = useState<number | null>(null);
   const [openRow, setOpenRow] = useState<number | null>(null);
   const [limEdit, setLimEdit] = useState<string | null>(null);
 
@@ -144,6 +151,9 @@ export function Buying() {
     setIndents((ind.data as IndentRow[]) ?? []);
     setOnHand(Object.fromEntries(((oh.data as { item_id: number; qty: number }[]) ?? []).map((r) => [r.item_id, Number(r.qty)])));
     setPos((po.data as PoRow[]) ?? []);
+    const [pq, pb] = await Promise.all([supabase.rpc('prod_orders_open'), supabase.rpc('prod_buy_lines', { p_date: date })]);
+    setProdOrders(((pq.data as ProdOrder[]) ?? []).map((o) => ({ ...o, qty: Number(o.qty), lines: o.lines.map((l) => ({ ...l, need: Number(l.need), issued: Number(l.issued), have: Number(l.have) })) })));
+    setProdBuy(((pb.data as ProdBuy[]) ?? []).map((b) => ({ ...b, qty: Number(b.qty) })));
     setLoading(false);
   }, [date]);
   useEffect(() => {
@@ -177,6 +187,11 @@ export function Buying() {
         e.asked += Number(l.qty); e.by.set(loc, (e.by.get(loc) ?? 0) + Number(l.qty)); agg.set(l.item_id, e);
       }
     }
+    // Production ingredients the store chose to buy outside: shown with the order they belong to.
+    for (const b of prodBuy) {
+      const e = agg.get(b.item_id) ?? emptyE();
+      e.asked += b.qty; e.by.set(b.label, (e.by.get(b.label) ?? 0) + b.qty); agg.set(b.item_id, e);
+    }
     // Pushed asks: out of today's list while pushed, back in from their due date.
     for (const h of holds) {
       if (h.drop_pending) continue;
@@ -203,7 +218,7 @@ export function Buying() {
       out.push({ near: near ? gap : 0, carried: e.carried, carriedAge: e.age, carriedWhy: e.why, item, asked: e.asked, by: [...e.by.entries()].map(([loc, qty]) => ({ loc, qty })), inStore, ordered, sug, qty, rate, step });
     }
     return out.sort((a, b) => (a.item.group_id ?? 99) - (b.item.group_id ?? 99) || a.item.name.localeCompare(b.item.name));
-  }, [sentInd, itemMap, onHand, orderedBy, edit, rateMap, locations, holds, date]);
+  }, [sentInd, itemMap, onHand, orderedBy, edit, rateMap, locations, holds, date, prodBuy]);
 
   const toBuy = rows.filter((r) => r.qty > 0);
   const vOf = (r: Row) => moved[r.item.id] ?? r.item.default_vendor_id;
@@ -257,7 +272,8 @@ export function Buying() {
   const pendingDrops = drops.filter((d) => d.status === 'asked' || d.status === 'question');
   // Items the counters need that the store has not ordered, put off, or asked to drop yet.
   const undecidedRows = rows.filter((r) => r.sug > 1e-9 && !vendorMap.get(vOf(r) ?? '')?.is_store && !dropOf(r.item.id));
-  const undecided = undecidedRows.length;
+  const prodUndecided = prodOrders.filter((o) => o.for_date <= date).reduce((n, o) => n + o.lines.filter((l) => l.mode == null).length, 0);
+  const undecided = undecidedRows.length + prodUndecided;
   const [dayClosed, setDayClosed] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const lastRep = useRef('');
@@ -322,6 +338,16 @@ export function Buying() {
     const { error } = await supabase.rpc('buy_drop_short', { p_item: r.item.id, p_date: date, p_qty: amt, p_reason: dropWhy, p_note: dropNote });
     if (error) return toast(errText(error));
     toast('Sent to the owner'); setShortFor(null); setDropWhy(''); setDropNote(''); await load();
+  }
+  const pMode = (o: ProdOrder, l: ProdLine): 'store' | 'buy' => pDraft[`${o.id}:${l.item_id}`] ?? l.mode ?? (l.have >= l.need - l.issued - 1e-9 ? 'store' : 'buy');
+  async function confirmProd(o: ProdOrder) {
+    setPBusy(o.id);
+    const modes: Record<string, string> = {};
+    for (const l of o.lines) modes[String(l.item_id)] = pMode(o, l);
+    const { error } = await supabase.rpc('prod_decide', { p_order: o.id, p_modes: modes });
+    setPBusy(null);
+    if (error) return toast(errText(error));
+    toast('Saved. Things to buy are on the vendor lists below.'); setPDraft((d) => { const n = { ...d }; for (const l of o.lines) delete n[`${o.id}:${l.item_id}`]; return n; }); await load();
   }
   async function dropWhole(r: Row) {
     if (!dropWhy) return;
@@ -394,8 +420,8 @@ export function Buying() {
         : <div className={`banner ${undecided > 0 ? 'warn' : 'good'}`} style={{ marginBottom: 12 }}>
             <div className="row" style={{ justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
               <div>{undecided > 0
-                ? <><b>{undecided} {undecided === 1 ? 'item' : 'items'} the counters need {undecided === 1 ? 'is' : 'are'} not ordered yet.</b> For each one, order it, put it off to another day, or say you will not buy it.
-                    <div className="small" style={{ marginTop: 4 }}>{undecidedRows.slice(0, 8).map((r) => r.item.name).join(', ')}{undecidedRows.length > 8 ? ` and ${undecidedRows.length - 8} more` : ''}</div></>
+                ? <><b>{undecided} {undecided === 1 ? 'item' : 'items'} {undecided === 1 ? 'is' : 'are'} not decided yet.</b> For each one, order it, put it off to another day, or say you will not buy it.
+                    <div className="small" style={{ marginTop: 4 }}>{undecidedRows.slice(0, 8).map((r) => r.item.name).join(', ')}{undecidedRows.length > 8 ? ` and ${undecidedRows.length - 8} more` : ''}{prodUndecided > 0 ? `${undecidedRows.length ? '. ' : ''}${prodUndecided} production ${prodUndecided === 1 ? 'ingredient' : 'ingredients'} to decide (see Production order below)` : ''}</div></>
                 : <><b>Everything is decided.</b> You can finish today's ordering.</>}</div>
               <button className="btn primary" disabled={undecided > 0 || finishing} onClick={() => void finishDay()}>{finishing ? 'Finishing…' : "Finish today's ordering"}</button>
             </div>
@@ -464,6 +490,43 @@ export function Buying() {
       {!loading && doubleRows.length > 0 && <div className="banner warn" style={{ marginBottom: 12 }}><b>{doubleRows.length === 1 ? 'One item may be ordered twice.' : `${doubleRows.length} items may be ordered twice.`}</b> Open {doubleRows.length === 1 ? 'it' : 'them'} below and decide: ask the owner to drop the earlier ask, or confirm the full quantity. Orders can be sent after that.</div>}
       {!loading && rows.some((r) => (r.near ?? 0) > 0) && <p className="muted small" style={{ marginBottom: 10 }}>Nearly covered by stock, not listed: {rows.filter((r) => (r.near ?? 0) > 0).map((r) => `${r.item.name} (needs ${n2(r.near ?? 0)} ${r.item.unit} more)`).join(', ')}.</p>}
       {!loading && overBlocked && shortRows.length === 0 && <div className="banner warn" style={{ marginBottom: 12 }}>Today is over the daily limit. Push some items to tomorrow, or ask the owner to approve. Orders can be sent once it fits.</div>}
+
+      {!loading && prodOrders.length > 0 && (
+        <div className="stack" style={{ marginBottom: 14 }}>
+          {prodOrders.map((o) => {
+            const todo = o.lines.filter((l) => l.mode == null).length;
+            const nBuy = o.lines.filter((l) => pMode(o, l) === 'buy').length;
+            return (
+              <div className="card" key={'prod' + o.id} style={{ borderColor: todo ? 'var(--warn)' : undefined }}>
+                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div><b>Production order: {o.name} {n2(o.qty)}</b> {o.urgent && <span className="chip late">Urgent</span>}
+                    <div className="muted small">{o.by ? `Asked by ${o.by} · ` : ''}needed {dayLabel(o.for_date)}. These ingredients are for this order only. For each one, give it from your store or buy it outside.</div></div>
+                  {todo > 0 ? <span className="chip due">{todo} to decide</span> : <span className="chip done">Decided</span>}
+                </div>
+                {o.lines.length === 0 ? <p className="muted small" style={{ marginTop: 8 }}>No ingredients were asked for this order.</p> : (
+                  <div className="tablewrap" style={{ border: 0, boxShadow: 'none', marginTop: 8 }}>
+                    <table>
+                      <thead><tr><th>Ingredient</th><th className="r">Needed</th><th className="r">In store</th><th>Decision</th><th>If you buy</th></tr></thead>
+                      <tbody>{o.lines.map((l) => { const m = pMode(o, l); const rem = l.need - l.issued; const short = l.have < rem - 1e-9; const v = vendorMap.get(itemMap.get(l.item_id)?.default_vendor_id ?? ''); return (
+                        <tr key={l.item_id}>
+                          <td><b>{l.name}</b>{l.issued > 0 && <div className="muted small">{n2(l.issued)} {l.unit} already issued</div>}</td>
+                          <td className="r num">{n2(rem)} {l.unit}</td>
+                          <td className="r num" style={short ? { color: 'var(--bad)' } : undefined}>{n2(l.have)} {l.unit}{short && <div className="small">short</div>}</td>
+                          <td><div className="seg" role="group" aria-label={`Decision for ${l.name}`}>
+                            <button aria-pressed={m === 'store'} disabled={short} title={short ? 'The store does not have enough' : ''} onClick={() => setPDraft((d) => ({ ...d, [`${o.id}:${l.item_id}`]: 'store' }))}>Give from store</button>
+                            <button aria-pressed={m === 'buy'} onClick={() => setPDraft((d) => ({ ...d, [`${o.id}:${l.item_id}`]: 'buy' }))}>Buy outside</button></div></td>
+                          <td className="small">{m === 'buy' ? (v ? `From ${v.name}` : 'No usual vendor. Choose one in the list below.') : <span className="muted">Nothing to buy</span>}</td>
+                        </tr>); })}</tbody>
+                    </table>
+                  </div>)}
+                <div className="row" style={{ justifyContent: 'space-between', marginTop: 8 }}>
+                  <span className="small muted">{o.lines.length - nBuy} from the store, {nBuy} to buy outside.</span>
+                  <button className="btn primary" disabled={pBusy === o.id || o.lines.length === 0} onClick={() => void confirmProd(o)}>{pBusy === o.id ? 'Saving…' : todo > 0 ? 'Confirm' : 'Save changes'}</button>
+                </div>
+              </div>);
+          })}
+        </div>
+      )}
 
       {loading ? <p className="muted">Loading…</p> : (
         <>

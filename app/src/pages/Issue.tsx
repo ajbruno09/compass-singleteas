@@ -6,6 +6,7 @@ import { useSession } from '../lib/session';
 import { qty as fmtQty, errText, packFactor, round3 } from '../lib/format';
 import { timeOf } from '../lib/ist';
 import { useToast } from '../components/Toast';
+import { ProdIssue } from '../components/ProdIssue';
 
 interface Item { id: number; name: string; unit: string; show_as?: string | null; purchase_factor?: number | null }
 interface IssueRow { id: string; issue_number: string; to_location_id: number; status: string; issued_at: string | null; for_date?: string | null; late_reason?: string | null; late_days?: number | null; issue_lines: { item_id: number; qty_issued: number; qty_received: number | null }[] }
@@ -96,6 +97,7 @@ export function Issue() {
   return (
     <>
       <div className="pagehead"><div><p className="label">Store</p><h1>Issue to counters</h1><p className="muted small" style={{ marginTop: 2 }}>Filled from what each counter asked for. Change any amount, then send. The counter confirms what it received.</p></div></div>
+      <ProdIssue />
       <div className="card" style={{ display: 'grid', gap: 8 }}>
         <b>Party order</b>
         {pStat?.active ? (<>

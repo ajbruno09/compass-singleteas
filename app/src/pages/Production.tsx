@@ -37,6 +37,7 @@ export function Production() {
   const { profile } = useSession();
   const toast = useToast();
   const admin = profile?.role === 'owner';
+  const [waits, setWaits] = useState<Record<number, string[]>>({});
   const staffView = profile?.role === 'department' || profile?.role === 'closing';
   const canReceive = admin || profile?.role === 'manager' || profile?.role === 'store';
   const [cancels, setCancels] = useState<{ id: string; order_id: number; reason: string; status: string; by: string | null; note: string | null }[]>([]);
@@ -89,6 +90,8 @@ export function Production() {
     setRecipes(rs);
     setLines(cd.lines);
     setInames(new Map(cd.lines.map((x) => [x.ingredient_id, { id: x.ingredient_id, name: x.name, unit: x.unit }])));
+    const reqIds = ((o.data as { id: number; status: string }[]) ?? []).filter((x) => x.status === 'requested').map((x) => x.id);
+    if (reqIds.length) { const pw = await supabase.rpc('prod_lines', { p_ids: reqIds }); setWaits(Object.fromEntries(((pw.data as { order_id: number; waiting: string[] }[]) ?? []).map((x) => [x.order_id, x.waiting]))); } else setWaits({});
     setPlan((p.data as Plan[]) ?? []);
     setLevels((l.data as Level[]) ?? []);
     const rmap = new Map(rs.map((x) => [x.item_id, x.items]));
@@ -156,7 +159,7 @@ export function Production() {
       if (error) { setBusy(false); toast(error.message); return; }
     }
     setBusy(false); setPick({}); setAskSel({}); setScr('home');
-    toast('Sent. Store indent and buying list are ready');
+    toast('Sent. The store will decide on the ingredients and issue them');
     void load();
   };
   const setQty = (o: Order, q: number) => { void run(() => supabase.rpc('prod_update_qty', { p_id: o.id, p_qty: q }), ''); };
@@ -247,9 +250,10 @@ export function Production() {
                   : <span className="pd-num">{o.qty}{u}</span>}
                 {rec.get(o.item_id)?.rate ? <span className="pd-sm pd-mut">₹{Math.round((rec.get(o.item_id)?.rate ?? 0) * o.qty).toLocaleString('en-IN')}</span> : null}
                 <span className={'pd-chip ' + (o.status === 'requested' ? 'pd-wait' : 'pd-ok')}>{STEPS[o.status]}</span>
+                {o.status === 'requested' && (waits[o.id]?.length ?? 0) > 0 && <span className="pd-sm pd-mut" style={{ flexBasis: '100%' }}>Waiting for the store to issue: {waits[o.id].join(', ')}. You can start cooking once everything is issued.</span>}
                 <span className="pd-row">
                   <button className="pd-btn" onClick={() => setOpen({ ...open, [-o.id]: !open[-o.id] })}>{open[-o.id] ? 'Hide' : 'Ingredients'}</button>
-                  {can && o.status === 'requested' && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'cooking')}>Start cooking</button>}
+                  {can && o.status === 'requested' && <button className="pd-btn" disabled={busy || (!admin && (waits[o.id]?.length ?? 0) > 0)} onClick={() => step(o.id, 'cooking')}>Start cooking</button>}
                   {can && ['requested', 'cooking'].includes(o.status) && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'on_the_way')}>Sent to store</button>}
                   {canReceive && o.status === 'on_the_way' && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'received')}>Received</button>}
                   {(can || canReceive) && ['requested', 'cooking', 'on_the_way'].includes(o.status) && !cancels.some((c) => c.order_id === o.id && c.status === 'pending') && <button className="pd-btn" disabled={busy} onClick={() => { setCancelFor(cancelFor === o.id ? null : o.id); setCancelWhy(''); }}>{admin ? 'Cancel' : 'Ask to cancel'}</button>}
@@ -336,7 +340,7 @@ export function Production() {
                 <div className="pd-sm pd-mut" style={{ display: 'block', marginBottom: 4 }}>The recipe is always the full list, for costing. The switch is only the default for what the counter asks the Store.</div>
                 {need(rItem.item_id, rQty).map((x) => ingRow(x, x.def, admin ? () => { void run(() => supabase.rpc('prod_set_ask_default', { p_recipe: rItem.item_id, p_ing: x.id, p_on: !x.def }), ''); } : null))}
               </div>
-              {need(rItem.item_id, rQty).some((x) => !x.ok) && <div className="pd-sm pd-mut">"unit?" means the recipe unit does not match how the item is counted. It is left off the indent until confirmed.</div>}
+              {need(rItem.item_id, rQty).some((x) => !x.ok) && <div className="pd-sm pd-mut">"unit?" means the recipe unit does not match how the item is counted. It is left off the order until confirmed.</div>}
             </div>
           )}
         </>
