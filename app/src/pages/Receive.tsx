@@ -25,7 +25,7 @@ function cleanQty(raw: string, unit: string): string | null {
   return String(Math.round(n * 1000) / 1000);
 }
 const rf = (i: Item) => (i.pack_name === 'portion' ? 0 : packFactor(i));
-interface Vendor { id: string; name: string }
+interface Vendor { id: string; name: string; bill_monthly?: boolean }
 interface Po { id: string; po_number: string; vendor_id: string; status: string; order_date: string; required_date: string | null; home?: boolean; po_lines: { item_id: number; qty: number }[] }
 interface Pending { id: string; grn_number: string; vendor_id: string; received_at: string }
 interface Grn { po_id: string; grn_lines: { item_id: number; qty_received: number }[] }
@@ -178,7 +178,7 @@ export function Receive() {
     const [p, i, v] = await Promise.all([
       supabase.from('purchase_orders').select('id, po_number, vendor_id, status, order_date, required_date, home, po_lines(item_id, qty)').in('status', ['sent', 'partly_received']).order('order_date', { ascending: false }),
       supabase.from('items').select('id, name, unit, show_as, purchase_factor, pack_name, count_unit, pcs_per_portion, last_cost').eq('active', true).order('name'),
-      supabase.from('vendors').select('id, name').eq('active', true).order('name')
+      supabase.from('vendors').select('id, name, bill_monthly').eq('active', true).order('name')
     ]);
     const list = (p.data as Po[]) ?? [];
     setPos(list);
@@ -317,6 +317,7 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
   }, [invs]);
   const setInv = (i: number, patch: Partial<Inv>) => setInvs((p) => p.map((v, k) => (k === i ? { ...v, ...patch } : v)));
   const addInvoice = () => setInvs((p) => (p.length ? [...p, { no: '', date: billDate, amount: '', pages: '' }] : [{ no: bill, date: billDate, amount, pages: '' }, { no: '', date: billDate, amount: '', pages: '' }]));
+  const bulkVendor = !!vendors[po ? po.vendor_id : vendor]?.bill_monthly;
   const rateOf = (id: number) => { const n = parseFloat(rates[id] ?? ''); return n > 0 ? n : 0; };
   const prevOf = (id: number) => { const it = items[id]; if (!it || it.last_cost == null) return null; return Number(it.last_cost) * (rf(it) && !it.count_unit ? rf(it) : 1); };
   const qtyOf = (id: number) => { const n = Number(vals[id]); return n > 0 ? n : 0; };
@@ -342,7 +343,7 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
     if (anyCount && neckItem && Number(neck) > 0) lines.push({ item_id: neckItem.id, qty: round3(Number(neck)) });
     if (!lines.length) return setErr('Enter what arrived for at least one item.');
     if (!po && !vendor) return setErr('Choose the vendor.');
-    if (!files.length && !later) return setErr('Add a photo of the bill, or choose Bill will come later.');
+    if (!files.length && !later && !bulkVendor) return setErr('Add a photo of the bill, or choose Bill will come later.');
     setBusy(true);
     let paths: string[] = [];
     try { paths = await uploadBills(profile?.id ?? 'x', files); } catch (e) { setBusy(false); return setErr(errText(e)); }
@@ -426,7 +427,8 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
       <div className="field"><span>Bill</span>
         {!later && <BillPicker files={files} setFiles={setFiles} />}
         {(br.reading || br.note) && <p className="small muted" role="status">{br.reading ? 'Reading the bill…' : br.note}</p>}
-        {files.length === 0 && <label className="row small" style={{ gap: 8, marginTop: 6 }}><input type="checkbox" checked={later} onChange={(e) => setLater(e.target.checked)} />Bill will come later. Remind us to add it.</label>}
+        {bulkVendor && files.length === 0 && <p className="small muted">This vendor sends bills in bulk later. No bill needed now, and no reminders.</p>}
+        {!bulkVendor && files.length === 0 && <label className="row small" style={{ gap: 8, marginTop: 6 }}><input type="checkbox" checked={later} onChange={(e) => setLater(e.target.checked)} />Bill will come later. Remind us to add it.</label>}
       </div>
       {invs.length > 1 ? (
         <div className="card" style={{ padding: 0 }}>

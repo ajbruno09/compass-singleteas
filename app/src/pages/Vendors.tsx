@@ -101,6 +101,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
   const [active, setActive] = useState(vendor?.active ?? true);
   const [remarks, setRemarks] = useState(vendor?.remarks ?? '');
   const [wa, setWa] = useState(vendor?.sends_po_whatsapp ?? true);
+  const [bulkBill, setBulkBill] = useState(vendor?.bill_monthly ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [qrFile, setQrFile] = useState<File | null>(null);
@@ -116,7 +117,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
     try {
       const body: Record<string, unknown> = Object.fromEntries(Object.entries(v).map(([k, val]) => [k, val.trim() === '' ? null : val.trim()]));
       body.credit_days = v.credit_days ? Number(v.credit_days) : null;
-      body.active = active; body.remarks = remarks; body.sends_po_whatsapp = wa;
+      body.active = active; body.remarks = remarks; body.sends_po_whatsapp = wa; body.bill_monthly = bulkBill;
       const res = vendor ? await supabase.from('vendors').update(body).eq('id', vendor.id).select('id').single() : await supabase.from('vendors').insert(body).select('id').single();
       if (res.error) throw res.error;
       if (qrFile) {
@@ -136,6 +137,8 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
     <Sheet title={vendor ? vendor.name : 'Add vendor'} onClose={onClose}
       footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save vendor'}</button></>}>
       <label className="row" style={{ gap: 10, fontWeight: 600 }}><input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} />Send POs to this vendor on WhatsApp</label>
+      <label className="row" style={{ gap: 10, fontWeight: 600 }}><input type="checkbox" checked={bulkBill} onChange={(e) => setBulkBill(e.target.checked)} />Bills come later in bulk</label>
+      {bulkBill && <p className="muted small" style={{ marginTop: -4 }}>Goods can be received without a bill, and Compass never reminds anyone about this vendor's bills. Upload them whenever they arrive.</p>}
       {!wa && <p className="small muted" style={{ margin: 0 }}>This vendor is ordered another way (app, shop, in house). No WhatsApp number or payment details are needed.</p>}
       <div className="form-grid">
         {FIELDS.filter(([k]) => wa || !['whatsapp', 'bank_name', 'bank_account', 'ifsc', 'upi'].includes(k)).map(([k, label, type]) => (

@@ -130,3 +130,10 @@ begin
 end $$;
 create or replace function public.receipt_invoices_list(p_receipt uuid) returns table(bill_number text, bill_date date, amount numeric, pages text) language sql stable security definer set search_path = public as $$
   select i.bill_number, i.bill_date, i.amount, i.pages from receipt_invoices i where has_role('owner','manager','store') and i.receipt_id = p_receipt order by i.sort $$;
+
+-- v5.126: vendors whose bills come in bulk, months later (for example Wholefood India Confectionary). No bill needed, never reminded.
+alter table public.vendors add column if not exists bill_monthly boolean not null default false;
+alter table public.goods_receipts add column if not exists bill_exempt boolean not null default false;
+update public.vendors set bill_monthly = true where id = '6a81157b-1643-4169-acf0-297332fe8a32';
+update public.goods_receipts set bill_exempt = true, bill_later = false where vendor_id in (select id from public.vendors where bill_monthly);
+-- store_dash, store_today, _sc_day and receive_goods were patched to skip bill_exempt receipts (applied directly).

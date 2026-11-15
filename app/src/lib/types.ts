@@ -12,6 +12,7 @@ export interface Item {
   usable_gas_g?: number | null; receiving_tolerance_g?: number | null; opening_base?: number | null;
 }
 export interface Vendor {
+  bill_monthly?: boolean;
   id: string; name: string; code: string | null; category: string | null; contact_person: string | null; phone: string | null;
   whatsapp: string | null; email: string | null; address: string | null; gst: string | null; credit_days: number | null;
   bank_name: string | null; bank_account: string | null; ifsc: string | null; upi: string | null; active: boolean; remarks: string | null; qr_path?: string | null; sends_po_whatsapp?: boolean;
