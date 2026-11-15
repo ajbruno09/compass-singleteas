@@ -6,6 +6,7 @@ import { useHealth } from '../components/StoreCheck';
 import { MonthToDate } from '../components/MonthToDate';
 import { HomeSpend } from '../components/HomeSpend';
 import { PurchasesMtd } from '../components/PurchasesMtd';
+import { PosTotal } from '../components/PosTotal';
 import { ApiCreditWarn } from '../components/ApiCredit';
 import { routeForAlert } from '../lib/alertRoutes';
 import { loadCountDetail, countDetailHtml } from '../lib/countDetail';
@@ -154,6 +155,7 @@ export function OwnerDashboard() {
   return (
     <div className="te" onClick={onClick}>
       <section className="hero a"><div className="hl"><div className="sub">Single Teas, Bilekahalli · {when}</div><h1>{html.head}</h1></div><div className="big4" dangerouslySetInnerHTML={{ __html: html.bigA }} /></section>
+      <PosTotal />
       <MonthToDate />
       <ApiCreditWarn />
       <PurchasesMtd />

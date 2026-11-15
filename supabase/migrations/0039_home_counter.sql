@@ -160,3 +160,7 @@ update public.goods_receipts set bill_exempt = true, bill_later = false where ve
 -- v5.136 (applied directly): GRN-1034 and GRN-1016 voided as not delivered (POs ST-PO-0038 and ST-PO-0023 back to sent),
 -- vendors.bill_chase_dow / bill_chase_hour, weekly_bill_reminder() (cron hourly 18:00 to 23:00 IST, acts only on the vendor's day),
 -- purchases_mtd() ignores voided receipts. Kerala Market: Saturday after 6 PM.
+
+-- v5.137: POS "Total sales" per day. Table pos_day_summary, functions pos_save_summary and pos_summary_days (applied directly).
+-- Edge function pos-summary reads the "Report Notification: SINGLE TEAS" email body (grand total, net sales, container charge, GST, round off, payment modes).
+-- Counters and the Munna / Deboda graphs stay on net sales.
