@@ -6,6 +6,7 @@ import type { Notice } from '../lib/types';
 import { useToast } from '../components/Toast';
 import { DatePicker, TimePicker, niceDate, niceTime } from '../components/DatePicker';
 import { Icon } from '../components/Icon';
+import { fileKind, fileSize, type NoticeFile } from '../components/NoticeFiles';
 import '../nt.css';
 
 type Person = { id: string; full_name: string; role: string; profile_locations: { location_id: number }[] };
@@ -45,6 +46,17 @@ export function Notices() {
   const [pin, setPin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [picked, setPicked] = useState<File[]>([]);
+  const [kept, setKept] = useState<NoticeFile[]>([]);
+  const addFiles = (list: FileList | null) => {
+    const next = [...picked];
+    for (const f of Array.from(list ?? [])) {
+      if (kept.length + next.length >= 5) { toast('Up to 5 files per notice'); break; }
+      if (f.size > 10 * 1048576) { toast(f.name + ' is over 10 MB'); continue; }
+      next.push(f);
+    }
+    setPicked(next);
+  };
 
   const load = useCallback(async () => {
     const [n, o] = await Promise.all([
@@ -78,7 +90,7 @@ export function Notices() {
   const sunday = (7 - new Date().getDay()) % 7 || 7;
   const tog = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
 
-  function reset() { setTitle(''); setBody(''); setK('all'); setPickRoles([]); setPickCounters([]); setPickPeople([]); setQ(''); setLater(false); setDate(''); setTime(''); setPin(false); setEditing(null); }
+  function reset() { setTitle(''); setBody(''); setK('all'); setPickRoles([]); setPickCounters([]); setPickPeople([]); setQ(''); setLater(false); setDate(''); setTime(''); setPin(false); setEditing(null); setPicked([]); setKept([]); }
 
   async function send() {
     if (!title.trim()) { toast('Write a short heading first'); return; }
@@ -95,6 +107,14 @@ export function Notices() {
       expires_at: pin ? null : new Date(at.getTime() + 14 * 86400e3).toISOString()
     };
     setBusy(true);
+    const up: NoticeFile[] = [];
+    for (const f of picked) {
+      const path = `${crypto.randomUUID()}/${f.name.replace(/[^A-Za-z0-9._-]/g, '_')}`;
+      const { error: ue } = await supabase.storage.from('notice-files').upload(path, f, { contentType: f.type || undefined });
+      if (ue) { setBusy(false); toast('Could not upload ' + f.name + ': ' + errText(ue)); return; }
+      up.push({ path, name: f.name, size: f.size, type: f.type });
+    }
+    (payload as Record<string, unknown>).files = [...kept, ...up];
     const { error } = editing ? await supabase.from('notices').update(payload).eq('id', editing) : await supabase.from('notices').insert(payload);
     setBusy(false);
     if (error) { toast(errText(error)); return; }
@@ -102,7 +122,7 @@ export function Notices() {
     reset(); void load();
   }
   function change(n: Notice) {
-    setEditing(n.id); setTitle(n.title); setBody(n.body ?? ''); setPin(n.pinned);
+    setEditing(n.id); setKept(n.files ?? []); setPicked([]); setTitle(n.title); setBody(n.body ?? ''); setPin(n.pinned);
     if (n.profile_ids?.length) { setK('people'); setPickPeople(n.profile_ids); }
     else if (n.roles?.length) { setK('role'); setPickRoles(ROLES.filter((r) => r.roles.some((x) => n.roles!.includes(x))).map((r) => r.k)); }
     else if (n.location_ids?.length) { setK('counter'); setPickCounters(n.location_ids); }
@@ -144,6 +164,16 @@ export function Notices() {
           <input id="n-title" placeholder="For example: Diwali timings" value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} />
           <label className="nt-lbl" htmlFor="n-body">Message (optional)</label>
           <textarea id="n-body" value={body} maxLength={500} onChange={(e) => setBody(e.target.value)} />
+          <label className="nt-lbl">Files (optional)</label>
+          {[...kept.map((f) => ({ f, k: true as const })), ...picked.map((f) => ({ f: { name: f.name, size: f.size, type: f.type, path: '' }, k: false as const }))].map((x, i) => {
+            const fk = fileKind(x.f);
+            return <div key={x.f.name + i} className="row" style={{ gap: 10, border: '1px solid var(--line2, #D3DAD6)', borderRadius: 10, padding: 8, marginBottom: 6 }}><span style={{ width: 36, height: 36, borderRadius: 8, background: fk.c, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700 }}>{fk.t}</span><span style={{ flex: 1, minWidth: 0 }}><b>{x.f.name}</b><div className="nt-sm nt-mut">{fileSize(x.f.size)}</div></span><button type="button" className="nt-chp" aria-label="Remove file" onClick={() => (x.k ? setKept((s) => s.filter((y) => y.path !== x.f.path)) : setPicked((s) => s.filter((y) => y.name !== x.f.name)))}>Remove</button></div>;
+          })}
+          <div className="row" style={{ gap: 8, marginBottom: 4 }}>
+            <label className="nt-chp" style={{ cursor: 'pointer' }}>Add files<input type="file" multiple hidden accept="image/*,.pdf,.xls,.xlsx,.csv,.doc,.docx" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} /></label>
+            <label className="nt-chp" style={{ cursor: 'pointer' }}>Take a photo<input type="file" hidden accept="image/*" capture="environment" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} /></label>
+            <span className="nt-sm nt-mut">Up to 5 files, 10 MB each</span>
+          </div>
           <label className="nt-lbl">Who should see it</label>
           <div className="nt-seg">
             {([['all', 'Everyone'], ['role', 'By role'], ['counter', 'By counter'], ['people', 'Pick people']] as const).map(([v, l]) => <button key={v} type="button" className={k === v ? 'nt-on' : ''} onClick={() => setK(v)}>{l}</button>)}
@@ -197,7 +227,7 @@ export function Notices() {
                 return (
                   <Fragment key={n.id}>
                     <div className="nt-n" onClick={() => void toggle(n.id)}>
-                      <div className="nt-t"><b>{n.pinned && <><span className="nt-pin"><Icon name="pin" size={14} stroke={1.8} /></span> </>}{n.title}</b><span>{audience(n)} · Sent {sent(n.send_at ?? n.created_at)}{n.pinned ? ' · pinned' : ''}</span></div>
+                      <div className="nt-t"><b>{n.pinned && <><span className="nt-pin"><Icon name="pin" size={14} stroke={1.8} /></span> </>}{n.title}</b><span>{audience(n)} · Sent {sent(n.send_at ?? n.created_at)}{n.pinned ? ' · pinned' : ''}{n.files?.length ? ` · ${n.files.length} file${n.files.length === 1 ? '' : 's'}` : ''}</span></div>
                       <div><div className="nt-bar"><i style={{ width: `${o.total ? (o.seen / o.total) * 100 : 0}%` }} /></div></div>
                       <div className="nt-seen">{miss > 0 ? <span style={{ color: 'var(--bad)' }}>{o.seen} of {o.total} seen</span> : <>{o.seen} of {o.total} seen ✓</>}</div>
                     </div>

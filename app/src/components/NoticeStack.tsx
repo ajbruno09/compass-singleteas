@@ -4,6 +4,7 @@ import { useSession } from '../lib/session';
 import type { Notice } from '../lib/types';
 import { timeOf } from '../lib/ist';
 import { Icon } from './Icon';
+import { NoticeFiles } from './NoticeFiles';
 
 // The first thing a person sees: notices from the owner or manager.
 export function NoticeStack() {
@@ -34,6 +35,7 @@ export function NoticeStack() {
             <span className="small muted">{timeOf(n.send_at ?? n.created_at)}</span>
           </div>
           {n.body && <p style={{ whiteSpace: 'pre-wrap' }}>{n.body}</p>}
+          <NoticeFiles files={n.files} />
           {read.has(n.id)
             ? <span className="small muted"><Icon name="check" size={14} /> Read</span>
             : <button className="btn primary" style={{ justifySelf: 'start' }} onClick={() => void got(n.id)}>Got it</button>}

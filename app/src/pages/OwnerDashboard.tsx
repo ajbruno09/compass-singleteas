@@ -5,6 +5,7 @@ import { useSession } from '../lib/session';
 import { useHealth } from '../components/StoreCheck';
 import { MonthToDate } from '../components/MonthToDate';
 import { HomeSpend } from '../components/HomeSpend';
+import { PurchasesMtd } from '../components/PurchasesMtd';
 import { ApiCreditWarn } from '../components/ApiCredit';
 import { routeForAlert } from '../lib/alertRoutes';
 import { loadCountDetail, countDetailHtml } from '../lib/countDetail';
@@ -155,6 +156,7 @@ export function OwnerDashboard() {
       <section className="hero a"><div className="hl"><div className="sub">Single Teas, Bilekahalli · {when}</div><h1>{html.head}</h1></div><div className="big4" dangerouslySetInnerHTML={{ __html: html.bigA }} /></section>
       <MonthToDate />
       <ApiCreditWarn />
+      <PurchasesMtd />
       <HomeSpend />
       <div className="sec kpisec"><h2>Key numbers</h2><div className="grid kpis" dangerouslySetInnerHTML={{ __html: html.kpis }} /></div>
       <div className="sec grid dd2">

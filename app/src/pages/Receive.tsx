@@ -27,7 +27,7 @@ function cleanQty(raw: string, unit: string): string | null {
 const rf = (i: Item) => (i.pack_name === 'portion' ? 0 : packFactor(i));
 interface Vendor { id: string; name: string; bill_monthly?: boolean }
 interface Po { id: string; po_number: string; vendor_id: string; status: string; order_date: string; required_date: string | null; home?: boolean; po_lines: { item_id: number; qty: number }[] }
-interface Pending { id: string; grn_number: string; vendor_id: string; received_at: string }
+export interface Pending { id: string; grn_number: string; vendor_id: string; received_at: string }
 interface Grn { po_id: string; grn_lines: { item_id: number; qty_received: number }[] }
 
 // Price before and now, per the unit the item is bought in. Red up arrow when it went up, green down arrow when it came down.
@@ -128,7 +128,7 @@ function BillPicker({ files, setFiles }: { files: File[]; setFiles: (f: File[]) 
   );
 }
 
-function AddBillSheet({ grn, vendorName, onClose, onDone }: { grn: Pending; vendorName: string; onClose: () => void; onDone: () => void }) {
+export function AddBillSheet({ grn, vendorName, onClose, onDone }: { grn: Pending; vendorName: string; onClose: () => void; onDone: () => void }) {
   const { profile } = useSession();
   const toast = useToast();
   const [files, setFiles] = useState<File[]>([]);

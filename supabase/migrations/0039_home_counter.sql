@@ -148,3 +148,7 @@ update public.goods_receipts set bill_exempt = true, bill_later = false where ve
 -- v5.131 (applied directly): prod_set_status lets store/manager enter qty_made when receiving and refuses a receive
 -- without it; prod_receive_reminder() (cron prod-receive-reminder, every 30 min, 08:30 to 22:00 IST) pushes and
 -- raises an alert for batches on the way over an hour, and pushes for old batches never closed.
+
+-- v5.132 (applied directly): notices.files (jsonb), private storage bucket notice-files with policies
+-- (signed-in users read, owner writes/deletes), purchases_mtd() for the owner dashboard card,
+-- Kerala Market set to bills-come-later (weekly Saturday bill).

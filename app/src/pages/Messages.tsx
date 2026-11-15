@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Notice } from '../lib/types';
 import { timeOf } from '../lib/ist';
+import { NoticeFiles } from '../components/NoticeFiles';
 
 export function MessagesPage() {
   const nav = useNavigate();
@@ -15,6 +16,7 @@ export function MessagesPage() {
         <section key={n.id} className="card" style={{ display: 'grid', gap: 4 }}>
           <div className="row" style={{ justifyContent: 'space-between' }}><b>{n.pinned ? '📌 ' : ''}{n.title}</b><span className="small muted">{timeOf(n.created_at)}</span></div>
           {n.body && <p style={{ whiteSpace: 'pre-wrap' }}>{n.body}</p>}
+          <NoticeFiles files={n.files} />
         </section>))}
     </div>
   );

@@ -137,7 +137,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
     <Sheet title={vendor ? vendor.name : 'Add vendor'} onClose={onClose}
       footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save vendor'}</button></>}>
       <label className="row" style={{ gap: 10, fontWeight: 600 }}><input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} />Send POs to this vendor on WhatsApp</label>
-      <label className="row" style={{ gap: 10, fontWeight: 600 }}><input type="checkbox" checked={bulkBill} onChange={(e) => setBulkBill(e.target.checked)} />Bills come later in bulk</label>
+      <label className="row" style={{ gap: 10, fontWeight: 600 }}><input type="checkbox" checked={bulkBill} onChange={(e) => setBulkBill(e.target.checked)} />Bills come later (weekly or in bulk)</label>
       {bulkBill && <p className="muted small" style={{ marginTop: -4 }}>Goods can be received without a bill, and Compass never reminds anyone about this vendor's bills. Upload them whenever they arrive.</p>}
       {!wa && <p className="small muted" style={{ margin: 0 }}>This vendor is ordered another way (app, shop, in house). No WhatsApp number or payment details are needed.</p>}
       <div className="form-grid">
