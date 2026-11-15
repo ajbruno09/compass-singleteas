@@ -13,6 +13,8 @@ export interface Item {
 }
 export interface Vendor {
   bill_monthly?: boolean;
+  bill_chase_dow?: number | null;
+  bill_chase_hour?: number;
   id: string; name: string; code: string | null; category: string | null; contact_person: string | null; phone: string | null;
   whatsapp: string | null; email: string | null; address: string | null; gst: string | null; credit_days: number | null;
   bank_name: string | null; bank_account: string | null; ifsc: string | null; upi: string | null; active: boolean; remarks: string | null; qr_path?: string | null; sends_po_whatsapp?: boolean;

@@ -25,7 +25,7 @@ function cleanQty(raw: string, unit: string): string | null {
   return String(Math.round(n * 1000) / 1000);
 }
 const rf = (i: Item) => (i.pack_name === 'portion' ? 0 : packFactor(i));
-interface Vendor { id: string; name: string; bill_monthly?: boolean }
+interface Vendor { id: string; name: string; bill_monthly?: boolean; bill_chase_dow?: number | null }
 interface Po { id: string; po_number: string; vendor_id: string; status: string; order_date: string; required_date: string | null; home?: boolean; po_lines: { item_id: number; qty: number }[] }
 export interface Pending { id: string; grn_number: string; vendor_id: string; received_at: string }
 interface Grn { po_id: string; grn_lines: { item_id: number; qty_received: number }[] }
@@ -178,15 +178,16 @@ export function Receive() {
     const [p, i, v] = await Promise.all([
       supabase.from('purchase_orders').select('id, po_number, vendor_id, status, order_date, required_date, home, po_lines(item_id, qty)').in('status', ['sent', 'partly_received']).order('order_date', { ascending: false }),
       supabase.from('items').select('id, name, unit, show_as, purchase_factor, pack_name, count_unit, pcs_per_portion, last_cost').eq('active', true).order('name'),
-      supabase.from('vendors').select('id, name, bill_monthly').eq('active', true).order('name')
+      supabase.from('vendors').select('id, name, bill_monthly, bill_chase_dow').eq('active', true).order('name')
     ]);
     const list = (p.data as Po[]) ?? [];
     setPos(list);
     const [po2, pc2] = await Promise.all([supabase.rpc('pieces_on_hand', { p_loc: 1 }), supabase.from('item_price_book').select('item_id, unit_cost').not('unit_cost', 'is', null)]);
     setPcsOn(Object.fromEntries(((po2.data as { item_id: number; pieces: number }[]) ?? []).map((r) => [r.item_id, Math.max(0, Number(r.pieces))])));
     setCostKg(Object.fromEntries(((pc2.data as { item_id: number; unit_cost: number }[]) ?? []).map((r) => [r.item_id, Number(r.unit_cost)])));
-    const pb = await supabase.from('goods_receipts').select('id, grn_number, vendor_id, received_at').eq('bill_later', true).order('received_at', { ascending: false });
-    setPending((pb.data as Pending[]) ?? []);
+    const pb = await supabase.from('goods_receipts').select('id, grn_number, vendor_id, received_at, bill_later').or('bill_later.eq.true,and(bill_exempt.eq.true,bill_amount.is.null)').not('note', 'ilike', '%not delivered%').not('note', 'ilike', '%bill chase cleared%').order('received_at', { ascending: false });
+    const weekly = new Set(((v.data as Vendor[]) ?? []).filter((x) => x.bill_chase_dow != null).map((x) => x.id));
+    setPending((((pb.data as (Pending & { bill_later: boolean })[]) ?? []).filter((g) => g.bill_later || weekly.has(g.vendor_id))) as Pending[]);
     setItems(Object.fromEntries(((i.data as Item[]) ?? []).map((x) => [x.id, x])));
     setVendors(Object.fromEntries(((v.data as Vendor[]) ?? []).map((x) => [x.id, x])));
     if (list.length) {

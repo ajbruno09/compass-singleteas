@@ -102,6 +102,8 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
   const [remarks, setRemarks] = useState(vendor?.remarks ?? '');
   const [wa, setWa] = useState(vendor?.sends_po_whatsapp ?? true);
   const [bulkBill, setBulkBill] = useState(vendor?.bill_monthly ?? false);
+  const [chaseDow, setChaseDow] = useState(vendor?.bill_chase_dow != null ? String(vendor.bill_chase_dow) : '');
+  const [chaseHour, setChaseHour] = useState(String(vendor?.bill_chase_hour ?? 18));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [qrFile, setQrFile] = useState<File | null>(null);
@@ -117,7 +119,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
     try {
       const body: Record<string, unknown> = Object.fromEntries(Object.entries(v).map(([k, val]) => [k, val.trim() === '' ? null : val.trim()]));
       body.credit_days = v.credit_days ? Number(v.credit_days) : null;
-      body.active = active; body.remarks = remarks; body.sends_po_whatsapp = wa; body.bill_monthly = bulkBill;
+      body.active = active; body.remarks = remarks; body.sends_po_whatsapp = wa; body.bill_monthly = bulkBill; body.bill_chase_dow = bulkBill && chaseDow ? Number(chaseDow) : null; body.bill_chase_hour = Number(chaseHour);
       const res = vendor ? await supabase.from('vendors').update(body).eq('id', vendor.id).select('id').single() : await supabase.from('vendors').insert(body).select('id').single();
       if (res.error) throw res.error;
       if (qrFile) {
@@ -139,6 +141,12 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor: Vendor | null; onClo
       <label className="row" style={{ gap: 10, fontWeight: 600 }}><input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} />Send POs to this vendor on WhatsApp</label>
       <label className="row" style={{ gap: 10, fontWeight: 600 }}><input type="checkbox" checked={bulkBill} onChange={(e) => setBulkBill(e.target.checked)} />Bills come later (weekly or in bulk)</label>
       {bulkBill && <p className="muted small" style={{ marginTop: -4 }}>Goods can be received without a bill, and Compass never reminds anyone about this vendor's bills. Upload them whenever they arrive.</p>}
+      {bulkBill && (
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <span className="small">Ask for the bill every</span>
+          <select value={chaseDow} onChange={(e) => setChaseDow(e.target.value)} aria-label="Weekday"><option value="">Never</option>{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d, k) => <option key={d} value={k + 1}>{d}</option>)}</select>
+          {chaseDow && <><span className="small">after</span><select value={chaseHour} onChange={(e) => setChaseHour(e.target.value)} aria-label="Hour">{[12, 14, 16, 17, 18, 19, 20, 21].map((h) => <option key={h} value={h}>{h > 12 ? h - 12 : h} {h >= 12 ? 'PM' : 'AM'}</option>)}</select></>}
+        </div>)}
       {!wa && <p className="small muted" style={{ margin: 0 }}>This vendor is ordered another way (app, shop, in house). No WhatsApp number or payment details are needed.</p>}
       <div className="form-grid">
         {FIELDS.filter(([k]) => wa || !['whatsapp', 'bank_name', 'bank_account', 'ifsc', 'upi'].includes(k)).map(([k, label, type]) => (

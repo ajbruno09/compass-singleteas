@@ -156,3 +156,7 @@ update public.goods_receipts set bill_exempt = true, bill_later = false where ve
 -- v5.135 (applied directly): sales_item_owner (items of a counter that count for one person, patterns matched on the
 -- till item name), _my_amount(profile, counter, day), my_sales_daily() now returns parts per counter, my_sales() uses
 -- the same split. Deboda owns veg cutlet, chicken cutlet and bread pockets at Snacks Frozen; others get the rest.
+
+-- v5.136 (applied directly): GRN-1034 and GRN-1016 voided as not delivered (POs ST-PO-0038 and ST-PO-0023 back to sent),
+-- vendors.bill_chase_dow / bill_chase_hour, weekly_bill_reminder() (cron hourly 18:00 to 23:00 IST, acts only on the vendor's day),
+-- purchases_mtd() ignores voided receipts. Kerala Market: Saturday after 6 PM.
