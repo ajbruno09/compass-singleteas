@@ -152,3 +152,7 @@ update public.goods_receipts set bill_exempt = true, bill_later = false where ve
 -- v5.132 (applied directly): notices.files (jsonb), private storage bucket notice-files with policies
 -- (signed-in users read, owner writes/deletes), purchases_mtd() for the owner dashboard card,
 -- Kerala Market set to bills-come-later (weekly Saturday bill).
+
+-- v5.135 (applied directly): sales_item_owner (items of a counter that count for one person, patterns matched on the
+-- till item name), _my_amount(profile, counter, day), my_sales_daily() now returns parts per counter, my_sales() uses
+-- the same split. Deboda owns veg cutlet, chicken cutlet and bread pockets at Snacks Frozen; others get the rest.
