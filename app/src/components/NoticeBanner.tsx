@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import type { Notice } from '../lib/types';
 import { Icon } from './Icon';
+import { NoticeFiles } from './NoticeFiles';
 import '../nt.css';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -33,7 +34,7 @@ export function NoticeBanner() {
       {shown.map((n) => (
         <div key={n.id} className="nt-banner">
           <span className="nt-ico"><Icon name="bell" size={18} stroke={1.8} /></span>
-          <div className="nt-sp"><b>{n.title}{n.body ? '.' : ''}</b>{n.body ? ' ' + n.body.replace(/\s*\n+\s*/g, ' ') : ''}</div>
+          <div className="nt-sp"><b>{n.title}{n.body ? '.' : ''}</b>{n.body ? ' ' + n.body.replace(/\s*\n+\s*/g, ' ') : ''}<NoticeFiles files={n.files} /></div>
           <span className="nt-sm" style={{ opacity: 0.8, whiteSpace: 'nowrap' }}>{sentOf(n.send_at ?? n.created_at)}</span>
           <button type="button" onClick={() => void got(n.id)}>Got it</button>
         </div>

@@ -19,6 +19,7 @@ import { NoticeBanner } from './NoticeBanner';
 interface NavItem { to: string; label: string; icon: string; roles: Role[]; group?: string }
 export const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: 'home', roles: ['owner', 'manager', 'store', 'accounts'], group: 'Today' },
+  { to: '/messages', label: 'Messages', icon: 'chat', roles: ['owner', 'manager', 'store', 'accounts'], group: 'Today' },
   { to: '/indents', label: 'Indents', icon: 'clip', roles: ['owner', 'manager', 'store'], group: 'Today' },
   { to: '/buying', label: 'Buying', icon: 'cart', roles: ['owner', 'store'], group: 'Buying and money' },
   // Hidden for now (Apify usage used up). To bring it back, put roles back to ['owner', 'store'].
