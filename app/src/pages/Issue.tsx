@@ -14,7 +14,10 @@ interface IssueRow { id: string; issue_number: string; to_location_id: number; s
 export function Issue() {
   const { locations } = useSession();
   const toast = useToast();
-  const counters = locations.filter((l) => l.kind === 'department' && l.active);
+  const counters = locations.filter((l) => l.kind === 'department' && l.active && !l.personal);
+  const homeLoc = locations.find((l) => l.personal && l.active);
+  const [mode, setMode] = useState<'counters' | 'home'>('counters');
+  const [bought, setBought] = useState<number[]>([]);
   const [loc, setLoc] = useState<number | null>(null);
   const [day, setDay] = useState('');
   const [items, setItems] = useState<Record<number, Item>>({});
@@ -48,6 +51,13 @@ export function Issue() {
     supabase.from('items').select('id, name, unit, show_as, purchase_factor').eq('active', true).order('name').then(({ data }) => setItems(Object.fromEntries(((data as Item[]) ?? []).map((i) => [i.id, i]))));
   }, []);
   useEffect(() => { if (loc == null && counters.length) setLoc(counters[0].id); }, [counters, loc]);
+  const isHome = mode === 'home' && !!homeLoc && loc === homeLoc.id;
+  function pick(m: 'counters' | 'home') { setMode(m); setForDate(day); setBought([]); setLoc(m === 'home' ? homeLoc?.id ?? null : counters[0]?.id ?? null); }
+  async function buyForHome(id: number, q: number) {
+    const { error } = await supabase.rpc('home_buy_add', { p_item: id, p_qty: round3(q) });
+    if (error) return toast(errText(error));
+    setBought((b) => [...b, id]); toast('Added to Home purchases in Buying');
+  }
 
   const loadToday = useCallback(async () => {
     if (!day) return;
@@ -72,7 +82,9 @@ export function Issue() {
       for (const r of (ind.data as { indent_lines: { item_id: number; qty: number }[] }[]) ?? []) for (const l of r.indent_lines) a[l.item_id] = (a[l.item_id] ?? 0) + Number(l.qty);
       setAsked(a);
       setStore(Object.fromEntries(((oh.data as { item_id: number; qty: number }[]) ?? []).map((r) => [r.item_id, Number(r.qty)])));
-      setVals(Object.fromEntries(Object.entries(a).map(([id, q]) => [id, String(items[Number(id)] && packFactor(items[Number(id)]) ? Math.max(1, Math.round(q / packFactor(items[Number(id)]))) : q)])));
+      const sOnHand = Object.fromEntries(((oh.data as { item_id: number; qty: number }[]) ?? []).map((r) => [r.item_id, Number(r.qty)]));
+      const homeNow = !!homeLoc && loc === homeLoc.id;
+      setVals(Object.fromEntries(Object.entries(a).map(([id, q]) => { const f = items[Number(id)] ? packFactor(items[Number(id)]) : 0; const give = homeNow ? Math.min(q, Math.max(0, sOnHand[Number(id)] ?? 0)) : q; return [id, give <= 0 ? '' : String(f ? Math.max(1, Math.round(give / f)) : give)]; })));
     })();
   }, [loc, day, forDate, items]);
 
@@ -91,7 +103,7 @@ export function Issue() {
     const { error } = await supabase.rpc('create_issue', { p_to: loc, p_lines: lines, p_for_date: forDate || null, p_reason: isLate ? reason : null });
     setBusy(false);
     if (error) return setErr(errText(error));
-    toast(`Issued to ${locName(loc!)}. The counter will confirm.`); setVals({}); setAsked({}); setExtra([]); setWhy(''); setWhyNote(''); setForDate(day); void loadToday(); void loadOld();
+    toast(isHome ? 'Issued to Home.' : `Issued to ${locName(loc!)}. The counter will confirm.`); setVals({}); setAsked({}); setExtra([]); setWhy(''); setWhyNote(''); setForDate(day); void loadToday(); void loadOld();
   }
 
   return (
@@ -124,7 +136,9 @@ export function Issue() {
           <div className="row" style={{ gap: 8 }}>{old.map((o) => <button key={o.indent_id} className={'btn secondary' + (loc === o.location_id && forDate === o.for_date ? ' pick on' : '')} onClick={() => { setLoc(o.location_id); setForDate(o.for_date); }}>{o.location_name} · {new Date(o.for_date + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · {o.items} items</button>)}</div>
         </div>
       )}
-      <div className="seg" role="group" aria-label="Counter">{counters.map((c) => <button key={c.id} aria-pressed={loc === c.id} onClick={() => { setLoc(c.id); setForDate(day); }}>{c.name}</button>)}</div>
+      {homeLoc && <div className="seg" role="group" aria-label="Who to issue to" style={{ marginBottom: 8 }}><button aria-pressed={mode === 'counters'} onClick={() => pick('counters')}>Counters</button><button aria-pressed={mode === 'home'} onClick={() => pick('home')}>Home</button></div>}
+      {isHome ? <div className="banner" style={{ borderLeft: '4px solid #7A5AB8', marginBottom: 8 }}><b>Home</b> <span className="chip" style={{ background: '#F1ECFA', color: '#5B3FA0' }}>Personal, not in food costing</span><div className="small muted">Issued from store stock. Anything the store does not have can be bought for Home. It never goes into the daily buying.</div></div>
+        : <div className="seg" role="group" aria-label="Counter">{counters.map((c) => <button key={c.id} aria-pressed={loc === c.id} onClick={() => { setLoc(c.id); setForDate(day); }}>{c.name}</button>)}</div>}
       <div className="tablewrap"><table>
         <thead><tr><th>Item</th><th className="r">Asked</th><th className="r">In store</th><th className="r" style={{ width: 130 }}>Issue now</th></tr></thead>
         <tbody>{ids.map((id) => { const it = items[id]; const f = packFactor(it); const have = store[id] ?? 0; const want = Number(vals[id] ?? 0) * (f || 1); const short = want > have; const show = (n: number) => (f ? `${Math.round((n / f) * 10) / 10} ${it.show_as}` : fmtQty(n, it.unit));
@@ -134,7 +148,9 @@ export function Issue() {
           return <tr key={id}><td><b>{it.name}</b> <span className="muted small">{f ? it.show_as : it.unit}</span></td>
             <td className="r num">{asked[id] != null ? show(asked[id]) : <span className="muted small">extra</span>}</td>
             <td className="r num" style={{ color: short ? 'var(--bad, #B42335)' : undefined, fontWeight: short ? 700 : 400 }}>{show(have)}</td>
-            <td className="r"><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110 }} aria-label={`Issue ${it.name}`} value={vals[id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} /></td></tr>; })}</tbody>
+            <td className="r">{isHome && have <= 0 ? (bought.includes(id) ? <span className="chip due">Buying</span> : <span className="row" style={{ gap: 6, justifyContent: 'flex-end' }}><span className="chip flag">Not in stock</span><button className="btn" onClick={() => void buyForHome(id, asked[id] ?? want)}>Buy for Home</button></span>)
+              : <span className="row" style={{ gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap' }}><input inputMode="decimal" className="num" style={{ textAlign: 'right', width: 110 }} aria-label={`Issue ${it.name}`} value={vals[id] ?? ''} onChange={(e) => setVals((p) => ({ ...p, [id]: e.target.value }))} />
+                {isHome && want > have + 1e-9 && !bought.includes(id) && <button className="btn" onClick={() => void buyForHome(id, want - have)}>Buy the other {show(want - have)}</button>}</span>}</td></tr>; })}</tbody>
       </table>{ids.length === 0 && <p className="empty">{loc ? `${locName(loc)} has not sent an indent for today. You can still add items below.` : ''}</p>}</div>
       {isLate && (
         <div className="card" style={{ display: 'grid', gap: 8, borderColor: 'var(--bad, #B42335)' }}>

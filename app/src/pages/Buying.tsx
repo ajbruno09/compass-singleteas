@@ -16,8 +16,9 @@ interface IndentRow { id: string; location_id: number; status: string; indent_li
 interface PoLine { item_id: number; qty: number; unit_rate: number | null }
 interface PoRow {
   id: string; po_number: string; vendor_id: string; status: string; notes: string; sent_at: string | null; order_date: string;
-  required_date: string | null; required_time: string | null; delivery: boolean; channel: string; for_date: string | null; po_lines: PoLine[]; party?: boolean;
+  required_date: string | null; required_time: string | null; delivery: boolean; channel: string; for_date: string | null; po_lines: PoLine[]; party?: boolean; home?: boolean;
 }
+interface HomeBuy { id: string; item_id: number; qty: number; ordered_qty: number }
 interface PS { item_id: number; vendor_id: string | null; approved_asked: number; buy_qty: number; ordered_qty: number }
 type Kind = 'wa' | 'phone' | 'app' | 'bought' | 'store';
 const kindOf = (v: VendorRow): Kind => (v.is_store ? 'store' : v.order_channel === 'whatsapp_group' ? 'wa' : v.order_channel === 'phone' ? 'phone' : v.order_channel === 'app' ? 'app' : 'bought');
@@ -78,9 +79,12 @@ export function Buying() {
   const [vitems, setVitems] = useState<VItem[]>([]);
   const [onHand, setOnHand] = useState<Record<number, number>>({});
   const [pos, setPos] = useState<PoRow[]>([]);
+  const [homePos, setHomePos] = useState<PoRow[]>([]);
+  const [homeBuys, setHomeBuys] = useState<HomeBuy[]>([]);
+  const [hvend, setHvend] = useState<Record<number, string>>({});
   const [edit, setEdit] = useState<Record<number, number>>({});
   const [openV, setOpenV] = useState<string | null>(null);
-  const [dlg, setDlg] = useState<{ vendorId: string; poId?: string; party?: boolean } | null>(null);
+  const [dlg, setDlg] = useState<{ vendorId: string; poId?: string; party?: boolean; home?: boolean } | null>(null);
   const [partyLoc, setPartyLoc] = useState<number | null>(null);
   const [partyLabel, setPartyLabel] = useState('');
   const [ps, setPs] = useState<PS[]>([]);
@@ -134,7 +138,7 @@ export function Buying() {
     const [ind, oh, po] = await Promise.all([
       supabase.from('indents').select('id, location_id, status, indent_lines(item_id, qty)').eq('for_date', date),
       supabase.from('stock_on_hand').select('item_id, qty').eq('location_id', STORE_ID),
-      supabase.from('purchase_orders').select('id, po_number, vendor_id, status, notes, sent_at, order_date, required_date, required_time, delivery, channel, for_date, party, po_lines(item_id, qty, unit_rate)').eq('for_date', date).neq('status', 'cancelled').order('created_at')
+      supabase.from('purchase_orders').select('id, po_number, vendor_id, status, notes, sent_at, order_date, required_date, required_time, delivery, channel, for_date, party, home, po_lines(item_id, qty, unit_rate)').eq('for_date', date).neq('status', 'cancelled').order('created_at')
     ]);
     const dl = await supabase.rpc('buy_drop_list', { p_date: date });
     const dj = (dl.data as { drops?: Drop[]; keeps?: number[] } | null) ?? {};
@@ -148,14 +152,18 @@ export function Buying() {
     setLimit(Number(lm.data ?? 0)); setPlaced(Number(pt.data ?? 0)); setAppr((ap.data as Approval | null) ?? null);
     const [pl, pst, psr] = await Promise.all([supabase.rpc('party_loc'), supabase.rpc('party_status'), supabase.from('party_sourcing').select('item_id, vendor_id, approved_asked, buy_qty, ordered_qty').eq('for_date', date)]);
     setPartyLoc(pl.data == null ? null : Number(pl.data)); setPartyLabel(String((pst.data as { label?: string } | null)?.label ?? '')); setPs((psr.data as PS[]) ?? []);
-    setIndents((ind.data as IndentRow[]) ?? []);
+    const personal = new Set(locations.filter((l) => l.personal).map((l) => l.id));
+    setIndents(((ind.data as IndentRow[]) ?? []).filter((r) => !personal.has(r.location_id)));
     setOnHand(Object.fromEntries(((oh.data as { item_id: number; qty: number }[]) ?? []).map((r) => [r.item_id, Number(r.qty)])));
-    setPos((po.data as PoRow[]) ?? []);
+    const allPo = (po.data as PoRow[]) ?? [];
+    setPos(allPo.filter((p) => !p.home)); setHomePos(allPo.filter((p) => p.home));
+    const hb = await supabase.rpc('home_buys_open');
+    setHomeBuys(((hb.data as HomeBuy[]) ?? []).map((h) => ({ ...h, qty: Number(h.qty), ordered_qty: Number(h.ordered_qty) })).filter((h) => h.qty - h.ordered_qty > 1e-9));
     const [pq, pb] = await Promise.all([supabase.rpc('prod_orders_open'), supabase.rpc('prod_buy_lines', { p_date: date })]);
     setProdOrders(((pq.data as ProdOrder[]) ?? []).map((o) => ({ ...o, qty: Number(o.qty), lines: o.lines.map((l) => ({ ...l, need: Number(l.need), issued: Number(l.issued), have: Number(l.have) })) })));
     setProdBuy(((pb.data as ProdBuy[]) ?? []).map((b) => ({ ...b, qty: Number(b.qty) })));
     setLoading(false);
-  }, [date]);
+  }, [date, locations]);
   useEffect(() => {
     void load();
     const ch = supabase.channel('buying').on('postgres_changes', { event: '*', schema: 'public', table: 'indents' }, () => { void load(); }).subscribe();
@@ -262,6 +270,21 @@ export function Buying() {
     setPdraft({}); toast('Sent to buying. Place the party orders below.'); await load();
   }
   function setAllEmpty(v: string) { if (!v) return; setPdraft((d) => { const n = { ...d }; for (const r of partyNew) if (!pVendor(r)) n[r.item.id] = { ...n[r.item.id], vendor: v }; return n; }); }
+
+  const homeToPlace = useMemo(() => {
+    const m = new Map<string, Row[]>();
+    for (const h of homeBuys) {
+      const item = itemMap.get(h.item_id); if (!item) continue;
+      const v = hvend[h.item_id] ?? item.default_vendor_id; if (!v || vendorMap.get(v)?.is_store) continue;
+      const rem = h.qty - h.ordered_qty;
+      const rate = rateMap.get(`${v}:${h.item_id}`) ?? (item.last_cost != null ? Number(item.last_cost) : null);
+      const step = item.purchase_factor ? Number(item.purchase_factor) : stepOf(item.unit);
+      m.set(v, [...(m.get(v) ?? []), { carried: 0, carriedAge: 0, carriedWhy: '', item, asked: rem, by: [{ loc: 'Home', qty: rem }], inStore: 0, ordered: 0, sug: rem, qty: rem, rate, step }]);
+    }
+    return m;
+  }, [homeBuys, hvend, itemMap, vendorMap, rateMap]);
+  const homeLoose = homeBuys.filter((h) => { const item = itemMap.get(h.item_id); const v = hvend[h.item_id] ?? item?.default_vendor_id; return !v || vendorMap.get(v)?.is_store; });
+  async function homeRemove(id: string) { const { error } = await supabase.rpc('home_buy_remove', { p_id: id }); if (error) return toast(errText(error)); await load(); }
 
   const estimate = (list: Row[]) => list.reduce((t, r) => t + (r.rate != null ? r.qty * r.rate : 0), 0);
   const shortRows = rows.filter((r) => !vendorMap.get(vOf(r) ?? '')?.is_store && r.qty < r.sug - 1e-9);
@@ -406,7 +429,7 @@ export function Buying() {
   const shops = vendors.filter((v) => (v.order_channel === 'walk_in' || v.order_channel === 'app') && !BASE_NAMES.includes(v.name));
 
   const dv = dlg ? vendorMap.get(dlg.vendorId) : undefined;
-  const dpo = dlg?.poId ? pos.find((p) => p.id === dlg.poId) : undefined;
+  const dpo = dlg?.poId ? [...pos, ...homePos].find((p) => p.id === dlg.poId) : undefined;
 
   return (
     <>
@@ -586,6 +609,43 @@ export function Buying() {
                   {partyPos.map((po) => <button key={po.id} className="chip done pickchip" onClick={() => setDlg({ vendorId: po.vendor_id, poId: po.id, party: true })}>{vendorMap.get(po.vendor_id)?.name} · {po.po_number}</button>)}
                 </div>
               )}
+            </div>
+          )}
+
+          {(homeBuys.length > 0 || homePos.length > 0) && (
+            <div className="card" style={{ borderLeft: '4px solid #7A5AB8' }}>
+              <div className="row" style={{ justifyContent: 'space-between' }}>
+                <div><b>Home purchases</b><div className="muted small">Things Home needs that the store does not have. Kept apart from the daily buying, the daily limit and Single Teas costing.</div></div>
+                <span className="chip" style={{ background: '#F1ECFA', color: '#5B3FA0' }}>Personal</span>
+              </div>
+              {homeLoose.length > 0 && (
+                <div className="stack" style={{ gap: 6, marginTop: 10 }}>
+                  <p className="small"><b>Choose where each one is bought.</b></p>
+                  {homeLoose.map((h) => { const it = itemMap.get(h.item_id); if (!it) return null; return (
+                    <div key={h.id} className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
+                      <span><b>{it.name}</b> <span className="num">{packText(it, h.qty - h.ordered_qty)}</span></span>
+                      <span className="row" style={{ gap: 6 }}>
+                        <select aria-label={`Vendor for ${it.name}`} value={hvend[h.item_id] ?? ''} onChange={(e) => setHvend((d) => ({ ...d, [h.item_id]: e.target.value }))}><option value="">Choose</option>{vendors.filter((x) => !x.is_store).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+                        <button className="btn quiet" onClick={() => void homeRemove(h.id)}>Remove</button></span>
+                    </div>); })}
+                </div>
+              )}
+              {homeToPlace.size > 0 && (
+                <div className="stack" style={{ gap: 6, marginTop: 10 }}>
+                  {[...homeToPlace.entries()].map(([vid, list]) => { const v = vendorMap.get(vid); if (!v) return null; return (
+                    <div key={vid} className="row" style={{ justifyContent: 'space-between', border: '1px solid var(--line)', borderRadius: 10, padding: '8px 12px' }}>
+                      <div><b>{v.name}</b> <span className="muted small">{list.length} {list.length === 1 ? 'item' : 'items'}: {list.map((r) => r.item.name).slice(0, 4).join(', ')}{list.length > 4 ? '…' : ''} · about ₹{Math.round(estimate(list)).toLocaleString('en-IN')}</span></div>
+                      <button className="btn primary" onClick={() => setDlg({ vendorId: vid, home: true, party: true })}>{kindOf(v) === 'bought' ? 'Open shopping list' : 'Review order'}</button>
+                    </div>); })}
+                </div>
+              )}
+              {homePos.length > 0 && (
+                <div className="row" style={{ marginTop: 10, gap: 8 }}>
+                  <span className="muted small">Placed:</span>
+                  {homePos.map((po) => <button key={po.id} className="chip done pickchip" onClick={() => setDlg({ vendorId: po.vendor_id, poId: po.id, home: true, party: true })}>{vendorMap.get(po.vendor_id)?.name} · {po.po_number}</button>)}
+                </div>
+              )}
+              <p className="small muted" style={{ marginTop: 10 }}>When it arrives, Receive goods sends it straight to Home. The bill counts in Home spend.</p>
             </div>
           )}
 
@@ -808,7 +868,7 @@ export function Buying() {
       {dlg && dv && (
         <OrderSheet
           key={dlg.poId ?? dlg.vendorId}
-          vendor={dv} kind={kindOf(dv)} po={dpo} rows={(dlg.party ? partyToPlace.get(dv.id) : byVendor.get(dv.id)) ?? []} party={dlg.party ? (partyLabel || 'Party') : undefined} itemMap={itemMap} forDate={date}
+          vendor={dv} kind={kindOf(dv)} po={dpo} rows={(dlg.home ? homeToPlace.get(dv.id) : dlg.party ? partyToPlace.get(dv.id) : byVendor.get(dv.id)) ?? []} party={dlg.home ? 'Home' : dlg.party ? (partyLabel || 'Party') : undefined} home={dlg.home} itemMap={itemMap} forDate={date}
           onClose={() => setDlg(null)}
           onDone={async (keep) => { setEdit({}); await load(); if (!keep) setDlg(null); }}
         />
@@ -817,8 +877,8 @@ export function Buying() {
   );
 }
 
-function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, party, onClose, onDone }: {
-  party?: string; vendor: VendorRow; kind: Kind; po?: PoRow; rows: Row[]; itemMap: Map<number, ItemRow>; forDate: string; onClose: () => void; onDone: (keepOpen: boolean) => Promise<void>;
+function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, party, home, onClose, onDone }: {
+  party?: string; home?: boolean; vendor: VendorRow; kind: Kind; po?: PoRow; rows: Row[]; itemMap: Map<number, ItemRow>; forDate: string; onClose: () => void; onDone: (keepOpen: boolean) => Promise<void>;
 }) {
   const toast = useToast();
   const today = istToday();
@@ -826,7 +886,7 @@ function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, party, onClose, 
   const [reqDate, setReqDate] = useState(forDate < today ? today : forDate);
   const [reqTime, setReqTime] = useState(lsGet(timeKey));
   const [delivery, setDelivery] = useState(true);
-  const [notes, setNotes] = useState(party ? `Party order: ${party}` : '');
+  const [notes, setNotes] = useState(home ? 'For Home' : party ? `Party order: ${party}` : '');
   const [pickTime, setPickTime] = useState(false);
   const [ticks, setTicks] = useState<Record<number, boolean>>({});
   const [busy, setBusy] = useState(false);
@@ -849,7 +909,7 @@ function OrderSheet({ vendor, kind, po, rows, itemMap, forDate, party, onClose, 
   async function place() {
     setBusy(true);
     const lines = rows.map((r) => ({ item_id: r.item.id, qty: r.qty, unit_rate: r.rate ?? '', asked: r.asked, in_store: r.inStore }));
-    const { data, error } = await supabase.rpc(party ? 'party_create_po' : 'create_po', {
+    const { data, error } = await supabase.rpc(home ? 'home_create_po' : party ? 'party_create_po' : 'create_po', {
       p_vendor_id: vendor.id, p_for_date: forDate, p_required_date: isMsg ? reqDate : forDate, p_required_time: isMsg ? reqTime : null,
       p_delivery: delivery, p_notes: notes, p_channel: vendor.order_channel, p_lines: lines
     });

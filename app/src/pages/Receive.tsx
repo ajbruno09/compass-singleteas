@@ -26,7 +26,7 @@ function cleanQty(raw: string, unit: string): string | null {
 }
 const rf = (i: Item) => (i.pack_name === 'portion' ? 0 : packFactor(i));
 interface Vendor { id: string; name: string }
-interface Po { id: string; po_number: string; vendor_id: string; status: string; order_date: string; required_date: string | null; po_lines: { item_id: number; qty: number }[] }
+interface Po { id: string; po_number: string; vendor_id: string; status: string; order_date: string; required_date: string | null; home?: boolean; po_lines: { item_id: number; qty: number }[] }
 interface Pending { id: string; grn_number: string; vendor_id: string; received_at: string }
 interface Grn { po_id: string; grn_lines: { item_id: number; qty_received: number }[] }
 
@@ -154,7 +154,7 @@ export function Receive() {
 
   const load = useCallback(async () => {
     const [p, i, v] = await Promise.all([
-      supabase.from('purchase_orders').select('id, po_number, vendor_id, status, order_date, required_date, po_lines(item_id, qty)').in('status', ['sent', 'partly_received']).order('order_date', { ascending: false }),
+      supabase.from('purchase_orders').select('id, po_number, vendor_id, status, order_date, required_date, home, po_lines(item_id, qty)').in('status', ['sent', 'partly_received']).order('order_date', { ascending: false }),
       supabase.from('items').select('id, name, unit, show_as, purchase_factor, pack_name, count_unit, pcs_per_portion, last_cost').eq('active', true).order('name'),
       supabase.from('vendors').select('id, name').eq('active', true).order('name')
     ]);
@@ -204,7 +204,7 @@ export function Receive() {
           {pos.map((po) => (
             <div key={po.id} className="card">
               <div className="row" style={{ justifyContent: 'space-between' }}>
-                <div><b>{vendors[po.vendor_id]?.name ?? 'Vendor'}</b> <span className="muted small">· {po.po_number} · ordered {fdate(po.order_date)}{po.required_date ? ` · needed ${fdate(po.required_date)}` : ''}</span>
+                <div><b>{vendors[po.vendor_id]?.name ?? 'Vendor'}</b> {po.home && <span className="chip" style={{ background: '#F1ECFA', color: '#5B3FA0', marginLeft: 6 }}>For Home</span>} <span className="muted small">· {po.po_number} · ordered {fdate(po.order_date)}{po.required_date ? ` · needed ${fdate(po.required_date)}` : ''}</span>
                   <div className="small muted">{po.po_lines.length} items{po.status === 'partly_received' ? ' · part received' : ''}</div></div>
                 <div className="row"><button className="btn primary" onClick={() => setOpen(po)}>Receive</button>
                   {po.status === 'partly_received' && <button className="btn quiet" onClick={() => closeOrder(po)}>Close order</button>}</div>
@@ -263,7 +263,7 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
     }
     setOffBill(off); setNoMatch(none);
   }, nameList);
-  const { profile } = useSession();
+  const { profile, locations } = useSession();
   const [find, setFind] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -322,7 +322,15 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
       const { error: pe } = await supabase.rpc('set_item_price', { p_item: id, p_price: r, p_label: pk > 1 ? (it.show_as ?? it.unit) : it.unit, p_qty: pk, p_vendor: po ? po.vendor_id : vendor, p_date: billDate || null, p_source: 'bill', p_ref: ref });
       if (pe) priceFail++;
     }
+    // Bought for Home: it goes straight to Home, out of store stock, so it never mixes with the cafe.
+    let homeFail = false;
+    const homeLoc = locations.find((l) => l.personal && l.active);
+    if (po?.home && homeLoc) {
+      const { error: he } = await supabase.rpc('create_issue', { p_to: homeLoc.id, p_lines: lines.map((l) => ({ item_id: l.item_id, qty: l.qty })), p_for_date: null, p_reason: null });
+      if (he) homeFail = true;
+    }
     setBusy(false);
+    if (homeFail) { toast('Goods received, but sending them to Home failed. Issue them to Home on the Issue screen.'); onDone(); return; }
     toast(priceFail ? 'Goods received. Stock updated. Some prices could not be saved.' : 'Goods received. Stock and prices updated.'); onDone();
   }
 

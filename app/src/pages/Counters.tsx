@@ -26,7 +26,7 @@ export function Counters() {
   const load = useCallback(async () => {
     const [il, pl, sg, im, cs] = await Promise.all([supabase.from('item_locations').select('item_id, location_id'), supabase.from('profile_locations').select('location_id'),
       supabase.from('item_groups').select('id, name, icon').eq('active', true).order('sort').order('id'), supabase.from('items').select('id, group_id').eq('active', true).not('group_id', 'is', null),
-      supabase.from('counter_shelves').select('location_id, group_id')]);
+      supabase.rpc('counter_shelves_list')]);
     const grp = new Map(((im.data as { id: number; group_id: number }[]) ?? []).map((x) => [x.id, x.group_id]));
     const sc: Record<number, number> = {}; grp.forEach((g) => { sc[g] = (sc[g] ?? 0) + 1; }); setShelfCount(sc);
     const hv: Record<string, number> = {}; ((il.data as { item_id: number; location_id: number }[]) ?? []).forEach((r) => { const g = grp.get(r.item_id); if (g != null) hv[`${r.location_id}:${g}`] = (hv[`${r.location_id}:${g}`] ?? 0) + 1; }); setHave(hv);
@@ -91,7 +91,7 @@ export function Counters() {
               <button className="btn quiet" disabled={busy || i === 0} aria-label="Move up" onClick={() => void move(i, -1)}>↑</button>
               <button className="btn quiet" disabled={busy || i === allLocations.length - 1} aria-label="Move down" onClick={() => void move(i, 1)}>↓</button></span></td>
             <td><input value={names[l.id] ?? ''} onChange={(e) => setNames((p) => ({ ...p, [l.id]: e.target.value }))} onBlur={() => { if ((names[l.id] ?? '').trim() && names[l.id] !== l.name) void save(l.id, names[l.id], null, null); }} aria-label={`Name of ${l.name}`} />
-              {l.kind === 'store' && <span className="muted small"> The store itself</span>}{!l.active && <span className="chip off" style={{ marginLeft: 8 }}>Hidden</span>}</td>
+              {l.kind === 'store' && <span className="muted small"> The store itself</span>}{l.personal && <span className="chip" style={{ marginLeft: 8, background: '#F1ECFA', color: '#5B3FA0' }}>Personal</span>}{!l.active && <span className="chip off" style={{ marginLeft: 8 }}>Hidden</span>}</td>
             <td><span className="row" style={{ gap: 5 }}>{(assigned[l.id] ?? []).map((g) => { const sh = shelves.find((x) => x.id === g); if (!sh) return null; const h = have[`${l.id}:${g}`] ?? 0, t = shelfCount[g] ?? 0; return <span key={g} className={`chip ${h < t ? 'due' : ''}`}>{sh.icon} {sh.name}{h < t ? ` ${h}/${t}` : ''}</span>; })}{!(assigned[l.id] ?? []).length && <span className="muted small">No shelves yet</span>}</span></td>
             <td className="r num">{items[l.id] ?? 0}</td><td className="r num">{people[l.id] ?? 0}</td>
             <td className="r"><span className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>{l.active && <button className="btn primary" disabled={busy} onClick={() => openAssign(l.id)}>Assign shelves</button>}{l.kind !== 'store' && <button className="btn" disabled={busy} onClick={() => void save(l.id, l.name, null, !l.active)}>{l.active ? 'Hide' : 'Show again'}</button>}</span></td>
