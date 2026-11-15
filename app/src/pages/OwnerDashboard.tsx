@@ -7,6 +7,7 @@ import { MonthToDate } from '../components/MonthToDate';
 import { HomeSpend } from '../components/HomeSpend';
 import { ApiCreditWarn } from '../components/ApiCredit';
 import { routeForAlert } from '../lib/alertRoutes';
+import { loadCountDetail, countDetailHtml } from '../lib/countDetail';
 import '../te.css';
 
 // Owner dashboard: Tea Estate v2, as approved in the mock. Live data where it exists, "Waiting" where it does not yet.
@@ -128,10 +129,10 @@ export function OwnerDashboard() {
     const IND_NAMES = ['Indian', 'South Indian', 'Tandoor', 'Continental', 'Gravy', 'Hot Brew', 'Cold Beverages', 'Pickup Station'];
     const dots = IND_NAMES.map((n) => { const c = counters.find((x) => x.name === n); if (!c) return ''; const r = dotRows.find((d) => d.name === n); const t = stat(c.id, today); const [k, l] = t === 'o' ? ['ok', 'On time'] : t === 'l' ? ['att', 'Late'] : t === 'm' ? ['crit', 'Missed'] : ['wait', 'No indent yet']; const pct = r?.pct ?? null; return `<div class="ir"><span class="n">${esc(n)}</span><span class="chip ${k}">${l}</span><span class="p" style="color:${pct == null ? 'var(--mut)' : pct < 70 ? 'var(--bad)' : pct < 90 ? 'var(--warn)' : 'var(--good)'}">${pct == null ? '—' : pct + '%'}</span></div>`; }).join('');
     const money = ([['Store stock', storeVal > 0 ? lakh(storeVal) : '—', storeVal > 0 ? 'Only items that have a price' : 'Needs prices and stock', storeVal > 0 ? 'part' : 'wait'], ['Counter stock', '—', 'Needs counters to count', 'wait'], ['Open purchase orders', lakh(openVal), `${openPos.length} orders. Not yet an expense`, 'live'], ['Due in 7 days', inr(due7amt), `${due7.length} bills`, 'live'], ['Wastage today', '—', 'Needs wastage entries', 'wait']] as [string, string, string, Tag][]).map((m) => `<div class="card"><div class="sm mut" style="display:flex;justify-content:space-between">${m[0]}${chip(m[3])}</div><div class="v">${m[1]}</div><div class="sm mut">${m[2]}</div></div>`).join('');
-    const AL = [
+    const AL: { id: string; cls: string; t: string; b: string; route: string | null; count?: boolean }[] = [
       ...overdueHealth.map((h) => ({ id: '', cls: 'm', t: `Store has not fixed: ${h.title.toLowerCase()}`, b: `Open ${h.age_days + 1} days.`, route: h.route as string | null })),
-      ...alerts.map((a) => ({ id: a.id, cls: ['urgent', 'critical', 'sos'].includes(a.level) ? 'c' : 'm', t: a.title, b: a.body ?? '', route: routeForAlert(a)?.to ?? null }))];
-    const al = AL.length ? AL.map((a) => `<div class="al ${a.cls === 'm' ? 'm' : ''}"><span class="sev"></span><div>${a.route ? `<b class="golink" data-go="${a.route}">${esc(a.t)}</b>` : `<b>${esc(a.t)}</b>`}<div class="sm mut">${esc(a.b)}</div></div><div class="go">${a.route ? `<button class="btn" data-go="${a.route}">Fix it</button>` : ''}${a.id ? `<button class="btn p" data-done="${a.id}">Mark done</button>` : ''}</div></div>`).join('') : '<div class="sm mut">Nothing is waiting for you.</div>';
+      ...alerts.map((a) => ({ id: a.id, cls: ['urgent', 'critical', 'sos'].includes(a.level) ? 'c' : 'm', t: a.title, b: a.body ?? '', route: routeForAlert(a)?.to ?? null, count: a.source === 'count' }))];
+    const al = AL.length ? AL.map((a) => `<div class="al ${a.cls === 'm' ? 'm' : ''}"><span class="sev"></span><div>${a.route ? `<b class="golink" data-go="${a.route}">${esc(a.t)}</b>` : `<b>${esc(a.t)}</b>`}<div class="sm mut">${esc(a.b)}</div></div><div class="go">${a.count && a.id ? `<button class="btn" data-count="${a.id}">Fix it</button>` : a.route ? `<button class="btn" data-go="${a.route}">Fix it</button>` : ''}${a.id ? `<button class="btn p" data-done="${a.id}">Mark done</button>` : ''}</div></div>`).join('') : '<div class="sm mut">Nothing is waiting for you.</div>';
     const head = need ? `${hasSales && delta != null ? (delta >= 0 ? 'Sales are up' : 'Sales are down') + ', and ' : ''}${need} ${need === 1 ? 'thing needs' : 'things need'} you now.` : 'Nothing needs you right now.';
     return { csNote, latestLabel, kpis, bigA, depts, trend, tleg, cs, dots, money, al, head, dim: tot === 0, hasTot: tot > 0 };
   }, [sales, inds, bills, alerts, stock, cost, pos, issues, counters, days, health]);
@@ -141,6 +142,8 @@ export function OwnerDashboard() {
     const t = e.target as HTMLElement;
     const dep = t.closest('[data-dept]') as HTMLElement | null;
     if (dep) { const d = ((window as unknown as { __depts: Dept[] }).__depts)[Number(dep.dataset.dept)]; setSheet({ title: `${d.name}, how the score is made`, html: d.rows.length ? `<table><tr><th>Measure</th><th class="r">Target</th><th class="r">Result</th></tr>${d.rows.map((r) => `<tr><td>${r[0]}</td><td class="r">${r[1]}</td><td class="r">${r[2]}</td></tr>`).join('')}</table><p class="sm mut" style="margin-top:10px">Only delays this department caused count against it. More measures and reasons follow as the data comes in.</p>` : `<p class="sm mut">${d.sub}. This score starts once that data is coming in.</p>` }); return; }
+    const cnt = t.closest('[data-count]') as HTMLElement | null;
+    if (cnt) { void loadCountDetail(cnt.dataset.count!).then((d) => { if (!d) { nav('/counts'); return; } setSheet({ title: 'Counted higher than the books', html: countDetailHtml(d) }); }); return; }
     const go = t.closest('[data-go]') as HTMLElement | null;
     if (go) { nav(go.dataset.go!); return; }
     const done = t.closest('[data-done]') as HTMLElement | null;

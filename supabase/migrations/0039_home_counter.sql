@@ -140,3 +140,7 @@ update public.goods_receipts set bill_exempt = true, bill_later = false where ve
 
 -- v5.128: Claude credit balance estimate (owner only). Applied directly: api_credit, api_credit_settings,
 -- api_credit_status(), api_credit_topup(added, balance), api_credit_set_alert(inr).
+
+-- v5.129 (applied directly): api_credit.expires_on, api_credit_topup(added, balance, expires), api_credit_set_expiry(date),
+-- api_credit_status() now returns expires_on and expiry_days, count_alert_detail(alert_id) lists the lines behind a
+-- "count is higher than the books" alert with a likely reason for each.

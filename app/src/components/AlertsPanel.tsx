@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import type { AlertRow } from '../lib/types';
 import { timeOf } from '../lib/ist';
 import { routeForAlert } from '../lib/alertRoutes';
+import { loadCountDetail, countDetailHtml } from '../lib/countDetail';
+import { Sheet } from './Sheet';
 
 const ORDER = { urgent: 0, today: 1, fyi: 2 } as const;
 const LABEL = { urgent: 'Urgent', today: 'Needs action today', fyi: 'For your information' } as const;
@@ -14,6 +16,8 @@ const guess = routeForAlert;
 export function AlertsPanel() {
   const [rows, setRows] = useState<AlertRow[]>([]);
   const nav = useNavigate();
+  const [detail, setDetail] = useState<string | null>(null);
+  async function openCount(id: string) { const d = await loadCountDetail(id); if (!d) { nav('/counts'); return; } setDetail(countDetailHtml(d)); }
   const load = useCallback(async () => {
     const { data } = await supabase.from('alerts').select('*').is('done_at', null).order('created_at', { ascending: false }).limit(30);
     setRows(((data as AlertRow[]) ?? []).sort((a, b) => ORDER[a.level] - ORDER[b.level]));
@@ -31,11 +35,12 @@ export function AlertsPanel() {
             {a.body && <p className="small muted">{a.body} · {timeOf(a.created_at)}</p>}
           </div>
           <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-            {guess(a) && <button className="btn primary" onClick={() => nav(guess(a)!.to)}>{guess(a)!.label}</button>}
+            {a.source === 'count' ? <button className="btn primary" onClick={() => void openCount(a.id)}>See items</button> : guess(a) && <button className="btn primary" onClick={() => nav(guess(a)!.to)}>{guess(a)!.label}</button>}
             <button className="btn secondary" onClick={() => void done(a.id)}>Done</button>
           </span>
         </div>
       ))}
+      {detail && <Sheet title="Counted higher than the books" onClose={() => setDetail(null)}><div dangerouslySetInnerHTML={{ __html: detail }} /></Sheet>}
     </section>
   );
 }
