@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 export interface BillLine { name: string; item_id: number | null; qty: number | null; unit: string | null; rate: number | null; amount: number | null }
-export interface BillRead { bill_number: string | null; bill_date: string | null; vendor: string | null; total: number | null; unclear: string[]; lines?: BillLine[] }
+export interface BillRead { bill_number: string | null; bill_date: string | null; vendor: string | null; total: number | null; unclear: string[]; lines?: BillLine[]; invoices?: { bill_number: string | null; bill_date: string | null; total: number | null; pages: string | null; lines: BillLine[] }[] }
 
 // Shrinks a phone photo so it uploads fast and costs little to read.
 async function shrink(file: File): Promise<{ b64: string; type: string }> {

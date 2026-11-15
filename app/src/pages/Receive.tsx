@@ -49,6 +49,28 @@ function rateFor(it: Item, l: BillLine, packed: boolean): number | null {
   return null;
 }
 
+// Same item on two invoices of one delivery: quantities add up, the rate is the average weighted by quantity.
+function mergeLines(ls: BillLine[]): BillLine[] {
+  const by = new Map<number, BillLine[]>(); const out: BillLine[] = [];
+  for (const l of ls) { if (l.item_id == null) { out.push(l); continue; } by.set(l.item_id, [...(by.get(l.item_id) ?? []), l]); }
+  for (const g of by.values()) {
+    if (g.length === 1) { out.push(g[0]); continue; }
+    const q = g.reduce((a, x) => a + (x.qty ?? 0), 0);
+    const w = g.filter((x) => x.rate != null && x.qty); const wq = w.reduce((a, x) => a + x.qty!, 0);
+    const rate = wq > 0 ? w.reduce((a, x) => a + x.qty! * x.rate!, 0) / wq : g.find((x) => x.rate != null)?.rate ?? null;
+    out.push({ ...g[0], qty: q || null, rate: rate == null ? null : Math.round(rate * 100) / 100 });
+  }
+  return out;
+}
+const normName = (t: string) => t.toLowerCase().replace(/[0-9]+(\.[0-9]+)?\s*(kg|g|gm|l|ltr|ml|pcs|pc|pkt|pack)?/g, ' ').replace(/[^a-z]+/g, ' ').trim();
+// A bill line the reader could not match: only match when exactly one of our names is the same or sits inside it.
+function guessItem(name: string, list: { id: number; name: string }[]): number | null {
+  const n = normName(name); if (n.length < 3) return null;
+  const hits = list.filter((x) => { const m = normName(x.name); return m.length >= 3 && (m === n || n.includes(m) || m.includes(n)); });
+  return hits.length === 1 ? hits[0].id : null;
+}
+interface Inv { no: string; date: string; amount: string; pages: string }
+
 const MAX_BILLS = 3;
 async function uploadBills(uid: string, files: File[]): Promise<string[]> {
   const out: string[] = [];
@@ -233,6 +255,7 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
   const [later, setLater] = useState(false);
   const [billDate, setBillDate] = useState('');
   const [rates, setRates] = useState<Record<number, string>>({});
+  const [invs, setInvs] = useState<Inv[]>([]);
   const [needRate, setNeedRate] = useState<number[]>([]);
   const [offBill, setOffBill] = useState<BillLine[]>([]);
   const [noMatch, setNoMatch] = useState<BillLine[]>([]);
@@ -253,9 +276,14 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
     else setNeedRate((p) => (p.includes(id) ? p : [...p, id]));
   }
   const br = useBillRead(files, po ? vendors[po.vendor_id]?.name ?? '' : vendors[vendor]?.name ?? '', (r) => {
-    if (r.bill_number) setBill((v) => v || r.bill_number!); if (r.total != null) setAmount((v) => v || String(r.total)); if (r.bill_date) setBillDate((v) => v || r.bill_date!);
+    const iv = r.invoices ?? [];
+    if (iv.length > 1) setInvs(iv.map((q) => ({ no: q.bill_number ?? '', date: q.bill_date ?? '', amount: q.total != null ? String(q.total) : '', pages: q.pages ?? '' })));
+    else { if (r.bill_number) setBill((v) => v || r.bill_number!); if (r.total != null) setAmount((v) => v || String(r.total)); }
+    if (r.bill_date) setBillDate((v) => v || r.bill_date!);
     const off: BillLine[] = [], none: BillLine[] = [];
-    for (const l of r.lines ?? []) {
+    for (const l0 of mergeLines(r.lines ?? [])) {
+      const gid = l0.item_id ?? guessItem(l0.name, nameList);
+      const l: BillLine = gid != null && gid !== l0.item_id ? { ...l0, item_id: gid } : l0;
       if (l.item_id == null || !items[l.item_id]) { none.push(l); continue; }
       if (po && !orderedIds.includes(l.item_id)) { off.push(l); continue; }
       if (!po) setExtra((p) => (p.includes(l.item_id!) ? p : [...p, l.item_id!]));
@@ -282,6 +310,13 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
   };
   const matches = useMemo(() => find.trim().length < 2 ? [] : Object.values(items).filter((i) => i.name.toLowerCase().includes(find.toLowerCase()) && !ids.includes(i.id) && i.name !== 'Chicken Neck').slice(0, 6), [find, items, ids]);
 
+  useEffect(() => {
+    if (invs.length < 2) return;
+    setBill(invs.map((v) => v.no.trim()).filter(Boolean).join(', '));
+    setAmount(String(Math.round(invs.reduce((a, v) => a + (Number(v.amount) || 0), 0) * 100) / 100));
+  }, [invs]);
+  const setInv = (i: number, patch: Partial<Inv>) => setInvs((p) => p.map((v, k) => (k === i ? { ...v, ...patch } : v)));
+  const addInvoice = () => setInvs((p) => (p.length ? [...p, { no: '', date: billDate, amount: '', pages: '' }] : [{ no: bill, date: billDate, amount, pages: '' }, { no: '', date: billDate, amount: '', pages: '' }]));
   const rateOf = (id: number) => { const n = parseFloat(rates[id] ?? ''); return n > 0 ? n : 0; };
   const prevOf = (id: number) => { const it = items[id]; if (!it || it.last_cost == null) return null; return Number(it.last_cost) * (rf(it) && !it.count_unit ? rf(it) : 1); };
   const qtyOf = (id: number) => { const n = Number(vals[id]); return n > 0 ? n : 0; };
@@ -313,6 +348,10 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
     try { paths = await uploadBills(profile?.id ?? 'x', files); } catch (e) { setBusy(false); return setErr(errText(e)); }
     const { data: rg, error } = await supabase.rpc('receive_goods', { p_po_id: po?.id ?? null, p_vendor_id: po ? null : vendor, p_bill_number: bill, p_bill_date: billDate || null, p_bill_amount: amount ? Number(amount) : null, p_note: note, p_lines: lines, p_bill_paths: paths, p_bill_later: later && !paths.length });
     if (error) { setBusy(false); return setErr(errText(error)); }
+    if (invs.length > 1) {
+      const rid = (rg as { id?: string } | null)?.id;
+      if (rid) await supabase.rpc('save_receipt_invoices', { p_receipt: rid, p_invoices: invs.map((v) => ({ bill_number: v.no.trim(), bill_date: v.date || billDate || null, amount: v.amount, pages: v.pages })) });
+    }
     // The rate on the bill (or typed here) becomes the current price. The old price stays in the price history.
     let priceFail = 0;
     const ref = (rg as { grn_number?: string } | null)?.grn_number ?? null;
@@ -389,10 +428,26 @@ function ReceiveSheet({ po, items, vendors, got, onClose, onDone, pcsOn, costKg 
         {(br.reading || br.note) && <p className="small muted" role="status">{br.reading ? 'Reading the bill…' : br.note}</p>}
         {files.length === 0 && <label className="row small" style={{ gap: 8, marginTop: 6 }}><input type="checkbox" checked={later} onChange={(e) => setLater(e.target.checked)} />Bill will come later. Remind us to add it.</label>}
       </div>
-      <div className="row" style={{ gap: 12 }}>
-        <label className="field" style={{ flex: 1 }}><span>Bill number (optional)</span><input value={bill} onChange={(e) => setBill(e.target.value)} /></label>
-        <label className="field" style={{ flex: 1 }}><span>Bill amount (optional)</span><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-      </div>
+      {invs.length > 1 ? (
+        <div className="card" style={{ padding: 0 }}>
+          <div className="row" style={{ padding: '10px 12px', justifyContent: 'space-between' }}><b>Invoices for this delivery</b><span className="small muted">Each invoice has its own number and amount.</span></div>
+          {invs.map((v, i) => (
+            <div key={i} className="row" style={{ gap: 8, padding: '8px 12px', borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}>
+              <label className="field" style={{ flex: 2, minWidth: 140 }}><span>Invoice {i + 1}{v.pages ? ` · pages ${v.pages}` : ''}</span><input value={v.no} onChange={(e) => setInv(i, { no: e.target.value })} /></label>
+              <label className="field" style={{ flex: 1, minWidth: 110 }}><span>Date</span><input type="date" value={v.date} onChange={(e) => setInv(i, { date: e.target.value })} /></label>
+              <label className="field" style={{ flex: 1, minWidth: 100 }}><span>Amount</span><input inputMode="decimal" value={v.amount} onChange={(e) => setInv(i, { amount: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
+              <button className="btn quiet" aria-label={`Remove invoice ${i + 1}`} onClick={() => setInvs((p) => (p.length <= 2 ? [] : p.filter((_, k) => k !== i)))}>Remove</button>
+            </div>))}
+          <div className="row" style={{ padding: '10px 12px', borderTop: '1px solid var(--line)', justifyContent: 'space-between' }}>
+            <button className="btn" onClick={addInvoice}>+ Add another invoice</button>
+            <span><span className="muted small">PO total of all invoices</span> <b className="num">₹{Math.round(Number(amount) || 0).toLocaleString('en-IN')}</b></span></div>
+        </div>
+      ) : (<>
+        <div className="row" style={{ gap: 12 }}>
+          <label className="field" style={{ flex: 1 }}><span>Bill number (optional)</span><input value={bill} onChange={(e) => setBill(e.target.value)} /></label>
+          <label className="field" style={{ flex: 1 }}><span>Bill amount (optional)</span><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+        </div>
+        <button className="btn quiet" style={{ alignSelf: 'flex-start' }} onClick={addInvoice}>+ Add another invoice</button></>)}
       <label className="field"><span>Bill date (optional)</span><input type="date" value={billDate} onChange={(e) => setBillDate(e.target.value)} /></label>
       <label className="field"><span>Note (optional)</span><input value={note} onChange={(e) => setNote(e.target.value)} /></label>
       {err && <p className="banner bad" role="alert">{err}</p>}

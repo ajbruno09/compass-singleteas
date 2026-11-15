@@ -108,3 +108,25 @@ create or replace function public.home_buys_open() returns table(id uuid, item_i
   select h.id, h.item_id, h.qty, h.ordered_qty from home_buys h where has_role('owner','store') and h.ordered_qty < h.qty order by h.created_at $$;
 create or replace function public.counter_shelves_list() returns table(location_id smallint, group_id smallint) language sql stable security definer set search_path = public as $$
   select c.location_id, c.group_id from counter_shelves c where has_role('owner') $$;
+
+-- v5.125: several invoices on one receipt
+create table if not exists public.receipt_invoices (
+  id uuid primary key default gen_random_uuid(),
+  receipt_id uuid not null references public.goods_receipts(id) on delete cascade,
+  bill_number text, bill_date date, amount numeric, pages text, sort smallint not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table public.receipt_invoices enable row level security;
+create or replace function public.save_receipt_invoices(p_receipt uuid, p_invoices jsonb) returns void language plpgsql security definer set search_path = public as $$
+declare x jsonb; n smallint := 0;
+begin
+  if not has_role('owner','manager','store') then raise exception 'Not allowed.'; end if;
+  delete from receipt_invoices where receipt_id = p_receipt;
+  for x in select * from jsonb_array_elements(coalesce(p_invoices,'[]'::jsonb)) loop
+    insert into receipt_invoices(receipt_id, bill_number, bill_date, amount, pages, sort)
+    values (p_receipt, nullif(x->>'bill_number',''), nullif(x->>'bill_date','')::date, nullif(x->>'amount','')::numeric, nullif(x->>'pages',''), n);
+    n := n + 1;
+  end loop;
+end $$;
+create or replace function public.receipt_invoices_list(p_receipt uuid) returns table(bill_number text, bill_date date, amount numeric, pages text) language sql stable security definer set search_path = public as $$
+  select i.bill_number, i.bill_date, i.amount, i.pages from receipt_invoices i where has_role('owner','manager','store') and i.receipt_id = p_receipt order by i.sort $$;
