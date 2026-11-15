@@ -164,3 +164,5 @@ update public.goods_receipts set bill_exempt = true, bill_later = false where ve
 -- v5.137: POS "Total sales" per day. Table pos_day_summary, functions pos_save_summary and pos_summary_days (applied directly).
 -- Edge function pos-summary reads the "Report Notification: SINGLE TEAS" email body (grand total, net sales, container charge, GST, round off, payment modes).
 -- Counters and the Munna / Deboda graphs stay on net sales.
+
+-- v5.138: owner_mtd days now carry cc (container charge). Month to date sales = net sales + container charge, never GST (applied directly).

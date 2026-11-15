@@ -12,7 +12,7 @@ const FREQ: Record<string, string> = { monthly: 'Every month', quarterly: 'Every
 const RUN = { food: 34.2, gas: 2.0, pack: 1.0 };
 
 interface Cost { id: number; name: string; section: string; amount: number; frequency: string; to_verify: boolean; note: string | null; actual: number | null }
-interface Day { d: string; status: string; net: number }
+interface Day { d: string; status: string; net: number; cc?: number }
 interface Mtd { month_start: string; dim: number; done: number; days: Day[]; pastries: number; staff_qty: number; costs: Cost[]; last_ingest: { received_at: string; result: string; message: string | null; report_date: string | null } | null }
 
 interface LogRow { id: number; received_at: string; sender: string | null; filename: string | null; report_date: string | null; items: number | null; net_total: number | null; result: string; message: string | null; replaced: boolean }
@@ -46,7 +46,7 @@ export function MonthToDate() {
     const done = Math.max(m.done, 1); const dim = m.dim;
     const F = m.costs.reduce((a, x) => a + eff(x), 0);
     const open_ = m.days.filter((d) => d.status === 'open'); const closed = m.days.filter((d) => d.status === 'closed');
-    const sales = open_.reduce((a, d) => a + Number(d.net), 0);
+    const sales = open_.reduce((a, d) => a + Number(d.net) + Number(d.cc ?? 0), 0);
     const cakesPct = sales > 0 ? (Number(m.pastries) * 0.7 / sales) * 100 : 0;
     const vp = (RUN.food + RUN.gas + RUN.pack + cakesPct) / 100; const cm = 1 - vp;
     const BE = F / cm; const beTD = BE * done / dim; const gap = sales - beTD;
@@ -140,7 +140,7 @@ export function MonthToDate() {
         </div>
         <div className="rcol">
           <div className="card"><h2>How these are worked out</h2><div className="sm mut mhow">
-            <div><b>Sales</b> are net of tax, from the nightly POS report, with container charges and round off included.</div>
+            <div><b>Sales</b> are net sales plus container charge, from the nightly POS report. GST and round off are left out, since they are not the cafe's income.</div>
             <div><b>Running costs</b> (food, gas, packaging) are assumptions of {RUN.food}%, {RUN.gas}% and {RUN.pack}% until recipes and gas weights feed in. Cakes By M is their real 70% of pastry sales.</div>
             <div><b>Fixed costs</b> (salary, rent, electricity and the rest) are spread evenly across the month.</div>
             <div><b>Break even</b> is the sales where what is left after running costs covers the fixed costs.</div>
