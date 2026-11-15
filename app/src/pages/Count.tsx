@@ -12,6 +12,8 @@ interface It { id: number; name: string; local_names: Record<string, string> | n
 
 // Shown per kg stored: grams for weighed items, pieces for chicken counted by the piece.
 const CAT_PHOTO: Record<number, string> = { 20: 'cleaningsupplies', 1: 'veg', 2: 'dairy', 3: 'chicken', 4: 'atta', 5: 'spices', 6: 'sauces', 7: 'frozen', 17: 'kitchen', 18: 'oilsalt', 9: 'bread', 10: 'drinks', 11: 'icecream', 12: 'packaging', 13: 'cleaning', 14: 'gas', 15: 'stationery', 16: 'dryfruits' };
+// Items counted by weight or volume in small units: whole numbers only, so 3 g can never become 0.3 or 0.03.
+const wholeOnly = (i: { unit: string; base_unit?: string | null; pieceG?: number }) => !i.pieceG && (i.unit === 'g' || i.unit === 'ml' || (i.unit === 'kg' && i.base_unit === 'g'));
 const mult = (i: { unit: string; base_unit?: string | null; pieceG?: number }) => (i.pieceG ? 1000 / i.pieceG : i.unit === 'kg' && i.base_unit === 'g' ? 1000 : 1);
 
 export function CountPage() {
@@ -80,7 +82,7 @@ export function CountPage() {
   const nextTile = cur ? tiles[tiles.findIndex((x) => x.id === cur.id) + 1] : undefined;
   const chipsOf = (i: It) => i.pieceG ? [1, 5, 10] : (i.quick_amounts ?? []).filter((n) => n > 0).map((n) => n * mult(i));
   const chipLabel = (n: number, i: It) => `+${Math.round(n * 1000) / 1000}${i.pieceG ? '' : mult(i) === 1000 ? ' g' : i.unit === 'L' && n < 1 ? ' L' : ''}`;
-  const put = (i: It, n: number) => { const sv = String(Math.round(Math.max(0, n) * 1000) / 1000); setVals((p) => ({ ...p, [i.id]: sv })); void save(i, sv); };
+  const put = (i: It, n: number) => { const sv = String(wholeOnly(i) ? Math.round(Math.max(0, n)) : Math.round(Math.max(0, n) * 1000) / 1000); setVals((p) => ({ ...p, [i.id]: sv })); void save(i, sv); };
   const done = items.filter((i) => saved[i.id]).length;
   const left = items.length - done;
 
@@ -124,10 +126,10 @@ export function CountPage() {
             <div className="stack">{shown.map((i) => (
               <div key={i.id} className="card" style={saved[i.id] ? undefined : { borderColor: '#F3B48E' }}>
                 <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-                  <div style={{ minWidth: 0, flex: 1 }}><b>{nameOf(i)}</b><div className={'small ' + (saved[i.id] ? 'muted' : '')} style={saved[i.id] ? undefined : { color: '#B3541E' }}>{i.pieceG ? `pieces${vals[i.id] && i.portionKg ? ` · about ${Math.round((Number(vals[i.id]) * i.pieceG / 1000 / i.portionKg) * 10) / 10} portions` : ''}` : mult(i) === 1000 ? 'g (grams, from the weighing machine)' : i.unit}{saved[i.id] ? ' · counted' : ' · not counted yet'}</div></div>
+                  <div style={{ minWidth: 0, flex: 1 }}><b>{nameOf(i)}</b><div className={'small ' + (saved[i.id] ? 'muted' : '')} style={saved[i.id] ? undefined : { color: '#B3541E' }}>{i.pieceG ? `pieces${vals[i.id] && i.portionKg ? ` · about ${Math.round((Number(vals[i.id]) * i.pieceG / 1000 / i.portionKg) * 10) / 10} portions` : ''}` : mult(i) === 1000 || i.unit === 'g' ? 'in grams, whole numbers only (3 g is 3)' : i.unit === 'ml' ? 'in ml, whole numbers only' : i.unit}{saved[i.id] ? ' · counted' : ' · not counted yet'}</div></div>
                   <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
                     <button className="qchip" aria-label="Less" onClick={() => put(i, Number(vals[i.id] || 0) - step(i))}>−</button>
-                    <input inputMode="decimal" className="num" style={{ width: 84, textAlign: 'center' }} aria-label={nameOf(i)} value={vals[i.id] ?? ''} onChange={(e) => { setVals((p) => ({ ...p, [i.id]: e.target.value })); setSaved((p) => { const c = { ...p }; delete c[i.id]; return c; }); }} onBlur={(e) => void save(i, e.target.value)} />
+                    <input inputMode={wholeOnly(i) ? 'numeric' : 'decimal'} className="num" style={{ width: 84, textAlign: 'center' }} aria-label={nameOf(i)} value={vals[i.id] ?? ''} onChange={(e) => { const v = wholeOnly(i) ? e.target.value.replace(/[^0-9]/g, '') : e.target.value; setVals((p) => ({ ...p, [i.id]: v })); setSaved((p) => { const c = { ...p }; delete c[i.id]; return c; }); }} onBlur={(e) => void save(i, e.target.value)} />
                     <button className="qchip" aria-label="More" onClick={() => put(i, Number(vals[i.id] || 0) + step(i))}>+</button>
                   </div>
                 </div>
