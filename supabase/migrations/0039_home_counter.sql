@@ -144,3 +144,7 @@ update public.goods_receipts set bill_exempt = true, bill_later = false where ve
 -- v5.129 (applied directly): api_credit.expires_on, api_credit_topup(added, balance, expires), api_credit_set_expiry(date),
 -- api_credit_status() now returns expires_on and expiry_days, count_alert_detail(alert_id) lists the lines behind a
 -- "count is higher than the books" alert with a likely reason for each.
+
+-- v5.131 (applied directly): prod_set_status lets store/manager enter qty_made when receiving and refuses a receive
+-- without it; prod_receive_reminder() (cron prod-receive-reminder, every 30 min, 08:30 to 22:00 IST) pushes and
+-- raises an alert for batches on the way over an hour, and pushes for old batches never closed.

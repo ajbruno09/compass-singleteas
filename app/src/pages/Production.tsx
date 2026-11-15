@@ -56,6 +56,8 @@ export function Production() {
   const [forDate, setForDate] = useState('');
   const [cut, setCut] = useState<{ due: string; seal: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [recvFor, setRecvFor] = useState<number | null>(null);
+  const [recvQty, setRecvQty] = useState('');
   const [tab, setTab] = useState<'today' | 'recipes' | 'plan' | 'levels' | 'who'>('today');
   const [scr, setScr] = useState<'home' | Kind>('home');
   const [pick, setPick] = useState<Record<number, number>>({});
@@ -251,11 +253,20 @@ export function Production() {
                 {rec.get(o.item_id)?.rate ? <span className="pd-sm pd-mut">₹{Math.round((rec.get(o.item_id)?.rate ?? 0) * o.qty).toLocaleString('en-IN')}</span> : null}
                 <span className={'pd-chip ' + (o.status === 'requested' ? 'pd-wait' : 'pd-ok')}>{STEPS[o.status]}</span>
                 {o.status === 'requested' && (waits[o.id]?.length ?? 0) > 0 && <span className="pd-sm pd-mut" style={{ flexBasis: '100%' }}>Waiting for the store to issue: {waits[o.id].join(', ')}. You can start cooking once everything is issued.</span>}
+                {recvFor === o.id && (
+                  <div style={{ flexBasis: '100%', background: 'var(--sunken, #F4F1EA)', borderRadius: 10, padding: 10 }}>
+                    <div className="pd-sm"><b>How much was actually made?</b> Stock and issues are updated from this number.</div>
+                    <div className="pd-row" style={{ marginTop: 6, alignItems: 'center' }}>
+                      <input inputMode="decimal" className="pd-num" style={{ width: 90, textAlign: 'center' }} value={recvQty} onChange={(e) => setRecvQty(e.target.value.replace(/[^0-9.]/g, ''))} aria-label="Quantity made" />
+                      <span className="pd-mut">{o.items?.unit === 'kg' ? 'kg' : 'pcs'} (planned {o.qty})</span>
+                      <button className="pd-btn" disabled={busy || !(Number(recvQty) > 0)} onClick={() => void run(() => supabase.rpc('prod_set_status', { p_id: o.id, p_status: 'received', p_made: Number(recvQty) }), 'Added to stock').then((ok) => { if (ok) setRecvFor(null); })}>Add to stock</button>
+                    </div>
+                  </div>)}
                 <span className="pd-row">
                   <button className="pd-btn" onClick={() => setOpen({ ...open, [-o.id]: !open[-o.id] })}>{open[-o.id] ? 'Hide' : 'Ingredients'}</button>
                   {can && o.status === 'requested' && <button className="pd-btn" disabled={busy || (!admin && (waits[o.id]?.length ?? 0) > 0)} onClick={() => step(o.id, 'cooking')}>Start cooking</button>}
                   {can && ['requested', 'cooking'].includes(o.status) && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'on_the_way')}>Sent to store</button>}
-                  {canReceive && o.status === 'on_the_way' && <button className="pd-btn" disabled={busy} onClick={() => step(o.id, 'received')}>Received</button>}
+                  {canReceive && o.status === 'on_the_way' && <button className="pd-btn" disabled={busy} onClick={() => { setRecvFor(recvFor === o.id ? null : o.id); setRecvQty(String(o.qty)); }}>Received</button>}
                   {(can || canReceive) && ['requested', 'cooking', 'on_the_way'].includes(o.status) && !cancels.some((c) => c.order_id === o.id && c.status === 'pending') && <button className="pd-btn" disabled={busy} onClick={() => { setCancelFor(cancelFor === o.id ? null : o.id); setCancelWhy(''); }}>{admin ? 'Cancel' : 'Ask to cancel'}</button>}
                 </span>
                 {cancels.filter((c) => c.order_id === o.id && c.status === 'pending').map((c) => (
