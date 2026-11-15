@@ -137,3 +137,6 @@ alter table public.goods_receipts add column if not exists bill_exempt boolean n
 update public.vendors set bill_monthly = true where id = '6a81157b-1643-4169-acf0-297332fe8a32';
 update public.goods_receipts set bill_exempt = true, bill_later = false where vendor_id in (select id from public.vendors where bill_monthly);
 -- store_dash, store_today, _sc_day and receive_goods were patched to skip bill_exempt receipts (applied directly).
+
+-- v5.128: Claude credit balance estimate (owner only). Applied directly: api_credit, api_credit_settings,
+-- api_credit_status(), api_credit_topup(added, balance), api_credit_set_alert(inr).

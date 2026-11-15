@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { money2, date } from '../lib/format';
+import { ApiCreditCard } from '../components/ApiCredit';
 
 interface Row { id: number; at: string; vendor: string | null; tier: 'light' | 'strong'; pages: number; cost_usd: number; retried: boolean; ok: boolean; error: string | null; paths: string[] | null; style: string | null }
 const RATE = 88; // rupees per US dollar, an estimate
@@ -41,13 +42,14 @@ export function BillSpend() {
     <>
       <div className="pagehead"><div><p className="label">Buying and money</p><h1>Bill reading spend</h1></div></div>
       {err && <p className="banner bad" role="alert">{err}</p>}
+      <ApiCreditCard />
       <div className="grid-tiles">
         <div className="card tile"><span className="label">Spent this month</span><span className="big">{money2(s.spend)}</span></div>
         <div className="card tile"><span className="label">Bills read</span><span className="big">{s.mon.length}</span><span className="small muted">{s.pages} pages</span></div>
         <div className="card tile"><span className="label">Re-read by strong reader</span><span className="big">{s.retried}</span></div>
         <div className="card tile"><span className="label">Could not read</span><span className="big">{s.failed}</span></div>
       </div>
-      <p className="small muted">An estimate from the exact amounts the reader used, at about ₹{RATE} to the dollar. Your balance is in the Anthropic Console (platform.claude.com, Billing).</p>
+      <p className="small muted">An estimate from the exact amounts the reader used, at about ₹{RATE} to the dollar.</p>
       {rows && rows.length === 0 && <p className="banner">No bills read yet. Add a bill photo at Receive goods and it will show here.</p>}
       {s.mon.length > 0 && (
         <div className="row" style={{ alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
