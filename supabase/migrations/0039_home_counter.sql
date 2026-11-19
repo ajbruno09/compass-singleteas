@@ -166,3 +166,6 @@ update public.goods_receipts set bill_exempt = true, bill_later = false where ve
 -- Counters and the Munna / Deboda graphs stay on net sales.
 
 -- v5.138: owner_mtd days now carry cc (container charge). Month to date sales = net sales + container charge, never GST (applied directly).
+
+-- v5.139: Needs attention is collapsible with a count, shows ageing, and items open more than 5 days can be sent to the owner to drop.
+-- alerts: drop_status (asked|dropped|kept), drop_reason, drop_asked_at, drop_asked_by, drop_note. Functions alert_ask_drop (store, manager, owner) and alert_decide_drop (owner only). Applied directly.
