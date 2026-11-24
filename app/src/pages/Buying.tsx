@@ -291,7 +291,8 @@ export function Buying() {
   const isDouble = (r: Row) => r.carried > 1e-9 && r.asked - r.carried > 1e-9;
   const dropOf = (id: number) => drops.find((d) => d.item_id === id && d.for_date === date && (d.status === 'asked' || d.status === 'question'));
   const needsDecision = (r: Row) => isDouble(r) && !keeps.includes(r.item.id);
-  const doubleRows = rows.filter((r) => needsDecision(r) && !vendorMap.get(vOf(r) ?? '')?.is_store);
+  // An item with nothing to buy (the store has enough) is not on any vendor list, so it cannot be a double order.
+  const doubleRows = rows.filter((r) => r.qty > 1e-9 && needsDecision(r) && !vendorMap.get(vOf(r) ?? '')?.is_store);
   const pendingDrops = drops.filter((d) => d.status === 'asked' || d.status === 'question');
   // Items the counters need that the store has not ordered, put off, or asked to drop yet.
   const undecidedRows = rows.filter((r) => r.sug > 1e-9 && !vendorMap.get(vOf(r) ?? '')?.is_store && !dropOf(r.item.id));
