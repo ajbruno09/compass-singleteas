@@ -115,6 +115,7 @@ export function Buying() {
   const [shortFor, setShortFor] = useState<number | null>(null);
   const [wontFor, setWontFor] = useState<number | null>(null);
   const [prodOrders, setProdOrders] = useState<ProdOrder[]>([]);
+  const [pOpen, setPOpen] = useState<Record<number, boolean>>({});
   const [prodBuy, setProdBuy] = useState<ProdBuy[]>([]);
   const [pDraft, setPDraft] = useState<Record<string, 'store' | 'buy'>>({});
   const [pBusy, setPBusy] = useState<number | null>(null);
@@ -520,14 +521,17 @@ export function Buying() {
           {prodOrders.map((o) => {
             const todo = o.lines.filter((l) => l.mode == null).length;
             const nBuy = o.lines.filter((l) => pMode(o, l) === 'buy').length;
+            const isOpen = pOpen[o.id] ?? todo > 0;
             return (
               <div className="card" key={'prod' + o.id} style={{ borderColor: todo ? 'var(--warn)' : undefined }}>
-                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div><b>Production order: {o.name} {n2(o.qty)}</b> {o.urgent && <span className="chip late">Urgent</span>}
-                    <div className="muted small">{o.by ? `Asked by ${o.by} · ` : ''}needed {dayLabel(o.for_date)}. These ingredients are for this order only. For each one, give it from your store or buy it outside.</div></div>
+                <button className="row" aria-expanded={isOpen} onClick={() => setPOpen((x) => ({ ...x, [o.id]: !isOpen }))} style={{ justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', border: 0, background: 'transparent', textAlign: 'left', cursor: 'pointer', padding: 0, flexWrap: 'nowrap' }}>
+                  <span style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <span style={{ display: 'inline-block', transform: isOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .12s', marginTop: 2 }}><Icon name="chev" /></span>
+                    <span><b>Production order: {o.name} {n2(o.qty)}</b> {o.urgent && <span className="chip late">Urgent</span>}
+                      <span className="muted small" style={{ display: 'block' }}>{o.by ? `Asked by ${o.by} · ` : ''}needed {dayLabel(o.for_date)}.{isOpen ? ' These ingredients are for this order only. For each one, give it from your store or buy it outside.' : ` ${o.lines.length - nBuy} from the store, ${nBuy} to buy outside.`}</span></span></span>
                   {todo > 0 ? <span className="chip due">{todo} to decide</span> : <span className="chip done">Decided</span>}
-                </div>
-                {o.lines.length === 0 ? <p className="muted small" style={{ marginTop: 8 }}>No ingredients were asked for this order.</p> : (
+                </button>
+                {!isOpen ? null : o.lines.length === 0 ? <p className="muted small" style={{ marginTop: 8 }}>No ingredients were asked for this order.</p> : (
                   <div className="tablewrap" style={{ border: 0, boxShadow: 'none', marginTop: 8 }}>
                     <table>
                       <thead><tr><th>Ingredient</th><th className="r">Needed</th><th className="r">In store</th><th>Decision</th><th>If you buy</th></tr></thead>
@@ -543,10 +547,10 @@ export function Buying() {
                         </tr>); })}</tbody>
                     </table>
                   </div>)}
-                <div className="row" style={{ justifyContent: 'space-between', marginTop: 8 }}>
+                {isOpen && <div className="row" style={{ justifyContent: 'space-between', marginTop: 8 }}>
                   <span className="small muted">{o.lines.length - nBuy} from the store, {nBuy} to buy outside.</span>
                   <button className="btn primary" disabled={pBusy === o.id || o.lines.length === 0} onClick={() => void confirmProd(o)}>{pBusy === o.id ? 'Saving…' : todo > 0 ? 'Confirm' : 'Save changes'}</button>
-                </div>
+                </div>}
               </div>);
           })}
         </div>
