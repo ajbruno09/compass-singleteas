@@ -116,6 +116,16 @@ function Gate() {
     );
   }
   if (!profile.setup_done_at) return <FirstRun uid={profile.id} owner={profile.role === 'owner'} />;
+  if (profile.role === 'closing_staff' && isPhone()) {
+    // After registration, closing staff work only on the POS computer, not on a phone.
+    return (
+      <div className="login"><div className="card">
+        <h1>Please use the POS computer</h1>
+        <p>The daily closing is done on the POS computer only. Please sign in there.</p>
+        <button className="btn secondary" onClick={signOut}>Sign out</button>
+      </div></div>
+    );
+  }
   if (profile.role === 'closing_staff') {
     // Closing staff see only the closing screen.
     return (
