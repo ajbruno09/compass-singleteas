@@ -115,6 +115,8 @@ export function ClosingWizard() {
   const timer = useRef<number | undefined>(undefined);
   const dirty = useRef(false);
   const isStaff = profile?.role === 'closing_staff';
+  const [openBills, setOpenBills] = useState<OpenBill[]>([]);
+  useEffect(() => { void supabase.rpc('bills_open').then(({ data, error }) => { if (!error && Array.isArray(data)) setOpenBills(data as OpenBill[]); }); }, []);
 
   useEffect(() => {
     (async () => {
@@ -248,7 +250,7 @@ export function ClosingWizard() {
         <div className="cw-bar"><i style={{ width: `${(step / TOTAL) * 100}%` }} /></div>
       </div>
       <div className="cw-body">
-        {s.t === 'review' ? <Review d={d} c={c} go={(n) => { setStep(n); setEditing(true); }} /> : <Question key={step} s={s} d={d} c={c} step={step} change={change} next={() => ok && next()} />}
+        {s.t === 'review' ? <Review d={d} c={c} go={(n) => { setStep(n); setEditing(true); }} /> : <Question key={step} s={s} d={d} c={c} step={step} change={change} next={() => ok && next()} bills={openBills} />}
       </div>
       <div className="cw-foot">
         {s.t === 'review' ? <button className="cw-btn cw-p" onClick={() => setSheet('submit')}>Submit report</button> : <button className="cw-btn cw-p" disabled={!ok} onClick={next}>{editing ? 'Back to review' : 'Next'}</button>}
@@ -268,7 +270,7 @@ function Money({ v, onChange, onEnter }: { v: string; onChange: (s: string) => v
   return <div className="cw-field"><span>{'₹'}</span><input autoFocus inputMode="decimal" value={v} placeholder="0" onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ''))} onKeyDown={(e) => { if (e.key === 'Enter') onEnter(); }} /></div>;
 }
 
-function Question({ s, d, c, step, change, next }: { s: Exclude<Step, { t: 'review' }>; d: CD; c: ReturnType<typeof calc>; step: number; change: (f: (x: CD) => CD) => void; next: () => void }) {
+function Question({ s, d, c, step, change, next, bills }: { s: Exclude<Step, { t: 'review' }>; d: CD; c: ReturnType<typeof calc>; step: number; change: (f: (x: CD) => CD) => void; next: () => void; bills: OpenBill[] }) {
   const yn = (v: boolean | null, set: (y: boolean) => void) => (
     <div className="cw-yn"><button className={v === true ? 'on' : ''} onClick={() => set(true)}>Yes</button><button className={v === false ? 'on' : ''} onClick={() => set(false)}>No</button></div>
   );
@@ -314,7 +316,7 @@ function Question({ s, d, c, step, change, next }: { s: Exclude<Step, { t: 'revi
         <>
           {s.key === 'dues' && c.gap > 0.5 && <DueBox gap={c.gap} e={sum(d.dues, 'amt')} />}
           {yn(d[s.yes], (y) => change((p) => ({ ...p, [s.yes]: y, [s.key]: y ? (p[s.key].length ? p[s.key] : [{}]) : [] })))}
-          {d[s.yes] && <Rows s={s} rows={d[s.key]} set={(rows) => change((p) => ({ ...p, [s.key]: rows, ...(rows.length ? {} : { [s.yes]: null }) }))} />}
+          {d[s.yes] && <Rows s={s} bills={bills} rows={d[s.key]} set={(rows) => change((p) => ({ ...p, [s.key]: rows, ...(rows.length ? {} : { [s.yes]: null }) }))} />}
         </>
       )}
       {s.t === 'notes' && (
@@ -351,7 +353,9 @@ function DueBox({ gap, e }: { gap: number; e: number }) {
   );
 }
 
-function Rows({ s, rows, set }: { s: Extract<Step, { t: 'rows' }>; rows: Row[]; set: (r: Row[]) => void }) {
+interface OpenBill { id: string; no: string | null; who: string | null; bal: number }
+const billLabel = (b: OpenBill) => `${b.no ?? 'No number'} · ${b.who ?? 'Customer'} · balance ${fmt(Number(b.bal))}`;
+function Rows({ s, rows, set, bills }: { s: Extract<Step, { t: 'rows' }>; rows: Row[]; set: (r: Row[]) => void; bills: OpenBill[] }) {
   const upd = (i: number, k: string, v: string) => set(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   return (
     <>
@@ -361,7 +365,7 @@ function Rows({ s, rows, set }: { s: Extract<Step, { t: 'rows' }>; rows: Row[]; 
           {s.cols.map((cl) => (
             <div key={cl.k}>
               <label className="cw-lab">{cl.l}</label>
-              {cl.ty === 'bill' && <select className="cw-in" value={r[cl.k] ?? ''} onChange={(e) => upd(i, cl.k, e.target.value)}><option value="">Choose</option>{OPEN_BILLS.map((o) => <option key={o}>{o}</option>)}</select>}
+              {cl.ty === 'bill' && <select className="cw-in" value={r[cl.k] ?? ''} onChange={(e) => { const v = e.target.value; const b = bills.find((x) => billLabel(x) === v); set(rows.map((x, j) => (j === i ? { ...x, [cl.k]: v, bid: b ? b.id : '' } : x))); }}><option value="">Choose</option>{OPEN_BILLS.map((o) => <option key={o}>{o}</option>)}{bills.map((b) => <option key={b.id}>{billLabel(b)}</option>)}</select>}
               {cl.ty === 'method' && <select className="cw-in" value={r[cl.k] ?? ''} onChange={(e) => upd(i, cl.k, e.target.value)}><option value="">Choose</option>{['Cash', 'UPI', 'Card', 'Split'].map((o) => <option key={o}>{o}</option>)}</select>}
               {(cl.ty === 'text' || cl.ty === 'num' || cl.ty === 'date') && <input className="cw-in" type={cl.ty === 'date' ? 'date' : 'text'} inputMode={cl.ty === 'num' ? 'decimal' : undefined} value={r[cl.k] ?? ''} onChange={(e) => upd(i, cl.k, cl.ty === 'num' ? e.target.value.replace(/[^0-9.]/g, '') : e.target.value)} />}
             </div>

@@ -65,6 +65,8 @@ import { SalesEntry } from './pages/SalesEntry';
 import { ClosingWizard } from './pages/ClosingWizard';
 import { ClosingReports } from './pages/ClosingReports';
 import { PettyCash } from './pages/PettyCash';
+import { PosDashboard } from './pages/PosDashboard';
+import { OutstandingBills } from './pages/OutstandingBills';
 import { PettyReceived } from './pages/PettyReceived';
 import { Brand } from './components/Brand';
 import { AvatarButton } from './components/AvatarButton';
@@ -72,7 +74,7 @@ import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/messages': <MessagesPage />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/buying-setup': <BuyingSetup />, '/data-check': <DataCheck />, '/keep-ready': <KeepReady />, '/store-levels': <StoreLevels />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/shelves': <Shelves />, '/price-check': <PriceCheck />, '/bill-spend': <BillSpend />, '/team-usage': <TeamUsage />, '/counter-sales': <CounterSales />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/gas': <Gas />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/maint-requests': <MaintRequests />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/count-frequency': <CountFrequency />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />, '/closing-reports': <ClosingReports />, '/petty-cash': <PettyCash />, '/closing-wizard': <ClosingWizard />
+  '/': <Dashboard />, '/messages': <MessagesPage />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/buying-setup': <BuyingSetup />, '/data-check': <DataCheck />, '/keep-ready': <KeepReady />, '/store-levels': <StoreLevels />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/shelves': <Shelves />, '/price-check': <PriceCheck />, '/bill-spend': <BillSpend />, '/team-usage': <TeamUsage />, '/counter-sales': <CounterSales />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/gas': <Gas />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/maint-requests': <MaintRequests />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/count-frequency': <CountFrequency />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />, '/closing-reports': <ClosingReports />, '/petty-cash': <PettyCash />, '/pos-dashboard': <PosDashboard />, '/outstanding-bills': <OutstandingBills />, '/closing-wizard': <ClosingWizard />
 };
 
 // After signing in, people with more than one app choose which to open. Once per visit.

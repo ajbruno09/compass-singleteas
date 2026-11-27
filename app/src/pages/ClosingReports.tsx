@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { useToast } from '../components/Toast';
-import { DEN, fmt, has, num, sg, type CD } from './ClosingWizard';
+import { DEN, calc, fmt, has, num, sg, type CD } from './ClosingWizard';
 import '../closing.css';
+import '../office.css';
 
 interface Rep {
   id: string; business_date: string; status: string; data: CD; pos_total: number | null; digital_var: number | null; cash_var: number | null; combined_var: number | null;
@@ -15,11 +16,9 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   draft: { label: 'Draft', cls: 'off' }, submitted: { label: 'Submitted', cls: 'due' }, reopen_requested: { label: 'Change requested', cls: 'late' },
   reopened: { label: 'Open for change', cls: 'due' }, verified: { label: 'Verified', cls: 'done' }, flagged: { label: 'Flagged', cls: 'late' }
 };
-const day = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 // Due before 2:00 AM the next day. Anything submitted after that is late.
 const isLate = (r: { business_date: string; submitted_at: string | null }) => !!r.submitted_at && new Date(r.submitted_at).getTime() > new Date(r.business_date + 'T00:00:00+05:30').getTime() + 26 * 3600 * 1000;
 const when = (t: string) => new Date(t).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-const vc = (v: number | null) => <span style={{ color: !v ? 'var(--ok)' : 'var(--warn)' }}>{v === null ? '-' : sg(Number(v))}</span>;
 
 // Daily closing reports: Accounts, Management and the owner open each report, check it, and verify or flag it.
 export function ClosingReports() {
@@ -64,92 +63,82 @@ export function ClosingReports() {
     await load();
   }
 
-  if (open) {
-    const d = open.data;
-    const st = STATUS[open.status] ?? { label: open.status, cls: 'off' };
-    const reported = Number(open.closing_cash ?? 0);
+  const [sp] = useSearchParams();
+  const [filt, setFilt] = useState('All');
+  const [sel, setSel] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  useEffect(() => { if (rows && !sel) { const want = sp.get('d'); setSel((want && rows.find((r) => r.business_date === want)?.id) || rows[0]?.id || null); } }, [rows, sel, sp]);
+  useEffect(() => { setReviewing(false); }, [sel]);
+
+  const list = (rows ?? []).filter((r) => filt === 'All' || (filt === 'Pending' && ['submitted', 'reopen_requested', 'reopened'].includes(r.status)) || (filt === 'Flagged' && r.status === 'flagged') || (filt === 'Verified' && r.status === 'verified'));
+  const cur = (rows ?? []).find((r) => r.id === sel) ?? null;
+  const tag = (s: string) => { const m = STATUS[s] ?? { label: s, cls: 'off' }; return <span className={'of-tag ' + (s === 'verified' ? 'g' : s === 'flagged' ? 'r' : s === 'draft' ? 'n' : 'a')}>{s === 'submitted' ? 'Under review' : m.label}</span>; };
+  const kv = (a: string, b: React.ReactNode, cls = '') => <div className={'of-kv ' + cls} key={a}><span>{a}</span><span>{b}</span></div>;
+  const vv = (v: number | null) => <b className={v === null ? '' : v < 0 ? 'of-neg' : 'of-pos'}>{v === null ? '-' : sg(Number(v))}</b>;
+  const lst = (a: Record<string, string>[] | undefined, f: (r: Record<string, string>) => string) => (a ?? []).map((r) => f(r)).join(' · ') || 'None';
+
+  const renderDetail = (r: Rep) => {
+    const d = r.data; const c = calc(d);
     const accNum = acc === '' ? null : num(acc);
-    const canReview = ['submitted', 'verified', 'flagged', 'reopen_requested'].includes(open.status);
-    const line = (a: string, b: string) => <div className="cr-kv" key={a}><span>{a}</span><span>{b}</span></div>;
-    const list = (a: Record<string, string>[] | undefined, f: (r: Record<string, string>) => string) => (a ?? []).map((r) => f(r)).join(' · ') || 'None';
+    const match = accNum !== null && Math.round(accNum) === Math.round(c.counted);
+    const canReview = ['submitted', 'flagged', 'reopen_requested'].includes(r.status);
     return (
-      <>
-        <div className="pagehead"><div><p className="label"><button className="btn quiet" style={{ padding: 0 }} onClick={() => setOpen(null)}>&#8592; All reports</button></p><h1>Closing for {day(open.business_date)} <span className={`chip ${st.cls}`}>{st.label}</span></h1></div></div>
-        {open.status === 'reopen_requested' && (
-          <div className="cw-note" style={{ marginBottom: 14, maxWidth: 560 }}>The closing staff asked to open this report for change. Reason: {open.reopen_reason || 'none given'}.
-            {canDo || profile?.role === 'accounts' ? <> <button className="btn small" disabled={busy} onClick={reopen}>Allow the change</button></> : null}</div>
-        )}
-        <div className="cr-two">
-          <div className="cr-panel">
-            <h3 style={{ margin: '0 0 8px' }}>Report</h3>
-            {line('POS total', fmt(Number(open.pos_total ?? 0)))}
-            <div className="cr-kv"><span>Digital variance</span>{vc(open.digital_var)}</div>
-            <div className="cr-kv"><span>Cash variance</span>{vc(open.cash_var)}</div>
-            <div className="cr-kv"><span>Combined</span>{vc(open.combined_var)}</div>
-            {line('Closing cash reported', fmt(reported))}
-            {open.submitted_at && line('Submitted', when(open.submitted_at))}
-            <h3 style={{ margin: '14px 0 8px' }}>Answers</h3>
-            {line('Card / UPI / QR', `${fmt(num(d.card))} / ${fmt(num(d.upi))} / ${fmt(num(d.qr))}`)}
-            {line('Cash / Online', `${fmt(num(d.cash))} / ${fmt(num(d.online))}`)}
-            {line('Paytm collections', fmt(num(d.paytm)))}
-            {line('Proximus EDC', d.edcYes ? list(d.edc, (r) => `${r.room || ''} ${fmt(num(r.amt))}`) : 'None')}
-            {line('Opening cash', fmt(num(d.open)))}
-            {line('Notes counted', DEN.filter((x) => has(d.n?.[x])).map((x) => `${x}×${d.n[x]}`).join('  ') || '-')}
-            {line('Taken for expenses', fmt(num(d.withdrawn)) + (has(d.whyOut) ? ` (${d.whyOut})` : ''))}
-            {line('Cash secured or deposited', d.secured ? 'Yes' : 'No')}
-            {line('Room-charge bills', d.roomYes ? list(d.rooms, (r) => `${r.bill} Room ${r.room} ${fmt(num(r.amt))}`) : 'None')}
-            {line('Customer due bills', d.dueYes ? list(d.dues, (r) => `${r.bill} ${r.name} ${fmt(num(r.amt))}`) : 'None')}
-            {line('Older bills paid', d.oldYes ? list(d.olds, (r) => `${r.bill} ${fmt(num(r.amt))} ${r.method}`) : 'None')}
-            {line('Note', d.noteYes ? d.note : 'None')}
-          </div>
-          <div className="cr-panel">
-            <h3 style={{ margin: '0 0 8px' }}>Accounts check</h3>
-            <label className="field"><span>Cash counted by Accounts</span><input className="num" inputMode="numeric" value={acc} onChange={(e) => setAcc(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" /></label>
-            {accNum !== null && <p className="small" style={{ margin: '4px 0 10px' }}>{accNum === reported ? <span className="chip done">Matches the report</span> : <span className="chip due">{sg(accNum - reported)} against the report</span>}</p>}
-            <label className="field"><span>Note (optional)</span><input value={note} onChange={(e) => setNote(e.target.value)} /></label>
-            {canReview ? (
-              <div className="row" style={{ gap: 8, marginTop: 12 }}>
-                <button className="btn primary" disabled={busy} onClick={() => review('verified')}>Verify</button>
-                <button className="btn" disabled={busy} onClick={() => review('flagged')}>Flag</button>
-                {['submitted', 'flagged'].includes(open.status) && <button className="btn quiet" disabled={busy} onClick={reopen}>Open for change</button>}
-              </div>
-            ) : <p className="small muted">Nothing to check on this report yet.</p>}
-            <h3 style={{ margin: '16px 0 6px' }}>Trail</h3>
-            {open.events.length === 0 ? <p className="small muted">No activity yet.</p> : open.events.map((e, i) => <p className="small" style={{ margin: '2px 0' }} key={i}>{e.what} by {e.by}, {when(e.at)}{e.note ? `. ${e.note}` : ''}</p>)}
-          </div>
+      <div className="of-two" style={{ gridTemplateColumns: '1.25fr .75fr', alignItems: 'start' }}>
+        <div>
+          <div className="of-card"><h3>Closing report, {r.business_date} {tag(r.status)}{isLate(r) && <span className="of-tag a">Late</span>}</h3><p className="of-sub" style={{ margin: '2px 0 0' }}>{r.submitted_at ? `Submitted ${when(r.submitted_at)}` : 'Not submitted'}</p></div>
+          {r.status === 'reopen_requested' && <div className="of-note">The closing staff asked to open this report for change. Reason: {r.reopen_reason || 'none given'}. <button className="btn small" disabled={busy} onClick={reopen}>Allow the change</button></div>}
+          <div className="of-card"><h3>POS sales breakdown</h3>{kv('POS total sales', fmt(num(d.pos)))}{kv('Card sales', fmt(num(d.card)))}{kv('UPI / Paytm QR', fmt(num(d.upi)))}{kv('Petpooja static QR', fmt(num(d.qr)))}{kv('Cash sales', fmt(num(d.cash)))}{kv('Online platform sales', fmt(num(d.online)))}{kv('POS digital (card + UPI + QR)', fmt(c.digSales), 't')}</div>
+          <div className="of-card"><h3>Digital collections</h3>{kv('Paytm merchant collections', fmt(num(d.paytm)))}{kv('Less: Proximus EDC', '-' + fmt(c.edc))}{kv('Net merchant collections', fmt(num(d.paytm) - c.edc))}{kv('Digital variance', vv(r.digital_var), 't')}</div>
+          <div className="of-card"><h3>Cash reconciliation</h3>{kv('Opening cash', fmt(num(d.open)))}{kv('Counted closing cash', fmt(c.counted))}{kv('Taken for expenses', fmt(num(d.withdrawn)) + (has(d.whyOut) ? ` (${d.whyOut})` : ''))}{kv('Cash collected', fmt(c.coll))}{kv('POS cash sales', fmt(num(d.cash)))}{kv('Cash variance', vv(r.cash_var), 't')}{kv('Combined variance', vv(r.combined_var), 't')}
+            {(r.digital_var ?? 0) * (r.cash_var ?? 0) < 0 && <div className="of-note">Opposite-direction variances. Possible payment mode mismatch.</div>}</div>
+          <div className="of-card"><h3>Other answers</h3>{kv('Notes counted', DEN.filter((x) => has(d.n?.[x])).map((x) => `${x}×${d.n[x]}`).join('  ') || '-')}{kv('Cash secured or deposited', d.secured ? 'Yes' : 'No')}
+            {kv('Proximus EDC', d.edcYes ? lst(d.edc, (x) => `${x.room || ''} ${fmt(num(x.amt))}`) : 'None')}{kv('Room-charge bills', d.roomYes ? lst(d.rooms, (x) => `${x.bill} Room ${x.room} ${fmt(num(x.amt))}`) : 'None')}
+            {kv('Customer due bills', d.dueYes ? lst(d.dues, (x) => `${x.bill} ${x.name || ''} ${fmt(num(x.amt))}`) : 'None')}{kv('Older bills paid', d.oldYes ? lst(d.olds, (x) => `${x.bill} ${fmt(num(x.amt))} ${x.method}`) : 'None')}</div>
+          {d.noteYes && has(d.note) && <div className="of-card"><h3>Closing user notes</h3><p style={{ margin: '6px 0 0' }}>{d.note}</p></div>}
         </div>
-      </>
+        <div>
+          <div className="of-card"><h3>Accounts verification</h3>
+            {r.status === 'verified' ? <div className="of-note ok">Verified.{r.accounts_count != null ? ` Counted ${fmt(Number(r.accounts_count))}.` : ''}{r.review_note ? ' ' + r.review_note : ''}</div>
+              : !canReview ? <p className="of-sub">Nothing to check on this report yet.</p>
+              : !reviewing ? <><p className="of-sub">{r.status === 'flagged' ? 'This report is flagged for management.' : 'This report is waiting for Accounts to check it.'}</p><button className="btn primary" style={{ width: '100%' }} onClick={() => setReviewing(true)}>Start review</button></>
+              : <>
+                <label className="of-l">Independent cash count (₹)</label><input className="of-in" inputMode="numeric" placeholder="0" value={acc} onChange={(e) => setAcc(e.target.value.replace(/[^0-9.]/g, ''))} />
+                <p className="of-sub" style={{ margin: '4px 0 0' }}>Your own physical count, kept as the Accounts figure.</p>
+                {accNum !== null && (match ? <div className="of-note ok">Matches the report, {fmt(c.counted)}.</div> : <div className="of-note">{fmt(accNum)} against {fmt(c.counted)} in the report. Difference {sg(accNum - c.counted)}.</div>)}
+                <label className="of-l">Comment for management{accNum !== null && !match ? ' (needed when it does not match)' : ''}</label><textarea className="of-in" placeholder="Observations, notes for management review..." value={note} onChange={(e) => setNote(e.target.value)} />
+                <div className="of-row" style={{ marginTop: 10 }}>
+                  <button className="btn primary" disabled={busy || accNum === null || (!match && !note.trim())} onClick={() => void review('verified')}>Verify</button>
+                  <button className="btn" disabled={busy || !note.trim()} onClick={() => void review('flagged')}>Flag</button>
+                  <button className="btn" onClick={() => setReviewing(false)}>Cancel</button></div></>}
+          </div>
+          <div className="of-card"><h3>Audit trail</h3><div className="of-trail"><p>Report submitted<small>{r.submitted_at ? when(r.submitted_at) : ''}</small></p>
+            {r.events.filter((e) => e.what !== 'Submitted').map((e, i) => <p key={i}>{e.what}<small>{e.by} · {when(e.at)}{e.note ? ' · ' + e.note : ''}</small></p>)}</div></div>
+        </div>
+      </div>
     );
-  }
+  };
 
   return (
-    <>
+    <div className="of">
       <div className="pagehead">
-        <div><p className="label">Finance &amp; Accounts</p><h1>POS Daily Closing</h1></div>
+        <div><p className="label">Finance &amp; Accounts</p><h1>POS Daily Closing</h1><p className="muted" style={{ margin: '2px 0 0' }}>Check each night's closing, enter your own cash count, then verify or flag it.</p></div>
         {canDo && <button className="btn primary" onClick={() => nav('/closing-wizard')}>Do tonight's closing</button>}
       </div>
-      <p className="muted">Each night's cash and POS check. Open a report to verify or flag it.</p>
       {rows === null ? <p className="muted">Loading…</p> : rows.length === 0 ? <p className="muted">No closing reports yet.</p> : (
-        <div className="tablewrap">
-          <table>
-            <thead><tr><th>Business day</th><th className="num">POS total</th><th className="num">Digital</th><th className="num">Cash</th><th>Status</th></tr></thead>
-            <tbody>
-              {rows.map((r) => {
-                const st = STATUS[r.status] ?? { label: r.status, cls: 'off' };
-                return (
-                  <tr key={r.id} className="click" onClick={() => setOpen(r)}>
-                    <td>{day(r.business_date)}<div className="small muted">{r.submitted_at ? `Submitted ${when(r.submitted_at)}` : 'Not submitted'}</div></td>
-                    <td className="num">{r.pos_total === null ? '-' : fmt(Number(r.pos_total))}</td>
-                    <td className="num">{vc(r.digital_var)}</td>
-                    <td className="num">{vc(r.cash_var)}</td>
-                    <td><span className={`chip ${st.cls}`}>{st.label}</span>{isLate(r) && <span className="chip late" style={{ marginLeft: 6 }}>Late</span>}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="of-rep">
+          <div className="of-card" style={{ padding: '10px 0' }}>
+            <div style={{ padding: '0 12px' }}><h3>Closing reports</h3><div className="of-chips" style={{ marginTop: 8 }}>{['All', 'Pending', 'Flagged', 'Verified'].map((x) => <button key={x} className={'of-chip' + (filt === x ? ' on' : '')} onClick={() => setFilt(x)}>{x}</button>)}</div></div>
+            <div className="of-rl">{list.map((r) => (
+              <div key={r.id} className={'of-ri' + (r.id === sel ? ' on' : '')} onClick={() => setSel(r.id)}>
+                <div className="t"><span>{r.business_date}</span>{tag(r.status)}</div>
+                <small>{r.submitted_at ? `Submitted ${when(r.submitted_at)}` : 'Not submitted'}{isLate(r) ? ' · Late' : ''}</small>
+                <div className="of-row" style={{ justifyContent: 'space-between' }}><b>{r.pos_total === null ? '-' : fmt(Number(r.pos_total))}</b><span className={r.combined_var === null ? '' : Number(r.combined_var) < 0 ? 'of-neg' : 'of-pos'}>{r.combined_var === null ? '' : sg(Number(r.combined_var)) + ' var'}</span></div>
+              </div>))}
+              {list.length === 0 && <p className="muted" style={{ padding: 12 }}>None.</p>}</div>
+          </div>
+          {cur && renderDetail(cur)}
         </div>
       )}
-    </>
+    </div>
   );
 }
