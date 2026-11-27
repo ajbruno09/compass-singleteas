@@ -16,6 +16,8 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   reopened: { label: 'Open for change', cls: 'due' }, verified: { label: 'Verified', cls: 'done' }, flagged: { label: 'Flagged', cls: 'late' }
 };
 const day = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+// Due before 2:00 AM the next day. Anything submitted after that is late.
+const isLate = (r: { business_date: string; submitted_at: string | null }) => !!r.submitted_at && new Date(r.submitted_at).getTime() > new Date(r.business_date + 'T00:00:00+05:30').getTime() + 26 * 3600 * 1000;
 const when = (t: string) => new Date(t).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 const vc = (v: number | null) => <span style={{ color: !v ? 'var(--ok)' : 'var(--warn)' }}>{v === null ? '-' : sg(Number(v))}</span>;
 
@@ -140,7 +142,7 @@ export function ClosingReports() {
                     <td className="num">{r.pos_total === null ? '-' : fmt(Number(r.pos_total))}</td>
                     <td className="num">{vc(r.digital_var)}</td>
                     <td className="num">{vc(r.cash_var)}</td>
-                    <td><span className={`chip ${st.cls}`}>{st.label}</span></td>
+                    <td><span className={`chip ${st.cls}`}>{st.label}</span>{isLate(r) && <span className="chip late" style={{ marginLeft: 6 }}>Late</span>}</td>
                   </tr>
                 );
               })}

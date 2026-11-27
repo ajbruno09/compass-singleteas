@@ -128,6 +128,12 @@ export function ClosingWizard() {
         if (j.row.status === 'reopened') setStep(25);
         if (j.row.digital !== null) setRes({ digital: Number(j.row.digital), cash: Number(j.row.cash), combined: Number(j.row.combined) });
       }
+      // Opening cash (question 9) comes from the petty cash float the opening staff accepted today.
+      if (!j.row || ['draft', 'reopened'].includes(j.row.status)) {
+        const f = await supabase.rpc('petty_float_today');
+        const amt = Number(f.data);
+        if (!f.error && amt > 0) setD((x) => (String(x.open ?? '').trim() === '' ? { ...x, open: String(amt) } : x));
+      }
       setLoaded(true);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps

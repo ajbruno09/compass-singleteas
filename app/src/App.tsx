@@ -64,13 +64,15 @@ import { KeepReady } from './pages/KeepReady';
 import { SalesEntry } from './pages/SalesEntry';
 import { ClosingWizard } from './pages/ClosingWizard';
 import { ClosingReports } from './pages/ClosingReports';
+import { PettyCash } from './pages/PettyCash';
+import { PettyReceived } from './pages/PettyReceived';
 import { Brand } from './components/Brand';
 import { AvatarButton } from './components/AvatarButton';
 import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/messages': <MessagesPage />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/buying-setup': <BuyingSetup />, '/data-check': <DataCheck />, '/keep-ready': <KeepReady />, '/store-levels': <StoreLevels />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/shelves': <Shelves />, '/price-check': <PriceCheck />, '/bill-spend': <BillSpend />, '/team-usage': <TeamUsage />, '/counter-sales': <CounterSales />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/gas': <Gas />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/maint-requests': <MaintRequests />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/count-frequency': <CountFrequency />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />, '/closing-reports': <ClosingReports />, '/closing-wizard': <ClosingWizard />
+  '/': <Dashboard />, '/messages': <MessagesPage />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/buying-setup': <BuyingSetup />, '/data-check': <DataCheck />, '/keep-ready': <KeepReady />, '/store-levels': <StoreLevels />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/shelves': <Shelves />, '/price-check': <PriceCheck />, '/bill-spend': <BillSpend />, '/team-usage': <TeamUsage />, '/counter-sales': <CounterSales />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/gas': <Gas />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/maint-requests': <MaintRequests />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/count-frequency': <CountFrequency />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />, '/closing-reports': <ClosingReports />, '/petty-cash': <PettyCash />, '/closing-wizard': <ClosingWizard />
 };
 
 // After signing in, people with more than one app choose which to open. Once per visit.
@@ -142,6 +144,7 @@ function Gate() {
         <Route path="/indent" element={<IndentPage />} />
         <Route path="/closing" element={<ClosingHub />} />
         <Route path="/closing-wizard" element={<ClosingWizard />} />
+        <Route path="/petty-received" element={<PettyReceived />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/count" element={<CountPage />} />
         <Route path="/received" element={<ReceivedPage />} />
