@@ -121,7 +121,7 @@ export function ClosingReports() {
   return (
     <>
       <div className="pagehead">
-        <div><p className="label">Money</p><h1>Daily closing</h1></div>
+        <div><p className="label">Finance &amp; Accounts</p><h1>POS Daily Closing</h1></div>
         {canDo && <button className="btn primary" onClick={() => nav('/closing-wizard')}>Do tonight's closing</button>}
       </div>
       <p className="muted">Each night's cash and POS check. Open a report to verify or flag it.</p>
