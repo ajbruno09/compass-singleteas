@@ -173,3 +173,6 @@ update public.goods_receipts set bill_exempt = true, bill_later = false where ve
 -- v5.143 (applied directly): stock_counts.late (daily count after 1:00 AM next day, set in submit_count);
 -- pos_ingest and pos_save_summary ignore a report for a business day that is not closed yet (only the report after 3:00 AM counts);
 -- indent_expected_counters skips personal locations (Home); Kitchen General and FOH General items counted weekly.
+
+-- v5.143 (applied directly): weekly_report_send(p_dry) sends each person a private notice and the owner a summary;
+-- pg_cron job 'weekly-counter-report' runs it Saturdays 16:45 IST (11:15 UTC), covering the 7 business days up to Friday.
