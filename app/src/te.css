@@ -2,6 +2,9 @@
 .te{color:var(--ink);font:var(--fb);-webkit-font-smoothing:antialiased}
 .te{--bg:#EDF2EE;--card:#fff;--ink:#10231B;--mut:#5D6F66;--line:#DCE5DF;--acc:#1F6B4A;--acc2:#C99A2E;--good:#1F7A4F;--warn:#B77A00;--bad:#C23B2B;--goods:#E3F1E9;--warns:#FBF0D5;--bads:#FBE4E0;--r:16px;--sh:0 1px 2px rgba(16,35,27,.05);--fh:'Manrope','Inter',system-ui,sans-serif;--fb:500 14px/1.45 'Manrope','Inter',system-ui,sans-serif;--fn:'Manrope','Inter',system-ui,sans-serif;--hero:#0F3B28;--heroink:#F2F7F4}
 .te h2{font:700 15px var(--fh)}
+/* The dashboard cards are always light, so chips that use the app's sunken colour must stay light in dark mode too */
+.te{--sunken:#EEF1EF}
+@media (prefers-color-scheme: dark){.te .mhead h2,.te .sec>h2{color:#E8EFEA}}
 .te .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;box-shadow:var(--sh)}
 .te .sec{margin-top:16px}
 .te .sec>h2{margin:0 0 9px}
