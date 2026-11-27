@@ -92,7 +92,7 @@ export function People() {
                 <td className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{p.photo ? <img src={p.photo} alt="" width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} /> : <span className="avatar">{(p.full_name || '?')[0]}</span>}<strong>{p.full_name || p.email}</strong></td>
                 <td className="num small">{p.phone ?? '—'}</td>
                 <td>{ROLE_LABEL[p.role]}</td>
-                <td className="small">{p.profile_locations.filter((l) => l.location_id !== GRAVY_SHELF).map((l) => locName(l.location_id)).join(', ') || '—'}</td>
+                <td className="small">{p.profile_locations.filter((l) => l.location_id !== GRAVY_SHELF).map((l) => locName(l.location_id)).join(', ') || (p.role === 'closing_staff' ? 'POS' : '—')}</td>
                 <td className="small">{p.extra_language ? LANGUAGES[p.extra_language] ?? p.extra_language : '—'}</td>
                 <td>{!p.active ? <span className="chip off">No access</span> : (() => { const st = presence(p); return <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }} title={st.label}><span aria-hidden style={{ width: 11, height: 11, borderRadius: '50%', background: LIGHT[st.tone], boxShadow: st.tone === 'on' ? '0 0 0 4px rgba(31,157,85,.2)' : 'none', flex: 'none' }} /><span className="small">{st.label}</span></span>; })()}</td>
                 <td className="row" style={{ gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>{isOwner && (p.role === 'owner' ? <button className="btn secondary" onClick={(e) => { e.stopPropagation(); setMyPin(true); }}>Change my PIN</button> : <>
