@@ -141,6 +141,7 @@ function Gate() {
         <Route path="/" element={<StaffHome />} />
         <Route path="/indent" element={<IndentPage />} />
         <Route path="/closing" element={<ClosingHub />} />
+        <Route path="/closing-wizard" element={<ClosingWizard />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/count" element={<CountPage />} />
         <Route path="/received" element={<ReceivedPage />} />
@@ -161,6 +162,7 @@ function Gate() {
       <Route element={<Layout><Outlet /></Layout>}>
         <Route path="/" element={<Home several={several} />} />
         {allowed.filter((n) => n.to !== '/').map((n) => <Route key={n.to} path={n.to} element={PAGES[n.to]} />)}
+        <Route path="/closing-wizard" element={<ClosingWizard />} />
       </Route>
       <Route path="/count" element={<CountPage />} />
       <Route path="/received" element={<ReceivedPage />} />

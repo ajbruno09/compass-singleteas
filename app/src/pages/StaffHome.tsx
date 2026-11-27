@@ -25,6 +25,8 @@ export function StaffHome() {
   const ids = myLocations.map((l) => l.id);
   const [loc, setLoc] = useState(getCounter(ids));
   const [gasDuty, setGasDuty] = useState(false);
+  const [posDuty, setPosDuty] = useState(false);
+  useEffect(() => { if (!profile) return; void supabase.from('duty_people').select('duty').eq('profile_id', profile.id).eq('duty', 'pos_closing').then(({ data }) => setPosDuty(!!data?.length)); }, [profile]);
   useEffect(() => { if (!profile) return; void supabase.from('duty_people').select('duty').eq('profile_id', profile.id).eq('duty', 'gas_weigh').then(({ data }) => setGasDuty(!!data?.length)); }, [profile]);
   const [status, setStatus] = useState<Record<number, IndentRec>>({});
   const [date, setDate] = useState('');
@@ -130,6 +132,7 @@ export function StaffHome() {
         if (weeklyLeft.length) rows.push({ k: 'wc', e: 'cal', label: 'Do weekly closing', cls: 'late', go: () => nav('/closing'),
           chip: many ? `${weeklyLeft.length} left` : 'Due today', sub: many ? names(weeklyLeft) : undefined });
         if (toConfirm > 0) rows.push({ k: 'rc', e: 'inbox', label: 'Confirm items from the store', cls: 'late', go: () => nav(`/received?loc=${myLocations.find((l) => (waiting[l.id] || 0) > 0)?.id ?? loc}`), chip: `${toConfirm} to confirm` });
+        if (posDuty) rows.push({ k: 'pos', e: 'moon', label: 'POS Daily Closing', cls: 'due', go: () => nav('/closing-wizard'), chip: 'On the POS computer', sub: 'Cash and sales check for the day' });
         if (gasDuty) rows.push({ k: 'gas', e: 'box', label: 'Weigh LPG', cls: 'due', go: () => nav('/gas'), chip: 'Tonight', sub: 'Both cylinders, with a photo of each' });
         if (!rows.length) return <div className="card"><span className="lbl"><Icon name="check" size={20} /> Nothing to do right now. All done.</span></div>;
         return (

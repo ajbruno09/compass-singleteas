@@ -29,7 +29,9 @@ export function ClosingReports() {
   const [acc, setAcc] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const canDo = profile?.role === 'owner' || profile?.role === 'manager';
+  const [duty, setDuty] = useState(false);
+  useEffect(() => { if (!profile) return; void supabase.from('duty_people').select('duty').eq('profile_id', profile.id).eq('duty', 'pos_closing').then(({ data }) => setDuty(!!data?.length)); }, [profile]);
+  const canDo = profile?.role === 'owner' || profile?.role === 'manager' || duty;
 
   async function load() {
     const { data, error } = await supabase.rpc('closing_list', { p_limit: 60 });

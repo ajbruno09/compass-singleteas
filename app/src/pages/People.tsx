@@ -121,6 +121,8 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
   const [locs, setLocs] = useState<number[]>(person?.profile_locations.map((l) => l.location_id) ?? []);
   const [active, setActive] = useState(person?.active ?? true);
   const [gasDuty, setGasDuty] = useState(false);
+  const [posDuty, setPosDuty] = useState(false);
+  useEffect(() => { if (!person) return; void supabase.from('duty_people').select('duty').eq('profile_id', person.id).eq('duty', 'pos_closing').then(({ data }) => setPosDuty(!!data?.length)); }, [person]);
   useEffect(() => { if (!person) return; void supabase.from('duty_people').select('duty').eq('profile_id', person.id).eq('duty', 'gas_weigh').then(({ data }) => setGasDuty(!!data?.length)); }, [person]);
   const [pin, setPin] = useState('');
   const [food, setFood] = useState('');
@@ -161,6 +163,7 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
         const del = await supabase.from('profile_locations').delete().eq('profile_id', person.id); if (del.error) throw del.error;
         if (locs.length) { const ins = await supabase.from('profile_locations').insert(locs.map((l) => ({ profile_id: person.id, location_id: l }))); if (ins.error) throw ins.error; }
         if (gasDuty) { const d = await supabase.from('duty_people').upsert({ duty: 'gas_weigh', profile_id: person.id }); if (d.error) throw d.error; } else { const d = await supabase.from('duty_people').delete().eq('duty', 'gas_weigh').eq('profile_id', person.id); if (d.error) throw d.error; }
+        if (posDuty) { const d = await supabase.from('duty_people').upsert({ duty: 'pos_closing', profile_id: person.id }); if (d.error) throw d.error; } else { const d = await supabase.from('duty_people').delete().eq('duty', 'pos_closing').eq('profile_id', person.id); if (d.error) throw d.error; }
         if (pin) { if (!/^[0-9]{6}$/.test(pin)) throw new Error('A new PIN must be 6 digits.'); await callAdmin({ action: 'reset_pin', user_id: person.id, pin }); }
         toast('Saved');
         if (pin && person.phone) { onSaved({ name: name.trim(), phone: person.phone, lang, pin }); return; }
@@ -200,6 +203,7 @@ function PersonForm({ person, onClose, onSaved }: { person: Person | null; onClo
       {person && person.photo && <button className="btn secondary" style={{ justifySelf: 'start' }} onClick={async () => { await supabase.rpc('clear_photo', { p_user: person.id }); toast('Photo cleared. They will take a new one.'); onSaved(); }}>Clear photo so they retake it</button>}
       {person && <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Can sign in</label>}
       {person && <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={gasDuty} onChange={(e) => setGasDuty(e.target.checked)} /><span>Weighs the gas cylinders at night<span className="small muted" style={{ display: 'block' }}>They will see the cylinders issued to their counters on their phone.</span></span></label>}
+      {person && !['owner', 'manager', 'closing_staff'].includes(role) && <label className="row" style={{ gap: 10 }}><input type="checkbox" checked={posDuty} onChange={(e) => setPosDuty(e.target.checked)} /><span>Can do POS closing<span className="small muted" style={{ display: 'block' }}>They can do the daily closing on the POS computer, as well as their own work.</span></span></label>}
       {error && <p className="banner bad" role="alert">{error}</p>}
       {person && person.role !== 'owner' && isOwnerMe && (
         <div className="card" style={{ display: 'grid', gap: 8 }}>

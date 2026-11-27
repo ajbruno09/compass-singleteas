@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { useToast } from '../components/Toast';
+import { isPhone } from './Install';
 import '../closing.css';
 
 // Daily closing wizard: 25 questions, one per screen. Moved from the separate Daily Closing app. Same questions, order and rules.
@@ -169,6 +170,9 @@ export function ClosingWizard() {
     toast('Sent. Waiting for approval.');
   }
 
+  if (isPhone() && profile?.role !== 'owner' && profile?.role !== 'manager') {
+    return <div className="cw"><div className="cw-card"><div className="cw-body cw-center"><div className="cw-q">Please use the POS computer</div><p className="cw-hint">The daily closing is done on the POS computer only.</p><button className="cw-btn" onClick={() => nav('/')}>Back</button></div></div></div>;
+  }
   if (!loaded) return <div className="cw"><div className="cw-card"><p className="muted" style={{ padding: 20 }}>Loading…</p></div></div>;
 
   const locked = status === 'submitted' || status === 'reopen_requested' || status === 'verified' || status === 'flagged';

@@ -168,3 +168,11 @@ begin
   if not public.has_role('owner','manager','accounts') then raise exception 'Not allowed'; end if;
   return query select * from public.daily_closings order by business_date desc limit greatest(p_limit,1);
 end $$;
+
+-- Any person can also be given POS closing with the "Can do POS closing" tick in People (duty_people, duty = 'pos_closing').
+create or replace function public.closing_can_do() returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.has_role('owner','manager','closing_staff')
+      or exists (select 1 from public.duty_people d join public.profiles p on p.id = d.profile_id
+                 where d.duty = 'pos_closing' and d.profile_id = auth.uid() and p.active);
+$$;

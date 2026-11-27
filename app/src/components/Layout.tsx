@@ -64,7 +64,9 @@ export const NAV: NavItem[] = [
 export function Layout({ children }: { children: ReactNode }) {
   const { profile, signOut } = useSession();
   useUsagePing(!!profile);
-  const nav = NAV.filter((n) => profile && n.roles.includes(profile.role));
+  const [posDuty, setPosDuty] = useState(false);
+  useEffect(() => { if (!profile) return; void supabase.from('duty_people').select('duty').eq('profile_id', profile.id).eq('duty', 'pos_closing').then(({ data }) => setPosDuty(!!data?.length)); }, [profile?.id]);
+  const nav: NavItem[] = [...NAV.filter((n) => profile && n.roles.includes(profile.role)), ...(posDuty && profile && ['store', 'accounts'].includes(profile.role) ? [{ to: '/closing-wizard', label: 'Do POS closing', icon: 'moon', roles: [] as Role[], group: 'Finance & Accounts' }] : [])];
   const navigate = useNavigate();
   const loc = useLocation();
   const [me, setMe] = useState(false);
