@@ -43,6 +43,28 @@ export function Welcome({ onAgree }: { onAgree: () => void }) {
   const x = TEXT[lang === 'hi' ? 'hi' : 'en'];
   function pick(l: '' | 'hi') { setLang(l); try { localStorage.setItem(welcomeLangKey(uid), l); } catch { /* ignore */ } }
   function agree() { try { localStorage.setItem(welcomeKey(uid), '1'); } catch { /* ignore */ } onAgree(); }
+  if (profile?.role === 'closing_staff') {
+    // POS closing staff get their own welcome: what the closing screen is, not the counter staff one.
+    return (
+      <div className="setup"><div className="box">
+        <Brand />
+        <span className="chip done" style={{ justifySelf: 'start', letterSpacing: '.06em', fontSize: 11 }}>INTERNAL OPERATIONS</span>
+        <h1>Daily Closing &amp; Reconciliation</h1>
+        <p className="muted">Hi{first ? `, ${first}` : ''}.</p>
+        <p>End-of-day POS reconciliation, cash variance tracking, and multi-role report verification, all in one place.</p>
+        <ul className="stack">
+          <li>Guided conversational closing wizard</li>
+          <li>Automatic cash &amp; digital variance computation</li>
+          <li>Outstanding bill register &amp; collections</li>
+          <li>Accounts verification and Management review workflow</li>
+        </ul>
+        <p>Before you start, you need to set up your profile. It takes only a few minutes.</p>
+        <button className="btn primary" style={{ fontSize: 18, padding: '16px 20px' }} onClick={agree}>I agree</button>
+        <button className="btn secondary" onClick={signOut}>Not now</button>
+        <p className="small muted">Internal use only. Single Teas Operations.</p>
+      </div></div>
+    );
+  }
   const line = (parts: readonly string[]) => parts.map((p, i) => (i % 2 === 1 ? <b key={i}>{p}</b> : p));
   return (
     <div className="setup"><div className="box">
