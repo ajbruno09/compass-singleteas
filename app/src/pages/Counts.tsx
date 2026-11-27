@@ -6,7 +6,7 @@ import { qty as fmtQty } from '../lib/format';
 import { timeOf } from '../lib/ist';
 
 interface Item { id: number; name: string; unit: string }
-interface CountRow { id: string; location_id: number; status: string; submitted_at: string | null; stock_count_lines: { item_id: number; qty: number; expected: number | null }[] }
+interface CountRow { id: string; location_id: number; status: string; submitted_at: string | null; late?: boolean; stock_count_lines: { item_id: number; qty: number; expected: number | null }[] }
 
 export function Counts() {
   const { locations } = useSession();
@@ -27,7 +27,7 @@ export function Counts() {
   }, []);
   const load = useCallback(async () => {
     if (!day) return;
-    const { data } = await supabase.from('stock_counts').select('id, location_id, status, submitted_at, stock_count_lines(item_id, qty, expected)').eq('business_date', day).in('frequency', ['daily', 'weekly', 'monthly']).order('frequency');
+    const { data } = await supabase.from('stock_counts').select('id, location_id, status, submitted_at, late, stock_count_lines(item_id, qty, expected)').eq('business_date', day).in('frequency', ['daily', 'weekly', 'monthly']).order('frequency');
     setRows((data as CountRow[]) ?? []);
   }, [day]);
   useEffect(() => { void load(); const p = window.setInterval(() => { void load(); }, 30000); return () => window.clearInterval(p); }, [load]);
@@ -45,7 +45,7 @@ export function Counts() {
         const open = openId === l.id + (r?.id ?? '');
         return <div key={l.id} className="card">
           <div className="row" style={{ justifyContent: 'space-between', cursor: sent ? 'pointer' : 'default' }} onClick={() => sent && setOpenId(open ? '' : l.id + r!.id)}>
-            <div><b>{l.name}</b> {sent && <span className="muted small">· {r!.stock_count_lines.length} items · {timeOf(r!.submitted_at)}</span>}</div>
+            <div><b>{l.name}</b> {sent && <span className="muted small">· {r!.stock_count_lines.length} items · {timeOf(r!.submitted_at)}</span>} {sent && r!.late && <span className="chip late">Late, after 1:00 AM</span>}</div>
             <div className="row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               {l.id !== 1 && (wo.sunday ? <span className="chip off">Weekly day</span> : <button className={'btn small ' + (wOn ? 'secondary' : '')} onClick={(e) => { e.stopPropagation(); void toggleWeekly(l.id, !wo.locations.includes(l.id) && !wOn); }}>{wOn ? 'Weekly open · turn off' : 'Open weekly count today'}</button>)}
               {l.id !== 1 && (mo.first_of_month ? <span className="chip off">Monthly day</span> : <button className={'btn small ' + (mOn ? 'secondary' : '')} onClick={(e) => { e.stopPropagation(); void toggleMonthly(l.id, !mo.locations.includes(l.id) && !mOn); }}>{mOn ? 'Monthly open · turn off' : 'Open monthly count today'}</button>)}

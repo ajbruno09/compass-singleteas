@@ -77,7 +77,7 @@ export function Bills() {
                   <td className="r num" style={{ fontWeight: Number(r.balance) > 0 ? 700 : 400 }}>{money2(r.balance)}</td>
                   <td><span className={`chip ${chip}`}>{r.payment_status}</span></td>
                   <td className="num small" style={{ color: overdue ? 'var(--critical)' : undefined, fontWeight: overdue ? 700 : 400 }}>{r.due_date ? date(r.due_date) : '—'}</td>
-                  {canPay && <td>{Number(r.balance) > 0 && <button className="btn secondary" onClick={() => setPaying(r)}>Record payment</button>}</td>}
+                  {canPay && <td></td>}
                 </tr>
               );
             })}

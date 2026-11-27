@@ -14,7 +14,9 @@ export function PosTotal({ date }: { date?: string }) {
   if (!days) return null;
   const want = date ?? pick;
   const d = (want ? days.find((x) => x.business_date === want) : days[0]) ?? null;
-  if (!d) return date ? <div className="card muted" style={{ maxWidth: 460, marginBottom: 12 }}>No POS total for this day yet. It arrives with the morning report email.</div> : null;
+  if (!d) return date ? <div className="card muted" style={{ maxWidth: 460, marginBottom: 12 }}>Waiting for sales. The day counts only from the report that arrives after 3:00 AM.</div> : null;
+  const istYesterday = new Date(Date.now() + 330 * 60000 - 86400000).toISOString().slice(0, 10);
+  const waiting = !date && d.business_date < istYesterday;
   const gst = Number(d.cgst ?? 0) + Number(d.sgst ?? 0);
   const rows: [string, number | null][] = [['Net sales', d.net_sales], ['Container charge', d.container_charge], ['GST (CGST + SGST)', gst], ['Round off', d.round_off]];
   const pays = Object.entries(d.payments ?? {}).filter(([, v]) => Number(v) !== 0);
@@ -25,6 +27,7 @@ export function PosTotal({ date }: { date?: string }) {
         <div style={{ fontSize: 30 }} className="num">{rs(d.grand_total)}</div>
         {d.orders != null && <div className="small muted" style={{ paddingBottom: 6 }}>{d.orders} orders</div>}
       </div>
+      {waiting && <div className="small muted" style={{ marginTop: 4 }}>Waiting for yesterday's sales. Only the report after 3:00 AM counts.</div>}
       <table style={{ width: '100%', marginTop: 6 }}><tbody>
         {rows.map(([k, v]) => (v == null || (Number(v) === 0 && k !== 'Net sales')) ? null : <tr key={k}><td className="muted">{k}</td><td className="r num">{rs(Number(v))}</td></tr>)}
       </tbody></table>

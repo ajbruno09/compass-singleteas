@@ -169,3 +169,7 @@ update public.goods_receipts set bill_exempt = true, bill_later = false where ve
 
 -- v5.139: Needs attention is collapsible with a count, shows ageing, and items open more than 5 days can be sent to the owner to drop.
 -- alerts: drop_status (asked|dropped|kept), drop_reason, drop_asked_at, drop_asked_by, drop_note. Functions alert_ask_drop (store, manager, owner) and alert_decide_drop (owner only). Applied directly.
+
+-- v5.143 (applied directly): stock_counts.late (daily count after 1:00 AM next day, set in submit_count);
+-- pos_ingest and pos_save_summary ignore a report for a business day that is not closed yet (only the report after 3:00 AM counts);
+-- indent_expected_counters skips personal locations (Home); Kitchen General and FOH General items counted weekly.
