@@ -1,4 +1,4 @@
-export type Role = 'owner' | 'manager' | 'store' | 'department' | 'closing' | 'accounts';
+export type Role = 'owner' | 'manager' | 'store' | 'department' | 'closing' | 'closing_staff' | 'accounts';
 export interface Profile { id: string; full_name: string; phone: string | null; email: string | null; role: Role; extra_language: string | null; active: boolean; photo?: string | null; setup_done_at?: string | null; }
 export interface Location { id: number; code: string; name: string; kind: 'store' | 'department'; sort: number; active: boolean; personal?: boolean; }
 export interface Category { id: number; code: string; name: string; sort: number; }
@@ -24,7 +24,7 @@ export interface BillRow {
   amount: number; status: string; paid: number; balance: number; payment_status: string; due_date: string | null;
 }
 export const ROLE_LABEL: Record<Role, string> = {
-  owner: 'Owner', manager: 'Manager', store: 'Store', department: 'Department staff', closing: 'Closing manager', accounts: 'Accounts'
+  owner: 'Owner', manager: 'Manager', store: 'Store', department: 'Department staff', closing: 'Closing manager', closing_staff: 'Closing staff', accounts: 'Accounts'
 };
 export const LANGUAGES: Record<string, string> = {
   hi: 'हिंदी (Hindi)', as: 'অসমীয়া (Assamese)', bn: 'বাংলা (Bengali)', kn: 'ಕನ್ನಡ (Kannada)', ta: 'தமிழ் (Tamil)',

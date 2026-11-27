@@ -7,7 +7,7 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
 const DOMAIN = 'staff.singleteas.local';
-const ROLES = ['manager', 'store', 'department', 'closing', 'accounts'];
+const ROLES = ['manager', 'store', 'department', 'closing', 'closing_staff', 'accounts'];
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
 Deno.serve(async (req) => {

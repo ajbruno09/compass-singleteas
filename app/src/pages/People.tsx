@@ -33,7 +33,7 @@ function inviteText(t: InviteTarget): string {
   }
   return `Hi ${first}, welcome to Compass, the Single Teas app.\n\nOpen this link: ${link}\n\nSign in with your mobile number ${t.phone}${t.pin ? `. Your PIN is ${t.pin}` : ' and your PIN'}.\n\nTip: tap the browser menu and choose Add to Home Screen, so it opens like an app.`;
 }
-const STAFF_ROLES: Role[] = ['department', 'store', 'closing', 'accounts', 'manager'];
+const STAFF_ROLES: Role[] = ['department', 'store', 'closing', 'closing_staff', 'accounts', 'manager'];
 
 async function callAdmin(body: Record<string, unknown>) {
   async function once() {

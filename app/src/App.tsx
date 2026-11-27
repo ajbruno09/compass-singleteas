@@ -62,11 +62,15 @@ import { OpenInChrome, inAppBrowser } from './pages/OpenInChrome';
 import { OfflineBar } from './components/OfflineBar';
 import { KeepReady } from './pages/KeepReady';
 import { SalesEntry } from './pages/SalesEntry';
+import { ClosingWizard } from './pages/ClosingWizard';
+import { ClosingReports } from './pages/ClosingReports';
+import { Brand } from './components/Brand';
+import { AvatarButton } from './components/AvatarButton';
 import { LockGate } from './components/BioLock';
 import { appsFor } from './lib/apps';
 
 const PAGES: Record<string, JSX.Element> = {
-  '/': <Dashboard />, '/messages': <MessagesPage />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/buying-setup': <BuyingSetup />, '/data-check': <DataCheck />, '/keep-ready': <KeepReady />, '/store-levels': <StoreLevels />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/shelves': <Shelves />, '/price-check': <PriceCheck />, '/bill-spend': <BillSpend />, '/team-usage': <TeamUsage />, '/counter-sales': <CounterSales />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/gas': <Gas />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/maint-requests': <MaintRequests />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/count-frequency': <CountFrequency />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />
+  '/': <Dashboard />, '/messages': <MessagesPage />, '/indents': <Indents />, '/buying': <Buying />, '/items': <Items />, '/buying-setup': <BuyingSetup />, '/data-check': <DataCheck />, '/keep-ready': <KeepReady />, '/store-levels': <StoreLevels />, '/menu': <MenuItems />, '/rules': <Rules />, '/counters': <Counters />, '/shelves': <Shelves />, '/price-check': <PriceCheck />, '/bill-spend': <BillSpend />, '/team-usage': <TeamUsage />, '/counter-sales': <CounterSales />, '/reasons': <IndentReasons />, '/scorecard': <Scorecard />, '/schedules': <Schedules />, '/notices': <Notices />, '/stock': <OpeningStock />, '/upload': <Upload />, '/recipes': <Recipes />, '/production': <Production />, '/gas': <Gas />, '/photos': <Photos />, '/inventory': <Inventory />, '/maintenance': <Maintenance />, '/maint-requests': <MaintRequests />, '/receive': <Receive />, '/issue': <Issue />, '/sos': <SosPage />, '/stockview': <StockView />, '/counts': <Counts />, '/count-frequency': <CountFrequency />, '/vendors': <Vendors />, '/bills': <Bills />, '/people': <People />, '/sales': <SalesEntry />, '/closing-reports': <ClosingReports />, '/closing-wizard': <ClosingWizard />
 };
 
 // After signing in, people with more than one app choose which to open. Once per visit.
@@ -112,6 +116,15 @@ function Gate() {
     );
   }
   if (!profile.setup_done_at) return <FirstRun uid={profile.id} owner={profile.role === 'owner'} />;
+  if (profile.role === 'closing_staff') {
+    // Closing staff see only the closing screen.
+    return (
+      <LockGate>
+        <div className="cw-top"><Brand size={26} /><div className="row" style={{ gap: 6 }}><AvatarButton /><button className="btn quiet" onClick={signOut}>Sign out</button></div></div>
+        <Routes><Route path="/profile" element={<ProfilePage />} /><Route path="*" element={<ClosingWizard />} /></Routes>
+      </LockGate>
+    );
+  }
   if (profile.role === 'department' || profile.role === 'closing') {
     return (
       <LockGate><Routes><Route element={<StaffShell />}>

@@ -45,6 +45,7 @@ export const NAV: NavItem[] = [
   { to: '/maint-requests', label: 'Maintenance requests', icon: 'wrench', roles: ['owner', 'manager', 'store', 'accounts'], group: 'Maintenance' },
   { to: '/maintenance', label: 'Jobs and schedules', icon: 'clock', roles: ['owner', 'manager', 'store'], group: 'Maintenance' },
   { to: '/stock', label: 'Opening stock', icon: 'clip', roles: ['owner', 'store'], group: 'Stock' },
+  { to: '/closing-reports', label: 'Daily closing (new)', icon: 'moon', roles: ['owner', 'manager', 'accounts'], group: 'Buying and money' },
   { to: '/sales', label: 'Daily sales', icon: 'receipt', roles: ['owner', 'manager', 'accounts'], group: 'Buying and money' },
   { to: '/vendors', label: 'Vendors', icon: 'truck', roles: ['owner', 'manager', 'store', 'accounts'], group: 'Buying and money' },
   { to: '/bills', label: 'Bills and payments', icon: 'receipt', roles: ['owner', 'manager', 'accounts'], group: 'Buying and money' },
