@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/session';
 import { useToast } from '../components/Toast';
@@ -101,6 +101,8 @@ export function ClosingWizard() {
   const { profile } = useSession();
   const toast = useToast();
   const nav = useNavigate();
+  const [sp] = useSearchParams();
+  const pd = /^\d{4}-\d{2}-\d{2}$/.test(sp.get('d') ?? '') && profile?.role === 'owner' ? sp.get('d') : null;
   const [d, setD] = useState<CD>(blank());
   const [step, setStep] = useState(0);
   const [editing, setEditing] = useState(false);
@@ -120,7 +122,7 @@ export function ClosingWizard() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.rpc('closing_today');
+      const { data, error } = await supabase.rpc('closing_today', { p_date: pd });
       if (error) { toast('Could not load. Please try again.'); setLoaded(true); return; }
       const j = data as { business_date: string; row: { status: Status; data: Partial<CD>; digital: number; cash: number; combined: number } | null };
       setBd(j.business_date);
@@ -150,7 +152,7 @@ export function ClosingWizard() {
     if (!dirty.current || (status !== 'none' && status !== 'draft' && status !== 'reopened')) return;
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(async () => {
-      const { error } = await supabase.rpc('closing_save', { p_data: d });
+      const { error } = await supabase.rpc('closing_save', { p_data: d, p_date: pd });
       if (!error && status === 'none') setStatus('draft');
       dirty.current = false;
     }, 700);
@@ -163,7 +165,7 @@ export function ClosingWizard() {
 
   async function submit() {
     setBusy(true);
-    const { data, error } = await supabase.rpc('closing_submit', { p_data: d });
+    const { data, error } = await supabase.rpc('closing_submit', { p_data: d, p_date: pd });
     setBusy(false);
     if (error) { toast(error.message); return; }
     setRes(data as typeof res);

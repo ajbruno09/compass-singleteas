@@ -25,6 +25,7 @@ export function ClosingReports() {
   const { profile } = useSession();
   const toast = useToast();
   const nav = useNavigate();
+  const [earlier, setEarlier] = useState('');
   const [rows, setRows] = useState<Rep[] | null>(null);
   const [open, setOpen] = useState<Rep | null>(null);
   const [acc, setAcc] = useState('');
@@ -122,7 +123,10 @@ export function ClosingReports() {
     <div className="of">
       <div className="pagehead">
         <div><p className="label">Finance &amp; Accounts</p><h1>POS Daily Closing</h1><p className="muted" style={{ margin: '2px 0 0' }}>Check each night's closing, enter your own cash count, then verify or flag it.</p></div>
-        {canDo && <button className="btn primary" onClick={() => nav('/closing-wizard')}>Do tonight's closing</button>}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {profile?.role === 'owner' && <><input type="date" value={earlier} max={new Date(Date.now() - 86400000).toISOString().slice(0, 10)} onChange={(e) => setEarlier(e.target.value)} style={{ padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8 }} /><button className="btn" disabled={!earlier} onClick={() => nav('/closing-wizard?d=' + earlier)}>Close an earlier day</button></>}
+          {canDo && <button className="btn primary" onClick={() => nav('/closing-wizard')}>Do tonight's closing</button>}
+        </div>
       </div>
       {rows === null ? <p className="muted">Loading…</p> : rows.length === 0 ? <p className="muted">No closing reports yet.</p> : (
         <div className="of-rep">
